@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -8,136 +9,77 @@ const prisma = new PrismaClient();
 
 app.use(cors());
 app.use(express.json());
-// Serve the frontend dashboard
+
+// Serve static HTML files (index.html and contact.html)
 app.use(express.static(__dirname));
+
 // ==========================================
-// ENDPOINT 1: Deduplication Check (Idempotency)
+// ENDPOINT 1: Deduplication Check
 // ==========================================
 app.post('/api/leads/check-duplicate', async (req, res) => {
   const { tenantId, eventId } = req.body;
-
   try {
-    // Look for the event ID in the database
-    const existingEvent = await prisma.webhookEvent.findUnique({
-      where: { eventId: eventId }
-    });
+    const existingEvent = await prisma.webhookEvent.findUnique({ where: { eventId } });
+    if (existingEvent) return res.json({ isDuplicate: true });
 
-    if (existingEvent) {
-      // If it exists, tell n8n to stop
-      return res.json({ isDuplicate: true });
-    }
-
-    // If it's new, save the event ID so the next attempt is blocked
-    await prisma.webhookEvent.create({
-      data: {
-        tenantId: tenantId,
-        eventId: eventId
-      }
-    });
-
-    // Tell n8n to continue
+    await prisma.webhookEvent.create({ data: { tenantId, eventId } });
     return res.json({ isDuplicate: false });
-
   } catch (error) {
-    console.error("Dedupe Error:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
 // ==========================================
-// ENDPOINT 2: Save Lead (With AI Score)
+// ENDPOINT 2: Save Lead with AI Score
 // ==========================================
 app.post('/api/leads/create', async (req, res) => {
   const { tenantId, leadId, name, email, aiScore, aiStatus, aiReason } = req.body;
-
   try {
     const newLead = await prisma.lead.create({
-      data: {
-        id: leadId, // We use the ID provided by n8n for consistency
-        tenantId: tenantId,
-        name: name,
-        email: email,
-        aiScore: parseInt(aiScore),
-        aiStatus: aiStatus,
-        aiReason: aiReason
-      }
+      data: { id: leadId, tenantId, name, email, aiScore: parseInt(aiScore), aiStatus, aiReason }
     });
-
-    console.log(`✅ Lead Saved: ${name} | Score: ${aiScore} (${aiStatus})`);
     res.json({ success: true, lead: newLead });
-
   } catch (error) {
-    console.error("Lead Save Error:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
 // ==========================================
-// ENDPOINT 3: Create Task
+// ENDPOINT 3: Create CRM Task
 // ==========================================
 app.post('/api/tasks/create', async (req, res) => {
   const { tenantId, leadId, title, priority } = req.body;
-
   try {
     const newTask = await prisma.task.create({
-      data: {
-        tenantId: tenantId,
-        leadId: leadId,
-        title: title,
-        priority: priority
-      }
+      data: { tenantId, leadId, title, priority }
     });
-
-    console.log(`📋 Task Created for Lead: ${leadId}`);
     res.json({ success: true, task: newTask });
-
   } catch (error) {
-    console.error("Task Save Error:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
-
-
 
 // ==========================================
 // ENDPOINT 4: Save AI Generated Content
 // ==========================================
 app.post('/api/content/create', async (req, res) => {
   const { tenantId, platform, topic, generatedText } = req.body;
-
   try {
     const newContent = await prisma.content.create({
-      data: {
-        tenantId: tenantId,
-        platform: platform,
-        topic: topic,
-        generatedText: generatedText,
-        status: "Draft"
-      }
+      data: { tenantId, platform, topic, generatedText, status: "Draft" }
     });
-
-    console.log(`✍️ Content Created for ${platform}: ${topic}`);
     res.json({ success: true, content: newContent });
-
   } catch (error) {
-    console.error("Content Save Error:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-
-
-
-
 // ==========================================
-// ENDPOINT 5: Get all Leads
+// ENDPOINT 5: Get All Leads (For Dashboard)
 // ==========================================
 app.get('/api/leads', async (req, res) => {
   try {
-    const leads = await prisma.lead.findMany({
-      orderBy: { createdAt: 'desc' } // Newest first
-    });
+    const leads = await prisma.lead.findMany({ orderBy: { createdAt: 'desc' } });
     res.json(leads);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch leads" });
@@ -145,35 +87,59 @@ app.get('/api/leads', async (req, res) => {
 });
 
 // ==========================================
-// ENDPOINT 6: Get all Content
+// ENDPOINT 6: Get All Content (For Dashboard)
 // ==========================================
 app.get('/api/content', async (req, res) => {
   try {
-    const content = await prisma.content.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
+    const content = await prisma.content.findMany({ orderBy: { createdAt: 'desc' } });
     res.json(content);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch content" });
   }
 });
 
+// ==========================================
+// ENDPOINT 7: Approve Content & Send to Facebook
+// ==========================================
+app.put('/api/content/:id/approve', async (req, res) => {
+  const { id } = req.params;
+  try {
+    // 1. Update the database status to Approved
+    const updatedContent = await prisma.content.update({
+      where: { id: id },
+      data: { status: "Approved" }
+    });
 
+    console.log(`✅ Content ${id} approved in database.`);
 
+    // 2. Trigger n8n to post to Facebook
+    try {
+      // PRODUCTION URL (Removed -test)
+      const n8nResponse = await fetch('http://localhost:5678/webhook/publish-facebook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postText: updatedContent.generatedText
+        })
+      });
 
+      if (n8nResponse.ok) {
+        console.log(`🚀 Sent to n8n for Facebook publishing.`);
+      } else {
+        console.error(`❌ n8n webhook failed. Status: ${n8nResponse.status}`);
+      }
+    } catch (n8nError) {
+      console.error("❌ Error reaching n8n. Is it running?", n8nError.message);
+    }
 
+    res.json({ success: true, content: updatedContent });
+  } catch (error) {
+    console.error("Approval Error:", error);
+    res.status(500).json({ error: "Failed to approve content" });
+  }
+});
 
-
-
-
-
-
-
-
-
-// Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Backend running on http://localhost:${PORT}`);
-  console.log(`Waiting for n8n webhooks...`);
 });

@@ -8,11 +8,11 @@ datasource db {
 }
 
 model Organization {
-  id    String @id @default(uuid())
-  name  String
-  leads Lead[]
-  tasks Task[]
-  contents Content[] // <-- ADD THIS LINE
+  id       String    @id @default(uuid())
+  name     String
+  leads    Lead[]
+  tasks    Task[]
+  contents Content[]
 }
 
 model WebhookEvent {
