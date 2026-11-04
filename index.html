@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MarketingFlow AI - Dashboard</title>
+    <!-- We use Tailwind CSS via CDN so you don't need to install anything -->
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-900 text-white font-sans p-8">
+    <!-- Header -->
+    <header
+      class="mb-10 border-b border-gray-700 pb-4 flex justify-between items-center"
+    >
+      <h1 class="text-3xl font-bold text-blue-400">MarketingFlow AI</h1>
+      <span
+        class="bg-green-500 text-black px-3 py-1 rounded-full text-sm font-bold"
+        >System Online</span
+      >
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <!-- Leads Section -->
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+        <h2 class="text-2xl font-semibold mb-4 text-purple-400">
+          🔥 Recent Leads (CRM)
+        </h2>
+        <div id="leads-container" class="space-y-4">
+          <p class="text-gray-400">Loading leads...</p>
+        </div>
+      </div>
+
+      <!-- Content Section -->
+      <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+        <h2 class="text-2xl font-semibold mb-4 text-green-400">
+          ✍️ AI Content Studio
+        </h2>
+        <div id="content-container" class="space-y-4">
+          <p class="text-gray-400">Loading content...</p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Fetch Leads
+      async function loadLeads() {
+        try {
+          const response = await fetch("/api/leads");
+          const leads = await response.json();
+          const container = document.getElementById("leads-container");
+
+          if (leads.length === 0) {
+            container.innerHTML =
+              '<p class="text-gray-400">No leads yet. Send a webhook to n8n!</p>';
+            return;
+          }
+
+          container.innerHTML = leads
+            .map(
+              (lead) => `
+                    <div class="bg-gray-700 p-4 rounded-md border-l-4 ${lead.aiStatus === "Hot" ? "border-red-500" : "border-blue-500"}">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-bold text-lg">${lead.name}</h3>
+                            <span class="px-2 py-1 text-xs rounded-full ${lead.aiStatus === "Hot" ? "bg-red-500" : "bg-blue-500"}">${lead.aiStatus} (${lead.aiScore})</span>
+                        </div>
+                        <p class="text-sm text-gray-300 mb-2">${lead.email || "No email provided"}</p>
+                        <p class="text-xs text-gray-400 italic">"${lead.aiReason}"</p>
+                    </div>
+                `,
+            )
+            .join("");
+        } catch (error) {
+          console.error("Error loading leads", error);
+        }
+      }
+
+      // Fetch Content
+      async function loadContent() {
+        try {
+          const response = await fetch("/api/content");
+          const content = await response.json();
+          const container = document.getElementById("content-container");
+
+          if (content.length === 0) {
+            container.innerHTML =
+              '<p class="text-gray-400">No content generated yet. Use the n8n workflow!</p>';
+            return;
+          }
+
+          container.innerHTML = content
+            .map(
+              (item) => `
+                    <div class="bg-gray-700 p-4 rounded-md border-l-4 border-green-500">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-bold text-md capitalize">${item.platform} Post</h3>
+                            <span class="px-2 py-1 bg-yellow-500 text-black text-xs rounded-full font-bold">${item.status}</span>
+                        </div>
+                        <p class="text-sm text-gray-300 whitespace-pre-wrap mb-2">${item.generatedText}</p>
+                        <p class="text-xs text-gray-500 mt-2">Topic: ${item.topic}</p>
+                    </div>
+                `,
+            )
+            .join("");
+        } catch (error) {
+          console.error("Error loading content", error);
+        }
+      }
+
+      // Load data when page opens
+      loadLeads();
+      loadContent();
+    </script>
+  </body>
+</html>

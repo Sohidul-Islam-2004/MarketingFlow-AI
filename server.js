@@ -8,7 +8,8 @@ const prisma = new PrismaClient();
 
 app.use(cors());
 app.use(express.json());
-
+// Serve the frontend dashboard
+app.use(express.static(__dirname));
 // ==========================================
 // ENDPOINT 1: Deduplication Check (Idempotency)
 // ==========================================
@@ -95,6 +96,80 @@ app.post('/api/tasks/create', async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
+
+
+
+// ==========================================
+// ENDPOINT 4: Save AI Generated Content
+// ==========================================
+app.post('/api/content/create', async (req, res) => {
+  const { tenantId, platform, topic, generatedText } = req.body;
+
+  try {
+    const newContent = await prisma.content.create({
+      data: {
+        tenantId: tenantId,
+        platform: platform,
+        topic: topic,
+        generatedText: generatedText,
+        status: "Draft"
+      }
+    });
+
+    console.log(`✍️ Content Created for ${platform}: ${topic}`);
+    res.json({ success: true, content: newContent });
+
+  } catch (error) {
+    console.error("Content Save Error:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+
+
+
+
+// ==========================================
+// ENDPOINT 5: Get all Leads
+// ==========================================
+app.get('/api/leads', async (req, res) => {
+  try {
+    const leads = await prisma.lead.findMany({
+      orderBy: { createdAt: 'desc' } // Newest first
+    });
+    res.json(leads);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch leads" });
+  }
+});
+
+// ==========================================
+// ENDPOINT 6: Get all Content
+// ==========================================
+app.get('/api/content', async (req, res) => {
+  try {
+    const content = await prisma.content.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(content);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch content" });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Start the server
 const PORT = process.env.PORT || 3000;

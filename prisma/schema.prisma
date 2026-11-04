@@ -12,6 +12,7 @@ model Organization {
   name  String
   leads Lead[]
   tasks Task[]
+  contents Content[] // <-- ADD THIS LINE
 }
 
 model WebhookEvent {
@@ -44,4 +45,15 @@ model Task {
   priority     String       @default("High")
   status       String       @default("Pending")
   createdAt    DateTime     @default(now())
+}
+
+model Content {
+  id            String       @id @default(uuid())
+  tenantId      String
+  organization  Organization @relation(fields: [tenantId], references: [id])
+  platform      String
+  topic         String
+  generatedText String
+  status        String       @default("Draft")
+  createdAt     DateTime     @default(now())
 }
