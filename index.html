@@ -6,7 +6,7 @@
     <title>MarketingFlow AI - Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Standard thin scrollbar, no lag */
+        /* Fast, lightweight scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #1e293b; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
@@ -17,32 +17,38 @@
 
     <div class="max-w-7xl mx-auto space-y-6">
         
-        <!-- Header -->
-        <header class="bg-slate-800 border border-slate-700 p-5 rounded-xl flex justify-between items-center shadow-md">
+        <!-- Header Navigation -->
+        <header class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex flex-col md:flex-row justify-between items-center shadow-md gap-4">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-xl">🤖</div>
+                <div class="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-xl shadow-lg">🤖</div>
                 <div>
                     <h1 class="text-xl font-bold text-white">MarketingFlow AI</h1>
-                    <p class="text-xs text-slate-400">Master Dashboard</p>
+                    <p class="text-xs text-slate-400">Business Command Center</p>
                 </div>
             </div>
-            <div class="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-md border border-slate-700 text-xs font-semibold text-emerald-400">
-                <span class="w-2 h-2 bg-emerald-400 rounded-full"></span>
-                System Online
+            
+            <div class="flex items-center gap-4">
+                <!-- Link to the Public Customer Form -->
+                <a href="/contact.html" target="_blank" class="text-sm font-semibold text-indigo-400 hover:text-indigo-300 transition">
+                    ↗ View Customer Form
+                </a>
+                
+                <div class="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-md border border-slate-700 text-xs font-semibold text-emerald-400">
+                    <span class="w-2 h-2 bg-emerald-400 rounded-full"></span>
+                    System Live
+                </div>
             </div>
         </header>
 
-        <!-- Main Workspace -->
+        <!-- Main Grid Workspace -->
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
             
-            <!-- ========================================== -->
-            <!-- LEFT COLUMN: LEADS (CRM)                   -->
-            <!-- ========================================== -->
+            <!-- LEFT COLUMN: LEADS (CRM) -->
             <div class="space-y-6">
                 
-                <!-- Lead Form -->
+                <!-- Lead Form (Simulation) -->
                 <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
-                    <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">📥 Capture New Lead</h2>
+                    <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">📥 Simulate New Lead</h2>
                     <form id="leadForm" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -58,7 +64,7 @@
                             <label class="block text-xs font-semibold text-slate-400 mb-1">Message</label>
                             <textarea id="leadMessage" required rows="2" placeholder="I need a marketing tool. Budget is $5000." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition resize-none"></textarea>
                         </div>
-                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg transition text-sm">
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg transition text-sm shadow-md">
                             Send Lead to AI
                         </button>
                     </form>
@@ -73,9 +79,7 @@
                 </div>
             </div>
 
-            <!-- ========================================== -->
-            <!-- RIGHT COLUMN: CONTENT (MARKETING)          -->
-            <!-- ========================================== -->
+            <!-- RIGHT COLUMN: CONTENT (MARKETING) -->
             <div class="space-y-6">
                 
                 <!-- Content Form -->
@@ -84,7 +88,7 @@
                     <form id="contentForm" class="space-y-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-xs font-semibold text-slate-400 mb-1">Platform</label>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">Target Platform</label>
                                 <select id="contentPlatform" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
                                     <option value="Facebook">Facebook</option>
                                     <option value="Instagram">Instagram</option>
@@ -92,17 +96,17 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-slate-400 mb-1">Topic</label>
+                                <label class="block text-xs font-semibold text-slate-400 mb-1">Core Topic</label>
                                 <input type="text" id="contentTopic" required placeholder="e.g., 50% off summer sale" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
                             </div>
                         </div>
-                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-lg transition text-sm">
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-lg transition text-sm shadow-md">
                             Generate Post with AI
                         </button>
                     </form>
                 </div>
 
-                <!-- Content List -->
+                <!-- Content List & Approval -->
                 <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
                     <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">📝 AI Content Studio</h2>
                     <div id="content-container" class="space-y-3 max-h-[400px] overflow-y-auto pr-1">
@@ -143,13 +147,14 @@
                     body: JSON.stringify(payload)
                 });
                 
+                // Wait 2 seconds for n8n to process and save to MySQL, then reload the list
                 setTimeout(() => {
                     loadLeads();
                     this.reset();
                     btn.innerText = originalText;
                     btn.disabled = false;
                     btn.classList.remove('opacity-75');
-                }, 2000); // Wait 2s for n8n to process
+                }, 2000);
             } catch (error) {
                 alert("Error: Make sure n8n is running and workflows are Published.");
                 btn.innerText = originalText;
@@ -183,13 +188,14 @@
                     body: JSON.stringify(payload)
                 });
                 
+                // Wait 3 seconds for AI to generate, then reload the list
                 setTimeout(() => {
                     loadContent();
                     this.reset();
                     btn.innerText = originalText;
                     btn.disabled = false;
                     btn.classList.remove('opacity-75');
-                }, 3000); // Wait 3s for AI to generate
+                }, 3000);
             } catch (error) {
                 alert("Error: Make sure n8n is running and workflows are Published.");
                 btn.innerText = originalText;
@@ -267,9 +273,9 @@
                             <p class="text-xs text-slate-300 whitespace-pre-wrap mb-3">${item.generatedText}</p>
                             
                             <div class="flex justify-between items-center border-t border-slate-700 pt-3">
-                                <p class="text-[10px] text-slate-500">Topic: ${item.topic}</p>
+                                <p class="text-[10px] text-slate-500 truncate max-w-[150px]">Topic: ${item.topic}</p>
                                 ${item.status === 'Draft' 
-                                    ? `<button onclick="approveContent('${item.id}')" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-1 px-3 rounded transition">Approve & Post</button>` 
+                                    ? `<button onclick="approveContent('${item.id}')" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-1 px-3 rounded transition shadow-sm">Approve & Post</button>` 
                                     : `<span class="text-emerald-400 text-xs font-bold">✓ Published</span>`
                                 }
                             </div>
@@ -287,16 +293,16 @@
             try {
                 const response = await fetch(`/api/content/${id}/approve`, { method: 'PUT' });
                 if (response.ok) {
-                    loadContent(); // Refresh the list immediately
+                    loadContent(); // Refresh the list immediately to show "Published"
                 } else {
-                    alert("Failed to approve. Check your Node.js terminal.");
+                    alert("Failed to approve. Check your Node.js terminal for errors.");
                 }
             } catch (error) {
                 console.error("Error:", error);
             }
         }
 
-        // Load data on page start
+        // Run initial load
         loadLeads();
         loadContent();
     </script>
