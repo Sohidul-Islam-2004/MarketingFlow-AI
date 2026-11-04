@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id    String @id @default(uuid())
+  name  String
+  leads Lead[]
+  tasks Task[]
+}
+
+model WebhookEvent {
+  id        String   @id @default(uuid())
+  tenantId  String
+  eventId   String   @unique
+  createdAt DateTime @default(now())
+}
+
+model Lead {
+  id           String       @id @default(uuid())
+  tenantId     String
+  organization Organization @relation(fields: [tenantId], references: [id])
+  name         String
+  email        String?
+  aiScore      Int          @default(0)
+  aiStatus     String       @default("Cold")
+  aiReason     String?
+  createdAt    DateTime     @default(now())
+  tasks        Task[]
+}
+
+model Task {
+  id           String       @id @default(uuid())
+  tenantId     String
+  organization Organization @relation(fields: [tenantId], references: [id])
+  leadId       String
+  lead         Lead         @relation(fields: [leadId], references: [id])
+  title        String
+  priority     String       @default("High")
+  status       String       @default("Pending")
+  createdAt    DateTime     @default(now())
+}
