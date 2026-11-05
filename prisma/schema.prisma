@@ -7,53 +7,101 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ==========================================
+// 1. CORE
+// ==========================================
+
 model Organization {
-  id       String    @id @default(uuid())
-  name     String
-  leads    Lead[]
-  tasks    Task[]
-  contents Content[]
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  // Relations
+  leads         Lead[]
+  tasks         Task[]
+  contentItems  ContentItem[]
+  socialAccounts SocialAccount[]
 }
 
-model WebhookEvent {
-  id        String   @id @default(uuid())
-  tenantId  String
-  eventId   String   @unique
-  createdAt DateTime @default(now())
-}
+// ==========================================
+// 2. CRM & LEADS
+// ==========================================
 
 model Lead {
-  id           String       @id @default(uuid())
-  tenantId     String
-  organization Organization @relation(fields: [tenantId], references: [id])
-  name         String
-  email        String?
-  aiScore      Int          @default(0)
-  aiStatus     String       @default("Cold")
-  aiReason     String?
-  createdAt    DateTime     @default(now())
-  tasks        Task[]
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  email          String?
+  aiScore        Int      @default(0)
+  aiStatus       String   @default("Cold")
+  aiReason       String?  @db.Text
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  tasks          Task[]
 }
 
 model Task {
-  id           String       @id @default(uuid())
-  tenantId     String
-  organization Organization @relation(fields: [tenantId], references: [id])
-  leadId       String
-  lead         Lead         @relation(fields: [leadId], references: [id])
-  title        String
-  priority     String       @default("High")
-  status       String       @default("Pending")
-  createdAt    DateTime     @default(now())
+  id             String   @id @default(uuid())
+  organizationId String
+  leadId         String?
+  title          String
+  priority       String   @default("High")
+  status         String   @default("Pending")
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  lead           Lead?        @relation(fields: [leadId], references: [id])
 }
 
-model Content {
-  id            String       @id @default(uuid())
-  tenantId      String
-  organization  Organization @relation(fields: [tenantId], references: [id])
-  platform      String
-  topic         String
-  generatedText String
-  status        String       @default("Draft")
-  createdAt     DateTime     @default(now())
+// ==========================================
+// 3. CONTENT & MARKETING
+// ==========================================
+
+model ContentItem {
+  id             String   @id @default(uuid())
+  organizationId String
+  ownerId        String   @default("system")
+  title          String   // Maps to "topic" in n8n
+  body           String   @db.Text // Maps to "generatedText" in n8n
+  status         String   @default("Draft")
+  language       String   @default("en")
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  variants       ContentVariant[]
+}
+
+model ContentVariant {
+  id        String @id @default(uuid())
+  contentId String
+  platform  String
+  caption   String @db.Text
+
+  content   ContentItem @relation(fields: [contentId], references: [id])
+}
+
+// ==========================================
+// 4. AUTOMATION (Idempotency)
+// ==========================================
+
+model WebhookEvent {
+  id               String   @id @default(uuid())
+  provider         String
+  externalEventId  String   @unique
+  tenantId         String
+  receivedAt       DateTime @default(now())
+  processingStatus String   @default("pending")
+}
+
+model SocialAccount {
+  id             String   @id @default(uuid())
+  organizationId String
+  platform       String
+  accountName    String
+  accountId      String
+  accessToken    String   @db.Text
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
 }

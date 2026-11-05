@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MarketingFlow AI - Dashboard</title>
+    <title>MarketingFlow AI - SaaS Platform</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Fast, lightweight scrollbar */
@@ -11,125 +11,253 @@
         ::-webkit-scrollbar-track { background: #1e293b; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .active-tab { background-color: #1e293b; border-left: 4px solid #6366f1; color: white; }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-200 font-sans p-4 md:p-8 min-h-screen">
+<body class="bg-slate-900 text-slate-200 font-sans min-h-screen flex overflow-hidden">
 
-    <div class="max-w-7xl mx-auto space-y-6">
+    <!-- SIDEBAR NAVIGATION -->
+    <aside class="w-64 bg-slate-950 border-r border-slate-800 flex flex-col h-screen flex-shrink-0">
+        <div class="p-6 flex items-center gap-3 border-b border-slate-800">
+            <div class="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center text-sm shadow-lg">🤖</div>
+            <h1 class="text-lg font-bold text-white tracking-wide">MarketingFlow</h1>
+        </div>
         
-        <!-- Header Navigation -->
-        <header class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex flex-col md:flex-row justify-between items-center shadow-md gap-4">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-xl shadow-lg">🤖</div>
-                <div>
-                    <h1 class="text-xl font-bold text-white">MarketingFlow AI</h1>
-                    <p class="text-xs text-slate-400">Business Command Center</p>
-                </div>
-            </div>
-            
+        <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+            <button onclick="switchView('dashboard')" id="nav-dashboard" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition active-tab">
+                <span>📊</span> Dashboard
+            </button>
+            <button onclick="switchView('leads')" id="nav-leads" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition">
+                <span>👥</span> Leads & CRM
+            </button>
+            <button onclick="switchView('content')" id="nav-content" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition">
+                <span>✍️</span> Content Studio
+            </button>
+            <button onclick="switchView('campaigns')" id="nav-campaigns" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition">
+                <span>🎯</span> Campaigns
+            </button>
+            <button onclick="switchView('integrations')" id="nav-integrations" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition">
+                <span>🔌</span> Integrations
+            </button>
+        </nav>
+
+        <div class="p-4 border-t border-slate-800">
+            <button onclick="switchView('settings')" id="nav-settings" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition">
+                <span>⚙️</span> Settings
+            </button>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden">
+        
+        <!-- TOP HEADER -->
+        <header class="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center">
+            <h2 id="page-title" class="text-xl font-bold text-white">Dashboard Overview</h2>
             <div class="flex items-center gap-4">
-                <!-- Link to the Public Customer Form -->
-                <a href="/contact.html" target="_blank" class="text-sm font-semibold text-indigo-400 hover:text-indigo-300 transition">
-                    ↗ View Customer Form
-                </a>
-                
-                <div class="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-md border border-slate-700 text-xs font-semibold text-emerald-400">
-                    <span class="w-2 h-2 bg-emerald-400 rounded-full"></span>
-                    System Live
+                <div class="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-md border border-slate-700 text-xs font-semibold text-emerald-400">
+                    <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span> System Live
                 </div>
+                <div class="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-sm font-bold">S</div>
             </div>
         </header>
 
-        <!-- Main Grid Workspace -->
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <!-- SCROLLABLE CONTENT -->
+        <div class="flex-1 overflow-y-auto p-6 relative">
             
-            <!-- LEFT COLUMN: LEADS (CRM) -->
-            <div class="space-y-6">
+            <!-- ========================================== -->
+            <!-- VIEW: DASHBOARD -->
+            <!-- ========================================== -->
+            <div id="view-dashboard" class="space-y-6 view-section">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl border-l-4 border-l-blue-500 shadow-sm">
+                        <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Total Leads</p>
+                        <h3 id="stat-total-leads" class="text-3xl font-bold text-white">0</h3>
+                    </div>
+                    <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl border-l-4 border-l-red-500 shadow-sm">
+                        <p class="text-xs font-semibold text-slate-400 uppercase mb-1">🔥 Hot Leads</p>
+                        <h3 id="stat-hot-leads" class="text-3xl font-bold text-white">0</h3>
+                    </div>
+                    <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl border-l-4 border-l-yellow-500 shadow-sm">
+                        <p class="text-xs font-semibold text-slate-400 uppercase mb-1">AI Content</p>
+                        <h3 id="stat-total-content" class="text-3xl font-bold text-white">0</h3>
+                    </div>
+                    <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl border-l-4 border-l-emerald-500 shadow-sm">
+                        <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Posts Published</p>
+                        <h3 id="stat-published" class="text-3xl font-bold text-white">0</h3>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-700 p-6 rounded-xl h-64 flex flex-col items-center justify-center shadow-sm">
+                    <p class="text-slate-500 mb-2">📈 Marketing Analytics Chart (Revenue vs Spend)</p>
+                    <p class="text-xs text-slate-600">Integration with Meta/Google Ads coming in Phase 3</p>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VIEW: LEADS (CRM) -->
+            <!-- ========================================== -->
+            <div id="view-leads" class="space-y-6 hidden view-section">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-1 bg-slate-800 border border-slate-700 rounded-xl p-5 h-fit">
+                        <h3 class="text-lg font-bold text-white mb-4">📥 Add New Lead</h3>
+                        <form id="leadForm" class="space-y-4">
+                            <input type="text" id="leadName" required placeholder="Customer Name" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500">
+                            <input type="email" id="leadEmail" required placeholder="Email Address" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500">
+                            <textarea id="leadMessage" required rows="3" placeholder="Message (e.g., Budget is $5000)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500"></textarea>
+                            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg transition text-sm">Send Lead to AI</button>
+                        </form>
+                    </div>
+                    <div class="lg:col-span-2 bg-slate-800 border border-slate-700 rounded-xl p-5">
+                        <h3 class="text-lg font-bold text-white mb-4">Recent Leads (CRM)</h3>
+                        <div id="leads-container" class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                            <p class="text-sm text-slate-400 text-center py-4">Loading leads...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VIEW: CONTENT STUDIO -->
+            <!-- ========================================== -->
+            <div id="view-content" class="space-y-6 hidden view-section">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-1 bg-slate-800 border border-slate-700 rounded-xl p-5 h-fit">
+                        <h3 class="text-lg font-bold text-white mb-4">✍️ Generate AI Content</h3>
+                        <form id="contentForm" class="space-y-4">
+                            <select id="contentPlatform" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500">
+                                <option value="Facebook">Facebook</option>
+                                <option value="Instagram">Instagram</option>
+                                <option value="LinkedIn">LinkedIn</option>
+                            </select>
+                            <input type="text" id="contentTopic" required placeholder="Topic (e.g., 50% off sale)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500">
+                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-lg transition text-sm">Generate Post</button>
+                        </form>
+                    </div>
+                    <div class="lg:col-span-2 bg-slate-800 border border-slate-700 rounded-xl p-5">
+                        <h3 class="text-lg font-bold text-white mb-4">AI Content Studio</h3>
+                        <div id="content-container" class="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                            <p class="text-sm text-slate-400 text-center py-4">Loading content...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VIEW: INTEGRATIONS -->
+            <!-- ========================================== -->
+            <div id="view-integrations" class="hidden view-section space-y-6">
                 
-                <!-- Lead Form (Simulation) -->
-                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
-                    <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">📥 Simulate New Lead</h2>
-                    <form id="leadForm" class="space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-400 mb-1">Customer Name</label>
-                                <input type="text" id="leadName" required placeholder="John Doe" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-400 mb-1">Email Address</label>
-                                <input type="email" id="leadEmail" required placeholder="john@company.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
-                            </div>
+                <!-- Connect New Account Form -->
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5">
+                    <h3 class="text-lg font-bold text-white mb-4">🔌 Connect a New Account</h3>
+                    <form id="connectForm" class="flex flex-col md:flex-row gap-4 items-end">
+                        <div class="w-full md:w-1/4">
+                            <label class="text-xs text-slate-400">Platform</label>
+                            <select id="intPlatform" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white block mt-1">
+                                <option value="Facebook">Facebook</option>
+                                <option value="LinkedIn">LinkedIn</option>
+                                <option value="Instagram">Instagram</option>
+                            </select>
+                        </div>
+                        <div class="w-full md:w-1/4">
+                            <label class="text-xs text-slate-400">Account Name</label>
+                            <input type="text" id="intName" required placeholder="e.g. Corner Cases" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white block mt-1">
+                        </div>
+                        <div class="w-full md:w-1/4">
+                            <label class="text-xs text-slate-400">Account ID / Page ID</label>
+                            <input type="text" id="intId" required placeholder="e.g. 123456789" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white block mt-1">
+                        </div>
+                        <div class="w-full md:w-1/4">
+                            <label class="text-xs text-slate-400">Access Token</label>
+                            <input type="password" id="intToken" required placeholder="Paste token here..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white block mt-1">
+                        </div>
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-6 rounded-lg transition text-sm h-[38px] w-full md:w-auto mt-2 md:mt-0">Connect</button>
+                    </form>
+                </div>
+
+                <!-- Connected Accounts List -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="accounts-container">
+                    <p class="text-sm text-slate-400">Loading accounts...</p>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VIEW: CAMPAIGNS (Placeholder) -->
+            <!-- ========================================== -->
+            <div id="view-campaigns" class="hidden view-section">
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-10 text-center">
+                    <h3 class="text-2xl font-bold text-slate-400 mb-2">🎯 Campaign Management</h3>
+                    <p class="text-slate-500">Phase 3 Module: Track ad spend, ROI, and budgets here.</p>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- VIEW: SETTINGS (Placeholder) -->
+            <!-- ========================================== -->
+            <div id="view-settings" class="hidden view-section">
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-2xl">
+                    <h3 class="text-lg font-bold text-white mb-4">⚙️ Organization Settings</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-xs text-slate-400">Organization Name</label>
+                            <input type="text" value="Test Agency" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 mt-1 text-sm text-white">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-1">Message</label>
-                            <textarea id="leadMessage" required rows="2" placeholder="I need a marketing tool. Budget is $5000." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition resize-none"></textarea>
+                            <label class="text-xs text-slate-400">Current Plan</label>
+                            <div class="bg-slate-900 border border-slate-700 rounded-lg p-4 mt-1 flex justify-between">
+                                <span class="text-indigo-400 font-bold">Free Tier</span>
+                                <span class="text-xs text-slate-500">Upgrade to Pro for unlimited AI</span>
+                            </div>
                         </div>
-                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg transition text-sm shadow-md">
-                            Send Lead to AI
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Leads List -->
-                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
-                    <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">🔥 Recent Leads (CRM)</h2>
-                    <div id="leads-container" class="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-                        <p class="text-sm text-slate-400 text-center py-4">Loading leads...</p>
                     </div>
                 </div>
             </div>
 
-            <!-- RIGHT COLUMN: CONTENT (MARKETING) -->
-            <div class="space-y-6">
-                
-                <!-- Content Form -->
-                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
-                    <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">✍️ Generate AI Content</h2>
-                    <form id="contentForm" class="space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-400 mb-1">Target Platform</label>
-                                <select id="contentPlatform" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
-                                    <option value="Facebook">Facebook</option>
-                                    <option value="Instagram">Instagram</option>
-                                    <option value="LinkedIn">LinkedIn</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-400 mb-1">Core Topic</label>
-                                <input type="text" id="contentTopic" required placeholder="e.g., 50% off summer sale" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
-                            </div>
-                        </div>
-                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-lg transition text-sm shadow-md">
-                            Generate Post with AI
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Content List & Approval -->
-                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
-                    <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">📝 AI Content Studio</h2>
-                    <div id="content-container" class="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-                        <p class="text-sm text-slate-400 text-center py-4">Loading content...</p>
-                    </div>
-                </div>
-
-            </div>
         </div>
-    </div>
+    </main>
 
+    <!-- ========================================== -->
+    <!-- JAVASCRIPT LOGIC -->
+    <!-- ========================================== -->
     <script>
-        // ==========================================
-        // 1. LEAD AUTOMATION FORM
-        // ==========================================
+        // --- NAVIGATION LOGIC ---
+        function switchView(viewName) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('nav button').forEach(el => {
+                el.classList.remove('active-tab');
+                el.classList.add('text-slate-400');
+            });
+
+            document.getElementById('view-' + viewName).classList.remove('hidden');
+            const activeBtn = document.getElementById('nav-' + viewName);
+            activeBtn.classList.add('active-tab');
+            activeBtn.classList.remove('text-slate-400');
+
+            const titles = {
+                dashboard: "Dashboard Overview",
+                leads: "Leads & CRM Management",
+                content: "AI Content Studio",
+                campaigns: "Campaign Management",
+                integrations: "Social Media Integrations",
+                settings: "Organization Settings"
+            };
+            document.getElementById('page-title').innerText = titles[viewName];
+
+            // Refresh data when switching tabs
+            if (viewName === 'dashboard') { loadStats(); }
+            if (viewName === 'leads') { loadLeads(); }
+            if (viewName === 'content') { loadContent(); }
+            if (viewName === 'integrations') { loadIntegrations(); }
+        }
+
+        // --- 1. LEAD FORM SUBMISSION ---
         document.getElementById('leadForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const btn = this.querySelector('button');
             const originalText = btn.innerText;
-            
             btn.innerText = "Processing...";
             btn.disabled = true;
-            btn.classList.add('opacity-75');
 
             const payload = {
                 tenantId: "org_123",
@@ -146,34 +274,26 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                
-                // Wait 2 seconds for n8n to process and save to MySQL, then reload the list
                 setTimeout(() => {
                     loadLeads();
                     this.reset();
                     btn.innerText = originalText;
                     btn.disabled = false;
-                    btn.classList.remove('opacity-75');
                 }, 2000);
             } catch (error) {
-                alert("Error: Make sure n8n is running and workflows are Published.");
+                alert("Error: Ensure n8n is running.");
                 btn.innerText = originalText;
                 btn.disabled = false;
-                btn.classList.remove('opacity-75');
             }
         });
 
-        // ==========================================
-        // 2. CONTENT GENERATION FORM
-        // ==========================================
+        // --- 2. CONTENT FORM SUBMISSION ---
         document.getElementById('contentForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const btn = this.querySelector('button');
             const originalText = btn.innerText;
-            
             btn.innerText = "Generating...";
             btn.disabled = true;
-            btn.classList.add('opacity-75');
 
             const payload = {
                 tenantId: "org_123",
@@ -187,124 +307,177 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                
-                // Wait 3 seconds for AI to generate, then reload the list
                 setTimeout(() => {
                     loadContent();
                     this.reset();
                     btn.innerText = originalText;
                     btn.disabled = false;
-                    btn.classList.remove('opacity-75');
                 }, 3000);
             } catch (error) {
-                alert("Error: Make sure n8n is running and workflows are Published.");
+                alert("Error: Ensure n8n is running.");
                 btn.innerText = originalText;
                 btn.disabled = false;
-                btn.classList.remove('opacity-75');
             }
         });
 
-        // ==========================================
-        // 3. LOAD LEADS FROM MYSQL
-        // ==========================================
+        // --- 3. INTEGRATION FORM SUBMISSION ---
+        document.getElementById('connectForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = this.querySelector('button');
+            btn.innerText = "Connecting...";
+
+            const payload = {
+                organizationId: "org_123",
+                platform: document.getElementById('intPlatform').value,
+                accountName: document.getElementById('intName').value,
+                accountId: document.getElementById('intId').value,
+                accessToken: document.getElementById('intToken').value
+            };
+            
+            try {
+                await fetch('/api/integrations/connect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                this.reset();
+                btn.innerText = "Connect";
+                loadIntegrations();
+            } catch (error) {
+                alert("Failed to connect account.");
+                btn.innerText = "Connect";
+            }
+        });
+
+        // --- 4. LOAD LEADS ---
         async function loadLeads() {
             try {
                 const response = await fetch('/api/leads');
                 const leads = await response.json();
                 const container = document.getElementById('leads-container');
-                
-                if (leads.length === 0) { 
-                    container.innerHTML = '<p class="text-sm text-slate-400 text-center py-4">No leads yet. Send one above!</p>'; 
-                    return; 
-                }
+                if (leads.length === 0) { container.innerHTML = '<p class="text-sm text-slate-400 text-center py-4">No leads yet.</p>'; return; }
                 
                 container.innerHTML = leads.map(lead => {
                     const isHot = lead.aiStatus === 'Hot';
                     const badgeColor = isHot ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-                    const borderColor = isHot ? 'border-l-red-500' : 'border-l-blue-500';
-
                     return `
-                        <div class="bg-slate-900 p-4 rounded-lg border border-slate-700 border-l-4 ${borderColor}">
+                        <div class="bg-slate-900 p-4 rounded-lg border border-slate-700 border-l-4 ${isHot ? 'border-l-red-500' : 'border-l-blue-500'}">
                             <div class="flex justify-between items-start mb-2">
                                 <div>
-                                    <h3 class="font-bold text-sm text-white">${lead.name}</h3>
+                                    <h4 class="font-bold text-sm text-white">${lead.name}</h4>
                                     <p class="text-xs text-slate-400">${lead.email}</p>
                                 </div>
-                                <span class="px-2 py-1 text-xs font-bold rounded-md border ${badgeColor}">
-                                    ${lead.aiStatus} (${lead.aiScore})
-                                </span>
+                                <span class="px-2 py-1 text-xs font-bold rounded-md border ${badgeColor}">${lead.aiStatus} (${lead.aiScore})</span>
                             </div>
                             <p class="text-xs text-slate-300 mt-2 bg-slate-800 p-2 rounded italic">"${lead.aiReason}"</p>
                         </div>`;
                 }).join('');
-            } catch (error) {
-                console.error("Error loading leads", error);
-            }
+                loadStats();
+            } catch (error) { console.error("Error loading leads", error); }
         }
 
-        // ==========================================
-        // 4. LOAD CONTENT FROM MYSQL
-        // ==========================================
+        // --- 5. LOAD CONTENT ---
         async function loadContent() {
             try {
                 const response = await fetch('/api/content');
                 const content = await response.json();
                 const container = document.getElementById('content-container');
-                
-                if (content.length === 0) { 
-                    container.innerHTML = '<p class="text-sm text-slate-400 text-center py-4">No content generated yet.</p>'; 
-                    return; 
-                }
+                if (content.length === 0) { container.innerHTML = '<p class="text-sm text-slate-400 text-center py-4">No content generated yet.</p>'; return; }
                 
                 container.innerHTML = content.map(item => {
                     const isApproved = item.status === 'Approved';
                     const badgeColor = isApproved ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-                    const borderColor = isApproved ? 'border-l-emerald-500' : 'border-l-yellow-500';
-
                     return `
-                        <div class="bg-slate-900 p-4 rounded-lg border border-slate-700 border-l-4 ${borderColor}">
+                        <div class="bg-slate-900 p-4 rounded-lg border border-slate-700 border-l-4 ${isApproved ? 'border-l-emerald-500' : 'border-l-yellow-500'}">
                             <div class="flex justify-between items-center mb-3">
-                                <h3 class="font-bold text-sm text-white capitalize">${item.platform} Post</h3>
-                                <span class="px-2 py-1 text-[10px] uppercase font-bold rounded-md border ${badgeColor}">
-                                    ${item.status}
-                                </span>
+                                <h4 class="font-bold text-sm text-white capitalize">${item.platform} Post</h4>
+                                <span class="px-2 py-1 text-[10px] uppercase font-bold rounded-md border ${badgeColor}">${item.status}</span>
                             </div>
-                            
                             <p class="text-xs text-slate-300 whitespace-pre-wrap mb-3">${item.generatedText}</p>
-                            
                             <div class="flex justify-between items-center border-t border-slate-700 pt-3">
-                                <p class="text-[10px] text-slate-500 truncate max-w-[150px]">Topic: ${item.topic}</p>
+                                <p class="text-[10px] text-slate-500">Topic: ${item.topic}</p>
                                 ${item.status === 'Draft' 
-                                    ? `<button onclick="approveContent('${item.id}')" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-1 px-3 rounded transition shadow-sm">Approve & Post</button>` 
-                                    : `<span class="text-emerald-400 text-xs font-bold">✓ Published</span>`
-                                }
+                                    ? `<button onclick="approveContent('${item.id}', '${item.platform}')" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-1 px-3 rounded transition">Approve</button>` 
+                                    : `<span class="text-emerald-400 text-xs font-bold">✓ Published</span>`}
                             </div>
                         </div>`;
                 }).join('');
-            } catch (error) {
-                console.error("Error loading content", error);
-            }
+                loadStats();
+            } catch (error) { console.error("Error loading content", error); }
         }
 
-        // ==========================================
-        // 5. APPROVE & PUBLISH
-        // ==========================================
-        async function approveContent(id) {
+       
+        // --- 6. LOAD INTEGRATIONS ---
+        async function loadIntegrations() {
             try {
-                const response = await fetch(`/api/content/${id}/approve`, { method: 'PUT' });
-                if (response.ok) {
-                    loadContent(); // Refresh the list immediately to show "Published"
-                } else {
-                    alert("Failed to approve. Check your Node.js terminal for errors.");
+                const response = await fetch('/api/integrations');
+                const accounts = await response.json();
+                const container = document.getElementById('accounts-container');
+
+                // SAFETY CHECK: If it's not an array, stop here
+                if (!Array.isArray(accounts)) {
+                    container.innerHTML = '<p class="text-sm text-red-400 col-span-3 text-center py-4">Error loading accounts. Check backend terminal.</p>';
+                    return;
                 }
-            } catch (error) {
-                console.error("Error:", error);
+                
+                if (accounts.length === 0) {
+                    container.innerHTML = '<p class="text-sm text-slate-400 col-span-3 text-center py-4">No accounts connected yet. Add one above!</p>';
+                    return;
+                }
+                
+                container.innerHTML = accounts.map(acc => `
+                    <div class="bg-slate-800 border border-emerald-500/50 rounded-xl p-6 flex justify-between items-center shadow-sm">
+                        <div>
+                            <h3 class="font-bold text-white text-lg">${acc.platform}</h3>
+                            <p class="text-xs text-emerald-400 mt-1">Connected as: ${acc.accountName}</p>
+                            <p class="text-[10px] text-slate-500 mt-1">Page ID: ${acc.accountId}</p>
+                        </div>
+                        <button onclick="disconnectAccount('${acc.id}')" class="bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white px-4 py-2 rounded-lg text-sm font-bold transition">Disconnect</button>
+                    </div>
+                `).join('');
+            } catch (error) { 
+                console.error("Error loading integrations", error); 
             }
         }
+        // --- 7. LOAD STATS ---
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const stats = await response.json();
+                document.getElementById('stat-total-leads').innerText = stats.totalLeads;
+                document.getElementById('stat-hot-leads').innerText = stats.hotLeads;
+                document.getElementById('stat-total-content').innerText = stats.totalContent;
+                document.getElementById('stat-published').innerText = stats.publishedContent;
+            } catch (error) { console.error("Error loading stats", error); }
+        }
 
-        // Run initial load
+        // --- 8. APPROVE CONTENT ---
+        async function approveContent(id, platform) {
+            try {
+                const response = await fetch(`/api/content/${id}/approve`, { 
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ platform: platform }) // Pass platform so backend knows which token to use
+                });
+                if (response.ok) { loadContent(); } 
+                else { alert("Failed to approve. Check Node.js terminal."); }
+            } catch (error) { console.error("Error:", error); }
+        }
+
+        // --- 9. DISCONNECT ACCOUNT ---
+        async function disconnectAccount(id) {
+            if(!confirm("Are you sure you want to disconnect this account?")) return;
+            try {
+                const response = await fetch(`/api/integrations/${id}`, { method: 'DELETE' });
+                if (response.ok) { loadIntegrations(); }
+            } catch (error) { console.error("Error deleting account", error); }
+        }
+
+        // Initialize Data on Load
         loadLeads();
         loadContent();
+        loadStats();
+        loadIntegrations();
     </script>
 </body>
 </html>
