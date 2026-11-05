@@ -208,7 +208,7 @@ app.put('/api/content/:id/approve', async (req, res) => {
     if (!account) return res.status(400).json({ error: "No account connected for this platform" });
 
     // 3. Send the DYNAMIC token and ID to n8n
-    await fetch('http://localhost:5678/webhook/publish-facebook', {
+    await fetch('http://localhost:5678/webhook-test/publish-facebook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
