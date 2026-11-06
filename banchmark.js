@@ -55,7 +55,7 @@ async function runBenchmark() {
             console.log(`❌ Request ${i + 1} Failed: ${error.response ? error.response.data.error.message : error.message}`);
         }
 
-    // Rate limit এড়ানোর জন্য ১ সেকেন্ড বিরতি
+
     await new Promise(resolve => setTimeout(resolve, 1000));
 }
 

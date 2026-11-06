@@ -8,7 +8,7 @@ async function runStressTest() {
     let successCount = 0;
     let failCount = 0;
 
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= 50; i++) {
         // Generate unique IDs using Date.now() and the loop index
         const uniqueId = `stress_${Date.now()}_${i}`;
 
@@ -32,7 +32,7 @@ async function runStressTest() {
         }
 
         // Small delay (100ms) to simulate real users, but still hits fast
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
     }
 
     console.log("\n=========================================");
