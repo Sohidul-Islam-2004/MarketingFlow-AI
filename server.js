@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const multer = require("multer")
 require("dotenv").config();
 const dns = require("dns");
 dns.setServers(["8.8.8.8", "8.8.4.4"]); // Use Google DNS
@@ -528,6 +529,98 @@ app.get("/api/stats", wrap(async (req, res) => {
   ]);
   res.json({ totalLeads, hotLeads, totalContent, publishedContent });
 }));
+
+
+
+
+
+
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
+});
+
+app.post("/upload", upload.single("data"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No video." });
+    if (!req.body.caption) return res.status(400).json({ error: "No caption." });
+
+    const form = new FormData();
+    form.append("data", new Blob([req.file.buffer], { type: req.file.mimetype }), req.file.originalname);
+    form.append("caption", req.body.caption);
+
+    const r = await fetch("http://localhost:5678/webhook-test/upload-video", {
+      method: "POST",
+      body: form,
+    });
+
+    if (!r.ok) {
+      console.error("n8n error:", await r.text());
+      return res.status(502).json({ error: "n8n rejected the request." });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* ---------- start ---------- */
 const PORT = process.env.PORT || 3000;

@@ -1,451 +1,1876 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CommercePilot AI</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-<style>
-:root{--bg:#f6f7f3;--card:#fff;--line:#e8ebe4;--ink:#0e1a14;--muted:#5f6b63;--side:#0d1b2a;--side-ink:#b7c2cf;
---lime:#b8f03a;--lime-d:#a5dc2a;--green:#0b7a2b;--blue:#1d4ed8;--purple:#6d28d9;--red:#c0362c;--hero:#0a1a22;--r:14px;
---font:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif}
-*{box-sizing:border-box;margin:0}
-body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;display:grid;grid-template-columns:245px 1fr;min-height:100vh}
-button,input,select,textarea{font:inherit;color:inherit}
-:focus-visible{outline:2px solid var(--green);outline-offset:2px}
-.hidden{display:none!important}
-svg.i{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CommercePilot AI</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f6f7f3;
+        --card: #fff;
+        --line: #e8ebe4;
+        --ink: #0e1a14;
+        --muted: #5f6b63;
+        --side: #0d1b2a;
+        --side-ink: #b7c2cf;
+        --lime: #b8f03a;
+        --lime-d: #a5dc2a;
+        --green: #0b7a2b;
+        --blue: #1d4ed8;
+        --purple: #6d28d9;
+        --red: #c0362c;
+        --hero: #0a1a22;
+        --r: 14px;
+        --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      body {
+        font-family: var(--font);
+        background: var(--bg);
+        color: var(--ink);
+        font-size: 14px;
+        line-height: 1.5;
+        display: grid;
+        grid-template-columns: 245px 1fr;
+        min-height: 100vh;
+      }
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+        color: inherit;
+      }
+      :focus-visible {
+        outline: 2px solid var(--green);
+        outline-offset: 2px;
+      }
+      .hidden {
+        display: none !important;
+      }
+      svg.i {
+        width: 18px;
+        height: 18px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex-shrink: 0;
+      }
 
-/* sidebar */
-aside{background:var(--side);height:100vh;position:sticky;top:0;display:flex;flex-direction:column;padding:18px 12px;overflow-y:auto}
-.brand{display:flex;align-items:center;gap:10px;padding:2px 6px 16px;color:#fff;font-weight:800;font-size:17px}
-.logo{width:32px;height:32px;border-radius:9px;background:var(--lime);display:grid;place-items:center;color:#0d1b2a}
-.bell{margin-left:auto;width:30px;height:30px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:none;color:var(--side-ink);display:grid;place-items:center;cursor:pointer}
-.grp{font-size:11px;font-weight:700;letter-spacing:.08em;color:#7d8b9a;padding:14px 12px 6px}
-.nav{display:flex;align-items:center;gap:12px;width:100%;padding:9px 12px;border:0;border-radius:9px;background:none;color:var(--side-ink);font-weight:500;cursor:pointer;text-align:left}
-.nav:hover{background:rgba(255,255,255,.06);color:#fff}
-.nav.active{background:rgba(184,240,58,.14);color:#fff;font-weight:600}
-.nav.active svg{color:var(--lime)}
-.user{margin-top:auto;display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;background:rgba(255,255,255,.06);color:#fff}
-.user .av{width:34px;height:34px;border-radius:50%;background:var(--lime);color:#0d1b2a;display:grid;place-items:center;font-weight:800}
-.user div{min-width:0;flex:1}.user b{display:block;font-size:13px}
-.user small{display:block;color:var(--side-ink);font-size:11px;overflow:hidden;text-overflow:ellipsis}
-.user button{background:none;border:0;color:var(--side-ink);cursor:pointer}
+      /* sidebar */
+      aside {
+        background: var(--side);
+        height: 100vh;
+        position: sticky;
+        top: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 18px 12px;
+        overflow-y: auto;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 2px 6px 16px;
+        color: #fff;
+        font-weight: 800;
+        font-size: 17px;
+      }
+      .logo {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        background: var(--lime);
+        display: grid;
+        place-items: center;
+        color: #0d1b2a;
+      }
+      .bell {
+        margin-left: auto;
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: none;
+        color: var(--side-ink);
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+      }
+      .grp {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: #7d8b9a;
+        padding: 14px 12px 6px;
+      }
+      .nav {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        padding: 9px 12px;
+        border: 0;
+        border-radius: 9px;
+        background: none;
+        color: var(--side-ink);
+        font-weight: 500;
+        cursor: pointer;
+        text-align: left;
+      }
+      .nav:hover {
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff;
+      }
+      .nav.active {
+        background: rgba(184, 240, 58, 0.14);
+        color: #fff;
+        font-weight: 600;
+      }
+      .nav.active svg {
+        color: var(--lime);
+      }
+      .user {
+        margin-top: auto;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff;
+      }
+      .user .av {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: var(--lime);
+        color: #0d1b2a;
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+      }
+      .user div {
+        min-width: 0;
+        flex: 1;
+      }
+      .user b {
+        display: block;
+        font-size: 13px;
+      }
+      .user small {
+        display: block;
+        color: var(--side-ink);
+        font-size: 11px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .user button {
+        background: none;
+        border: 0;
+        color: var(--side-ink);
+        cursor: pointer;
+      }
 
-/* main */
-main{padding:26px 36px 56px;min-width:0}
-.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}
-.crumb{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--muted)}
-.top h1{font-size:28px;font-weight:800;letter-spacing:-.02em}
-.tools{display:flex;gap:10px;align-items:center}
-.chip{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 14px;font-weight:600;font-size:13px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-.dot{width:8px;height:8px;border-radius:50%;background:#22c55e}.dot.off{background:var(--red)}
+      /* main */
+      main {
+        padding: 26px 36px 56px;
+        min-width: 0;
+      }
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+      .crumb {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+      .top h1 {
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+      .tools {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .chip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 9px 14px;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #22c55e;
+      }
+      .dot.off {
+        background: var(--red);
+      }
 
-/* hero */
-.hero{background:linear-gradient(120deg,#0a1a22,#0d2230);border-radius:18px;padding:30px;display:flex;justify-content:space-between;gap:24px;color:#fff;margin-bottom:16px}
-.hero .tag{color:var(--lime);font-size:11px;font-weight:800;letter-spacing:.1em}
-.hero h2{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:10px 0 8px}
-.hero p{color:#b9c6cf;max-width:520px;margin-bottom:20px}
-.row{display:flex;gap:10px;flex-wrap:wrap}
-.cta{display:flex;flex-direction:column;gap:10px;width:310px;flex-shrink:0;justify-content:center}
-.cta .btn{justify-content:space-between;padding:13px 18px}
-.btn{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:9px;padding:10px 16px;font-weight:700;cursor:pointer;background:var(--lime);color:#0d1b2a;transition:background .15s}
-.btn:hover{background:var(--lime-d)}.btn:disabled{opacity:.6;cursor:wait}
-.btn.white{background:#fff}.btn.white:hover{background:#eef1ea}
-.btn.ghost{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.14)}
-.btn.ghost:hover{background:rgba(255,255,255,.14)}
-.btn.sm{padding:6px 12px;font-size:12px}.btn.full{width:100%;justify-content:center}
-.btn.danger{background:#fdebea;color:var(--red)}.btn.danger:hover{background:var(--red);color:#fff}
+      /* hero */
+      .hero {
+        background: linear-gradient(120deg, #0a1a22, #0d2230);
+        border-radius: 18px;
+        padding: 30px;
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        color: #fff;
+        margin-bottom: 16px;
+      }
+      .hero .tag {
+        color: var(--lime);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+      }
+      .hero h2 {
+        font-size: 30px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin: 10px 0 8px;
+      }
+      .hero p {
+        color: #b9c6cf;
+        max-width: 520px;
+        margin-bottom: 20px;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .cta {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 310px;
+        flex-shrink: 0;
+        justify-content: center;
+      }
+      .cta .btn {
+        justify-content: space-between;
+        padding: 13px 18px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 0;
+        border-radius: 9px;
+        padding: 10px 16px;
+        font-weight: 700;
+        cursor: pointer;
+        background: var(--lime);
+        color: #0d1b2a;
+        transition: background 0.15s;
+      }
+      .btn:hover {
+        background: var(--lime-d);
+      }
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: wait;
+      }
+      .btn.white {
+        background: #fff;
+      }
+      .btn.white:hover {
+        background: #eef1ea;
+      }
+      .btn.ghost {
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+      }
+      .btn.ghost:hover {
+        background: rgba(255, 255, 255, 0.14);
+      }
+      .btn.sm {
+        padding: 6px 12px;
+        font-size: 12px;
+      }
+      .btn.full {
+        width: 100%;
+        justify-content: center;
+      }
+      .btn.danger {
+        background: #fdebea;
+        color: var(--red);
+      }
+      .btn.danger:hover {
+        background: var(--red);
+        color: #fff;
+      }
 
-/* cards + kpis */
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px}
-.card h3{font-size:16px;font-weight:700}
-.sub{color:var(--muted);font-size:13px;margin-bottom:14px}
-.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
-.kpi{padding:18px 20px}
-.kpi.auto{border:2px solid #0e3b1c}
-.kpi .l{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--muted)}
-.kpi .v{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:4px 0 2px;display:flex;justify-content:space-between;align-items:baseline}
-.kpi .d{font-size:13px;font-weight:700;color:var(--green)}.kpi .d.down{color:var(--green)}
-.kpi p{font-size:13px;color:var(--muted)}
-.c-green{color:var(--green)}.c-blue{color:var(--blue)}.c-purple{color:var(--purple)}
-.auto-tag{background:#e8f9b8;color:#3f6b00;border-radius:99px;padding:2px 10px;font-size:10px}
+      /* cards + kpis */
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 20px;
+      }
+      .card h3 {
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 14px;
+      }
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-bottom: 14px;
+      }
+      .kpi {
+        padding: 18px 20px;
+      }
+      .kpi.auto {
+        border: 2px solid #0e3b1c;
+      }
+      .kpi .l {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+      .kpi .v {
+        font-size: 30px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin: 4px 0 2px;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+      .kpi .d {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--green);
+      }
+      .kpi .d.down {
+        color: var(--green);
+      }
+      .kpi p {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .c-green {
+        color: var(--green);
+      }
+      .c-blue {
+        color: var(--blue);
+      }
+      .c-purple {
+        color: var(--purple);
+      }
+      .auto-tag {
+        background: #e8f9b8;
+        color: #3f6b00;
+        border-radius: 99px;
+        padding: 2px 10px;
+        font-size: 10px;
+      }
 
-/* table + pills */
-.tbl{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
-td{padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
-tr:last-child td{border-bottom:0}
-.pill{display:inline-block;border-radius:99px;padding:2px 11px;font-size:12px;font-weight:600}
-.p-yellow{background:#fdf0b8;color:#7a5b00}.p-green{background:#c9f2c0;color:#14631f}.p-blue{background:#cfe6fb;color:#0b4a8a}
-.p-purple{background:#e5dbfb;color:#5a24b4}.p-red{background:#fdd9d5;color:#a1271d}.p-grey{background:#eceee9;color:#4b564f}
-.head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
-.head > div{display:flex;align-items:center;gap:12px}
-.ico{width:34px;height:34px;border-radius:10px;background:#e8f9b8;color:#3f6b00;display:grid;place-items:center}
+      /* table + pills */
+      .tbl {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th {
+        text-align: left;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        white-space: nowrap;
+      }
+      td {
+        padding: 11px 12px;
+        border-bottom: 1px solid var(--line);
+        white-space: nowrap;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      .pill {
+        display: inline-block;
+        border-radius: 99px;
+        padding: 2px 11px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .p-yellow {
+        background: #fdf0b8;
+        color: #7a5b00;
+      }
+      .p-green {
+        background: #c9f2c0;
+        color: #14631f;
+      }
+      .p-blue {
+        background: #cfe6fb;
+        color: #0b4a8a;
+      }
+      .p-purple {
+        background: #e5dbfb;
+        color: #5a24b4;
+      }
+      .p-red {
+        background: #fdd9d5;
+        color: #a1271d;
+      }
+      .p-grey {
+        background: #eceee9;
+        color: #4b564f;
+      }
+      .head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 6px;
+      }
+      .head > div {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .ico {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: #e8f9b8;
+        color: #3f6b00;
+        display: grid;
+        place-items: center;
+      }
 
-/* forms + lists */
-.split{display:grid;grid-template-columns:340px 1fr;gap:18px;align-items:start}
-.stack{display:flex;flex-direction:column;gap:12px}
-label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px}
-input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
-input:focus,select:focus,textarea:focus{outline:0;border-color:var(--green);box-shadow:0 0 0 3px #dff5c4}
-.list{display:flex;flex-direction:column;gap:12px;max-height:640px;overflow-y:auto}
-.item{border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:10px;padding:14px 16px}
-.item.hot{border-left-color:var(--red)}.item.ok{border-left-color:var(--green)}.item.draft{border-left-color:#d49a12}
-.item-top{display:flex;justify-content:space-between;gap:12px;margin-bottom:8px}
-.item h4{font-size:14px}.item small{color:var(--muted);font-size:12px}
-.quote{background:var(--bg);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--muted)}
-.post{white-space:pre-wrap;font-size:13px;margin-bottom:12px}
-.item-foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:10px;font-size:12px;color:var(--muted)}
-.accounts{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:16px}
-.acct{display:flex;align-items:center;gap:14px}.acct > div:nth-child(2){flex:1;min-width:0}
-.acct p{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
-.connect{display:grid;grid-template-columns:repeat(4,1fr) auto;gap:14px;align-items:end}
-.empty{text-align:center;color:var(--muted);padding:40px 12px}
-.empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:4px}
-.empty code{background:var(--bg);padding:2px 6px;border-radius:6px;font-size:12px}
-.skel{height:70px;border-radius:10px;background:linear-gradient(90deg,var(--bg),var(--line),var(--bg));background-size:200% 100%;animation:sh 1.2s infinite}
-@keyframes sh{to{background-position:-200% 0}}
-.toasts{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:50}
-.toast{background:var(--side);color:#fff;padding:12px 16px;border-radius:10px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:340px}
-.toast.err{background:var(--red)}
+      /* forms + lists */
+      .split {
+        display: grid;
+        grid-template-columns: 340px 1fr;
+        gap: 18px;
+        align-items: start;
+      }
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        margin-bottom: 5px;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 10px 12px;
+      }
+      input:focus,
+      select:focus,
+      textarea:focus {
+        outline: 0;
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px #dff5c4;
+      }
+      .list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-height: 640px;
+        overflow-y: auto;
+      }
+      .item {
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--blue);
+        border-radius: 10px;
+        padding: 14px 16px;
+      }
+      .item.hot {
+        border-left-color: var(--red);
+      }
+      .item.ok {
+        border-left-color: var(--green);
+      }
+      .item.draft {
+        border-left-color: #d49a12;
+      }
+      .item-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      .item h4 {
+        font-size: 14px;
+      }
+      .item small {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .quote {
+        background: var(--bg);
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .post {
+        white-space: pre-wrap;
+        font-size: 13px;
+        margin-bottom: 12px;
+      }
+      .item-foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 1px solid var(--line);
+        padding-top: 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .accounts {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 14px;
+        margin-top: 16px;
+      }
+      .acct {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .acct > div:nth-child(2) {
+        flex: 1;
+        min-width: 0;
+      }
+      .acct p {
+        font-size: 12px;
+        color: var(--muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .connect {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr) auto;
+        gap: 14px;
+        align-items: end;
+      }
+      .empty {
+        text-align: center;
+        color: var(--muted);
+        padding: 40px 12px;
+      }
+      .empty b {
+        display: block;
+        color: var(--ink);
+        font-size: 16px;
+        margin-bottom: 4px;
+      }
+      .empty code {
+        background: var(--bg);
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-size: 12px;
+      }
+      .skel {
+        height: 70px;
+        border-radius: 10px;
+        background: linear-gradient(90deg, var(--bg), var(--line), var(--bg));
+        background-size: 200% 100%;
+        animation: sh 1.2s infinite;
+      }
+      @keyframes sh {
+        to {
+          background-position: -200% 0;
+        }
+      }
+      .toasts {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 50;
+      }
+      .toast {
+        background: var(--side);
+        color: #fff;
+        padding: 12px 16px;
+        border-radius: 10px;
+        font-weight: 600;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        max-width: 340px;
+      }
+      .toast.err {
+        background: var(--red);
+      }
 
-select[data-status]{width:auto;padding:4px 8px}.tbl .btn+.btn{margin-left:6px}
-@media(max-width:1100px){.kpis{grid-template-columns:1fr 1fr}.hero{flex-direction:column}.cta{width:100%}}
-@media(max-width:900px){
- body{grid-template-columns:1fr}
- aside{height:auto;position:static;flex-direction:row;align-items:center;overflow-x:auto;padding:10px;gap:4px}
- .brand span,.grp,.user,.bell{display:none}.brand{padding:0 8px 0 0}
- .nav{white-space:nowrap;width:auto}
- main{padding:20px 16px 40px}.split,.connect{grid-template-columns:1fr}.top{flex-direction:column}
-}
-@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-</style>
-</head>
-<body>
-<aside>
-  <div class="brand"><div class="logo" id="logo"></div><span>CommercePilot AI</span><button class="bell" aria-label="Notifications" id="bell"></button></div>
-  <div id="nav"></div>
-  <div class="user"><div class="av" id="uAv">T</div><div><b id="uName">Test</b><small id="uMail">test@example.com</small></div><button aria-label="Log out" id="logout"></button></div>
-</aside>
-
-<main>
-  <div class="top">
-    <div><div class="crumb" id="crumb">WORKSPACE / OVERVIEW</div><h1 id="title">Business overview</h1></div>
-    <div class="tools">
-      <button class="chip" id="refresh"></button>
-      <div class="chip" style="cursor:default"><i class="dot" id="dbDot"></i><span id="dbTxt">DB Connected</span></div>
-      <div class="chip" id="wsChip"></div>
-    </div>
-  </div>
-
-  <!-- OVERVIEW -->
-  <section id="v-overview">
-    <div class="hero">
-      <div>
-        <div class="tag" id="wsTag">WORKSPACE: TEST</div>
-        <h2>Less busywork. More business.</h2>
-        <p>Manage customer conversations, commerce operations and reviewed business discovery from one workspace. All stats and cards update live from your database.</p>
-        <div class="row"><button class="btn" data-view="orders">+ New Order</button><button class="btn ghost" data-view="inventory">+ Add Product</button></div>
+      select[data-status] {
+        width: auto;
+        padding: 4px 8px;
+      }
+      .tbl .btn + .btn {
+        margin-left: 6px;
+      }
+      @media (max-width: 1100px) {
+        .kpis {
+          grid-template-columns: 1fr 1fr;
+        }
+        .hero {
+          flex-direction: column;
+        }
+        .cta {
+          width: 100%;
+        }
+      }
+      @media (max-width: 900px) {
+        body {
+          grid-template-columns: 1fr;
+        }
+        aside {
+          height: auto;
+          position: static;
+          flex-direction: row;
+          align-items: center;
+          overflow-x: auto;
+          padding: 10px;
+          gap: 4px;
+        }
+        .brand span,
+        .grp,
+        .user,
+        .bell {
+          display: none;
+        }
+        .brand {
+          padding: 0 8px 0 0;
+        }
+        .nav {
+          white-space: nowrap;
+          width: auto;
+        }
+        main {
+          padding: 20px 16px 40px;
+        }
+        .split,
+        .connect {
+          grid-template-columns: 1fr;
+        }
+        .top {
+          flex-direction: column;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <aside>
+      <div class="brand">
+        <div class="logo" id="logo"></div>
+        <span>CommercePilot AI</span
+        ><button class="bell" aria-label="Notifications" id="bell"></button>
       </div>
-      <div class="cta">
-        <button class="btn" data-view="inbox">Messenger Inbox <span class="ar"></span></button>
-        <button class="btn white" data-view="comments">FB Comments <span class="ar"></span></button>
-        <button class="btn white" data-view="leads">Lead Discovery <span class="ar"></span></button>
+      <div id="nav"></div>
+      <div class="user">
+        <div class="av" id="uAv">T</div>
+        <div>
+          <b id="uName">Test</b><small id="uMail">test@example.com</small>
+        </div>
+        <button aria-label="Log out" id="logout"></button>
       </div>
-    </div>
-    <div class="kpis" id="kpis"></div>
-    <div class="card">
-      <div class="head"><div><span class="ico" id="aiIco"></span><h3 id="ordersTitle">AI orders placed today</h3></div><button class="btn sm" data-view="orders">Open Orders Manager <span class="ar"></span></button></div>
-      <p class="sub">Live records from your database. Select a card above to see what is behind the number.</p>
-      <div class="tbl"><table><thead><tr><th>ORDER #</th><th>CUSTOMER</th><th>PHONE</th><th>DELIVERY ADDRESS</th><th>TOTAL (৳)</th><th>PAYMENT</th><th>CHANNEL</th><th>STATUS</th></tr></thead><tbody id="ordersBody"></tbody></table></div>
-    </div>
-  </section>
+    </aside>
 
-  <!-- LEAD DISCOVERY -->
-  <section id="v-leads" class="hidden">
-    <div class="split">
-      <div class="card"><h3>Add a lead</h3><p class="sub">AI scores it as soon as it arrives</p>
-        <form id="leadForm" class="stack">
-          <div><label for="leadName">Name</label><input id="leadName" required placeholder="Jane Cooper" /></div>
-          <div><label for="leadEmail">Email</label><input type="email" id="leadEmail" required placeholder="jane@company.com" /></div>
-          <div><label for="leadMessage">Message</label><textarea id="leadMessage" rows="4" required placeholder="e.g. Our budget is 50,000 and we want to start next month"></textarea></div>
-          <button class="btn full">Score lead</button>
-        </form></div>
-      <div class="card"><h3>Discovered leads</h3><p class="sub">Newest first</p><div id="leads-container" class="list"><div class="skel"></div><div class="skel"></div></div></div>
-    </div>
-  </section>
+    <main>
+      <div class="top">
+        <div>
+          <div class="crumb" id="crumb">WORKSPACE / OVERVIEW</div>
+          <h1 id="title">Business overview</h1>
+        </div>
+        <div class="tools">
+          <button class="chip" id="refresh"></button>
+          <div class="chip" style="cursor: default">
+            <i class="dot" id="dbDot"></i><span id="dbTxt">DB Connected</span>
+          </div>
+          <div class="chip" id="wsChip"></div>
+        </div>
+      </div>
 
-  <!-- FB COMMENTS -->
-  <section id="v-comments" class="hidden">
-    <div class="split">
-      <div class="card"><h3>Write a post</h3><p class="sub">Pick a platform and a topic</p>
-        <form id="contentForm" class="stack">
-          <div><label for="contentPlatform">Platform</label><select id="contentPlatform"><option>Facebook</option><option>Instagram</option><option>LinkedIn</option></select></div>
-          <div><label for="contentTopic">Topic</label><input id="contentTopic" required placeholder="e.g. 50% off weekend sale" /></div>
-          <button class="btn full">Generate post</button>
-        </form></div>
-      <div class="card"><h3>Posts and comments</h3><p class="sub">Review drafts, then approve to publish</p><div id="content-container" class="list"><div class="skel"></div><div class="skel"></div></div></div>
-    </div>
-  </section>
+      <!-- OVERVIEW -->
+      <section id="v-overview">
+        <div class="hero">
+          <div>
+            <div class="tag" id="wsTag">WORKSPACE: TEST</div>
+            <h2>Less busywork. More business.</h2>
+            <p>
+              Manage customer conversations, commerce operations and reviewed
+              business discovery from one workspace. All stats and cards update
+              live from your database.
+            </p>
+            <div class="row">
+              <button class="btn" data-view="orders">+ New Order</button
+              ><button class="btn ghost" data-view="inventory">
+                + Add Product
+              </button>
+            </div>
+          </div>
+          <div class="cta">
+            <button class="btn" data-view="inbox">
+              Messenger Inbox <span class="ar"></span>
+            </button>
+            <button class="btn white" data-view="comments">
+              FB Comments <span class="ar"></span>
+            </button>
+            <button class="btn white" data-view="leads">
+              Lead Discovery <span class="ar"></span>
+            </button>
+          </div>
+        </div>
+        <div class="kpis" id="kpis"></div>
+        <div class="card">
+          <div class="head">
+            <div>
+              <span class="ico" id="aiIco"></span>
+              <h3 id="ordersTitle">AI orders placed today</h3>
+            </div>
+            <button class="btn sm" data-view="orders">
+              Open Orders Manager <span class="ar"></span>
+            </button>
+          </div>
+          <p class="sub">
+            Live records from your database. Select a card above to see what is
+            behind the number.
+          </p>
+          <div class="tbl">
+            <table>
+              <thead>
+                <tr>
+                  <th>ORDER #</th>
+                  <th>CUSTOMER</th>
+                  <th>PHONE</th>
+                  <th>DELIVERY ADDRESS</th>
+                  <th>TOTAL (৳)</th>
+                  <th>PAYMENT</th>
+                  <th>CHANNEL</th>
+                  <th>STATUS</th>
+                </tr>
+              </thead>
+              <tbody id="ordersBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
-  <!-- FACEBOOK PAGES -->
-  <section id="v-pages" class="hidden">
-    <div class="card"><h3>Connect a page</h3><p class="sub">Approved posts publish to connected accounts</p>
-      <form id="connectForm" class="connect">
-        <div><label for="intPlatform">Platform</label><select id="intPlatform"><option>Facebook</option><option>LinkedIn</option><option>Instagram</option></select></div>
-        <div><label for="intName">Account name</label><input id="intName" required placeholder="My Shop" /></div>
-        <div><label for="intId">Page or account ID</label><input id="intId" required placeholder="123456789" /></div>
-        <div><label for="intToken">Access token</label><input type="password" id="intToken" required placeholder="Paste token" autocomplete="off" /></div>
-        <button class="btn">Connect</button>
-      </form></div>
-    <div class="accounts" id="accounts-container"><div class="skel"></div></div>
-  </section>
+      <!-- LEAD DISCOVERY -->
+      <section id="v-leads" class="hidden">
+        <div class="split">
+          <div class="card">
+            <h3>Add a lead</h3>
+            <p class="sub">AI scores it as soon as it arrives</p>
+            <form id="leadForm" class="stack">
+              <div>
+                <label for="leadName">Name</label
+                ><input id="leadName" required placeholder="Jane Cooper" />
+              </div>
+              <div>
+                <label for="leadEmail">Email</label
+                ><input
+                  type="email"
+                  id="leadEmail"
+                  required
+                  placeholder="jane@company.com"
+                />
+              </div>
+              <div>
+                <label for="leadMessage">Message</label
+                ><textarea
+                  id="leadMessage"
+                  rows="4"
+                  required
+                  placeholder="e.g. Our budget is 50,000 and we want to start next month"
+                ></textarea>
+              </div>
+              <button class="btn full">Score lead</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3>Discovered leads</h3>
+            <p class="sub">Newest first</p>
+            <div id="leads-container" class="list">
+              <div class="skel"></div>
+              <div class="skel"></div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-  <!-- GENERIC MODULES (filled by JS) -->
-  <section id="v-module" class="hidden"><div class="card empty" id="moduleBox"></div></section>
-</main>
-<div class="toasts" id="toasts" aria-live="polite"></div>
+      <!-- FB COMMENTS -->
+      <section id="v-comments" class="hidden">
+        <div class="split">
+          <div class="card">
+            <h3>Write a post</h3>
+            <p class="sub">Pick a platform and a topic</p>
+            <form id="contentForm" class="stack">
+              <div>
+                <label for="contentPlatform">Platform</label
+                ><select id="contentPlatform">
+                  <option>Facebook</option>
+                  <option>Instagram</option>
+                  <option>LinkedIn</option>
+                </select>
+              </div>
+              <div>
+                <label for="contentTopic">Topic</label
+                ><input
+                  id="contentTopic"
+                  required
+                  placeholder="e.g. 50% off weekend sale"
+                />
+              </div>
+              <button class="btn full">Generate post</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3>Posts and comments</h3>
+            <p class="sub">Review drafts, then approve to publish</p>
+            <div id="content-container" class="list">
+              <div class="skel"></div>
+              <div class="skel"></div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-<script>
-/* ================= CONFIG: change these to connect everything ================= */
-const CFG = {
-  tenantId: "org_123",
-  workspace: "Test",
-  user: { name: "Test", email: "test@example.com" },
-  n8n: { lead: "http://localhost:5678/webhook-test/lead-capture", content: "http://localhost:5678/webhook-test/generate-content" },
-  api: {                       // set a path to load live data; null = show sample data
-    stats: "/api/stats", leads: "/api/leads", content: "/api/content",
-    pages: "/api/integrations", connectPage: "/api/integrations/connect",
-    overview: "/api/overview",
-    orders: "/api/orders"
-  }
-};
-const SAMPLE = {
-  overview: { revenueToday:52480, revenueDelta:18.6, ordersTodayNote:"47 orders recorded today", ordersToday:472, ordersDelta:20.4,
-    aiOrders:450, aiDelta:19.7, collected:771840, collectedDelta:32.1, openThreads:563, threadsDelta:12.8,
-    needsReview:18, reviewDelta:-37.9, products:458, productsDelta:5.3, b2bLeads:676, leadsDelta:24.5 },
-  orders: [
-    {no:"ORD-105932",customer:"Rafiul Hasan",phone:"01712345678",address:"House 12, Road 4, Mirpur-10, Dhaka",total:2490,payment:"COD (unpaid)",channel:"Messenger AI",status:"confirmed"},
-    {no:"ORD-105931",customer:"Tasmia Akter",phone:"01987654321",address:"Flat B-5, Block C, Bashundhara, Dhaka",total:1990,payment:"Paid (bKash)",channel:"Facebook Comment",status:"processing"},
-    {no:"ORD-105930",customer:"Imran Hossain",phone:"01678901234",address:"Chowrasta, Gazipur Sadar, Gazipur",total:3480,payment:"COD (unpaid)",channel:"Messenger AI",status:"confirmed"},
-    {no:"ORD-105929",customer:"Nusrat Jahan",phone:"01823456789",address:"House 25, Road 7, Uttara, Dhaka",total:1650,payment:"Paid (Nagad)",channel:"Messenger AI",status:"delivered"},
-    {no:"ORD-105928",customer:"Arifur Rahman",phone:"01765432109",address:"Ward 5, Bogra Sadar, Bogra",total:2200,payment:"COD (unpaid)",channel:"Lead Discovery",status:"processing"}
-  ]
-};
+      <!-- FACEBOOK PAGES -->
+      <section id="v-pages" class="hidden">
+        <div class="card">
+          <h3>Connect a page</h3>
+          <p class="sub">Approved posts publish to connected accounts</p>
+          <form id="connectForm" class="connect">
+            <div>
+              <label for="intPlatform">Platform</label
+              ><select id="intPlatform">
+                <option>Facebook</option>
+                <option>LinkedIn</option>
+                <option>Instagram</option>
+              </select>
+            </div>
+            <div>
+              <label for="intName">Account name</label
+              ><input id="intName" required placeholder="My Shop" />
+            </div>
+            <div>
+              <label for="intId">Page or account ID</label
+              ><input id="intId" required placeholder="123456789" />
+            </div>
+            <div>
+              <label for="intToken">Access token</label
+              ><input
+                type="password"
+                id="intToken"
+                required
+                placeholder="Paste token"
+                autocomplete="off"
+              />
+            </div>
+            <button class="btn">Connect</button>
+          </form>
+        </div>
+        <div class="accounts" id="accounts-container">
+          <div class="skel"></div>
+        </div>
+      </section>
 
-/* ================= icons ================= */
-const P={overview:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
-leads:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/>',comments:'<path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12z"/>',
-inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/>',
-orders:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/>',
-fraud:'<path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6z"/>',
-inventory:'<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
-agent:'<path d="m12 3 1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
-analytics:'<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>',courier:'<rect x="2" y="6" width="12" height="10" rx="1"/><path d="M14 9h4l4 4v3h-8"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
-pages:'<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>',
-subscription:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/>',
-send:'<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/>',
-refresh:'<path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12A9 9 0 0 1 18.5 5.8L21 8"/><path d="M21 3v5h-5M3 21v-5h5"/>',
-logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',
-test:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6"/>'};
-const icon=n=>`<svg class="i" viewBox="0 0 24 24">${P[n]}</svg>`;
+      <!-- GENERIC MODULES (filled by JS) -->
+      <section id="v-module" class="hidden">
+        <div class="card empty" id="moduleBox"></div>
+      </section>
+    </main>
+    <div class="toasts" id="toasts" aria-live="polite"></div>
 
-/* ================= nav ================= */
-const NAV=[["WORKSPACE",[["overview","Overview"],["leads","Lead Discovery"],["comments","FB Comments"],["inbox","Messenger Inbox"],["orders","Orders"],["fraud","Fraud Shield"],["inventory","Inventory"]]],
-["AI & OPERATIONS",[["agent","AI Agent"],["analytics","Analytics"],["courier","Courier Hub"]]],
-["SETTINGS",[["pages","Facebook Pages"],["subscription","Subscription"]]]];
-const LABEL={};NAV.forEach(([,a])=>a.forEach(([k,t])=>LABEL[k]=t));
-const TITLE={overview:"Business overview",leads:"Lead Discovery",comments:"FB Comments",inbox:"Messenger Inbox",orders:"Orders",fraud:"Fraud Shield",inventory:"Inventory",agent:"AI Agent",analytics:"Analytics",courier:"Courier Hub",pages:"Facebook Pages",subscription:"Subscription"};
-const MODULE_HOOK={inbox:"/api/inbox",fraud:"/api/fraud",inventory:"/api/products",agent:"/api/agent",analytics:"/api/analytics",courier:"/api/courier",subscription:"/api/subscription",orders:"/api/orders"};
+    <script>
+      /* ================= CONFIG: change these to connect everything ================= */
+      const CFG = {
+        tenantId: "org_123",
+        workspace: "Test",
+        user: { name: "Test", email: "test@example.com" },
+        n8n: {
+          lead: "http://localhost:5678/webhook-test/lead-capture",
+          content: "http://localhost:5678/webhook-test/generate-content",
+        },
+        api: {
+          // set a path to load live data; null = show sample data
+          stats: "/api/stats",
+          leads: "/api/leads",
+          content: "/api/content",
+          pages: "/api/integrations",
+          connectPage: "/api/integrations/connect",
+          overview: "/api/overview",
+          orders: "/api/orders",
+        },
+      };
+      const SAMPLE = {
+        overview: {
+          revenueToday: 52480,
+          revenueDelta: 18.6,
+          ordersTodayNote: "47 orders recorded today",
+          ordersToday: 472,
+          ordersDelta: 20.4,
+          aiOrders: 450,
+          aiDelta: 19.7,
+          collected: 771840,
+          collectedDelta: 32.1,
+          openThreads: 563,
+          threadsDelta: 12.8,
+          needsReview: 18,
+          reviewDelta: -37.9,
+          products: 458,
+          productsDelta: 5.3,
+          b2bLeads: 676,
+          leadsDelta: 24.5,
+        },
+        orders: [
+          {
+            no: "ORD-105932",
+            customer: "Rafiul Hasan",
+            phone: "01712345678",
+            address: "House 12, Road 4, Mirpur-10, Dhaka",
+            total: 2490,
+            payment: "COD (unpaid)",
+            channel: "Messenger AI",
+            status: "confirmed",
+          },
+          {
+            no: "ORD-105931",
+            customer: "Tasmia Akter",
+            phone: "01987654321",
+            address: "Flat B-5, Block C, Bashundhara, Dhaka",
+            total: 1990,
+            payment: "Paid (bKash)",
+            channel: "Facebook Comment",
+            status: "processing",
+          },
+          {
+            no: "ORD-105930",
+            customer: "Imran Hossain",
+            phone: "01678901234",
+            address: "Chowrasta, Gazipur Sadar, Gazipur",
+            total: 3480,
+            payment: "COD (unpaid)",
+            channel: "Messenger AI",
+            status: "confirmed",
+          },
+          {
+            no: "ORD-105929",
+            customer: "Nusrat Jahan",
+            phone: "01823456789",
+            address: "House 25, Road 7, Uttara, Dhaka",
+            total: 1650,
+            payment: "Paid (Nagad)",
+            channel: "Messenger AI",
+            status: "delivered",
+          },
+          {
+            no: "ORD-105928",
+            customer: "Arifur Rahman",
+            phone: "01765432109",
+            address: "Ward 5, Bogra Sadar, Bogra",
+            total: 2200,
+            payment: "COD (unpaid)",
+            channel: "Lead Discovery",
+            status: "processing",
+          },
+        ],
+      };
 
-/* ================= helpers ================= */
-const $=id=>document.getElementById(id);
-const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const fmt=n=>Number(n).toLocaleString("en-IN");
-const empty=(t,h)=>`<div class="empty"><b>${t}</b>${h}</div>`;
-function toast(m,err){const t=document.createElement("div");t.className="toast"+(err?" err":"");t.textContent=m;$("toasts").appendChild(t);setTimeout(()=>t.remove(),4000)}
-async function getJSON(url){const r=await fetch(url);if(!r.ok)throw new Error(r.status);return r.json()}
-async function busy(form,text,fn){const b=form.querySelector("button"),l=b.innerText;b.innerText=text;b.disabled=true;try{await fn()}finally{b.innerText=l;b.disabled=false}}
-const post=(url,body,method="POST")=>fetch(url,{method,headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-const pill=(t,c)=>`<span class="pill p-${c}">${esc(t)}</span>`;
-const payC=p=>!/unpaid/i.test(p)?"green":"yellow";
-const chanC=c=>/messenger/i.test(c)?"green":/comment/i.test(c)?"blue":/lead/i.test(c)?"purple":"grey";
-const statC=s=>({confirmed:"green",processing:"blue",delivered:"green",cancelled:"red",pending:"yellow"})[String(s).toLowerCase()]||"grey";
+      /* ================= icons ================= */
+      const P = {
+        overview:
+          '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+        leads: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/>',
+        comments:
+          '<path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12z"/>',
+        inbox:
+          '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/>',
+        orders:
+          '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+        fraud: '<path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6z"/>',
+        inventory:
+          '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+        agent:
+          '<path d="m12 3 1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+        analytics: '<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>',
+        courier:
+          '<rect x="2" y="6" width="12" height="10" rx="1"/><path d="M14 9h4l4 4v3h-8"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+        pages:
+          '<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>',
+        subscription:
+          '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/>',
+        send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
+        bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/>',
+        refresh:
+          '<path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12A9 9 0 0 1 18.5 5.8L21 8"/><path d="M21 3v5h-5M3 21v-5h5"/>',
+        logout:
+          '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+        arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+        test: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6"/>',
+      };
+      const icon = (n) => `<svg class="i" viewBox="0 0 24 24">${P[n]}</svg>`;
 
-/* ================= navigation ================= */
-$("nav").innerHTML=NAV.map(([g,items])=>`<div class="grp">${g}</div>`+items.map(([k,t])=>`<button class="nav" data-view="${k}">${icon(k)}${t}</button>`).join("")).join("");
-$("logo").innerHTML=icon("send");$("bell").innerHTML=icon("bell");$("logout").innerHTML=icon("logout");
-$("refresh").innerHTML=icon("refresh")+"Refresh";$("wsChip").innerHTML=icon("test")+esc(CFG.workspace);
-$("aiIco").innerHTML=icon("agent");document.querySelectorAll(".ar").forEach(e=>e.innerHTML=icon("arrow"));
-$("uName").textContent=CFG.user.name;$("uMail").textContent=CFG.user.email;$("uAv").textContent=CFG.user.name[0].toUpperCase();
-$("wsTag").textContent="WORKSPACE: "+CFG.workspace.toUpperCase();
+      /* ================= nav ================= */
+      const NAV = [
+        [
+          "WORKSPACE",
+          [
+            ["overview", "Overview"],
+            ["leads", "Lead Discovery"],
+            ["comments", "FB Comments"],
+            ["inbox", "Messenger Inbox"],
+            ["orders", "Orders"],
+            ["fraud", "Fraud Shield"],
+            ["inventory", "Inventory"],
+          ],
+        ],
+        [
+          "AI & OPERATIONS",
+          [
+            ["agent", "AI Agent"],
+            ["analytics", "Analytics"],
+            ["courier", "Courier Hub"],
+          ],
+        ],
+        [
+          "SETTINGS",
+          [
+            ["pages", "Facebook Pages"],
+            ["subscription", "Subscription"],
+          ],
+        ],
+      ];
+      const LABEL = {};
+      NAV.forEach(([, a]) => a.forEach(([k, t]) => (LABEL[k] = t)));
+      const TITLE = {
+        overview: "Business overview",
+        leads: "Lead Discovery",
+        comments: "FB Comments",
+        inbox: "Messenger Inbox",
+        orders: "Orders",
+        fraud: "Fraud Shield",
+        inventory: "Inventory",
+        agent: "AI Agent",
+        analytics: "Analytics",
+        courier: "Courier Hub",
+        pages: "Facebook Pages",
+        subscription: "Subscription",
+      };
+      const MODULE_HOOK = {
+        inbox: "/api/inbox",
+        fraud: "/api/fraud",
+        inventory: "/api/products",
+        agent: "/api/agent",
+        analytics: "/api/analytics",
+        courier: "/api/courier",
+        subscription: "/api/subscription",
+        orders: "/api/orders",
+      };
 
-const REAL=["overview","leads","comments","pages"];
-let current="overview";
-function switchView(v){
-  current=v;
-  document.querySelectorAll("main > section").forEach(s=>s.classList.add("hidden"));
-  document.querySelectorAll(".nav").forEach(b=>b.classList.toggle("active",b.dataset.view===v));
-  const id=REAL.includes(v)?"v-"+v:"v-module";
-  $(id).classList.remove("hidden");
-  $("title").textContent=TITLE[v];$("crumb").textContent=`WORKSPACE / ${LABEL[v].toUpperCase()}`;
-  if(v==="overview")loadOverview();
-  else if(v==="leads")loadLeads();
-  else if(v==="comments")loadContent();
-  else if(v==="pages")loadPages();
-  else renderModule(v);
-}
-document.addEventListener("click",e=>{const b=e.target.closest("[data-view]");if(b)switchView(b.dataset.view)});
-$("refresh").onclick=()=>switchView(current);
+      /* ================= helpers ================= */
+      const $ = (id) => document.getElementById(id);
+      const esc = (s) =>
+        String(s ?? "").replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      const fmt = (n) => Number(n).toLocaleString("en-IN");
+      const empty = (t, h) => `<div class="empty"><b>${t}</b>${h}</div>`;
+      function toast(m, err) {
+        const t = document.createElement("div");
+        t.className = "toast" + (err ? " err" : "");
+        t.textContent = m;
+        $("toasts").appendChild(t);
+        setTimeout(() => t.remove(), 4000);
+      }
+      async function getJSON(url) {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+      }
+      async function busy(form, text, fn) {
+        const b = form.querySelector("button"),
+          l = b.innerText;
+        b.innerText = text;
+        b.disabled = true;
+        try {
+          await fn();
+        } finally {
+          b.innerText = l;
+          b.disabled = false;
+        }
+      }
+      const post = (url, body, method = "POST") =>
+        fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      const pill = (t, c) => `<span class="pill p-${c}">${esc(t)}</span>`;
+      const payC = (p) => (!/unpaid/i.test(p) ? "green" : "yellow");
+      const chanC = (c) =>
+        /messenger/i.test(c)
+          ? "green"
+          : /comment/i.test(c)
+            ? "blue"
+            : /lead/i.test(c)
+              ? "purple"
+              : "grey";
+      const statC = (s) =>
+        ({
+          confirmed: "green",
+          processing: "blue",
+          delivered: "green",
+          cancelled: "red",
+          pending: "yellow",
+        })[String(s).toLowerCase()] || "grey";
 
-/* ================= overview ================= */
-async function loadOverview(){
-  let o=SAMPLE.overview;
-  try{ if(CFG.api.overview)o=await getJSON(CFG.api.overview);
-       const s=await getJSON(CFG.api.stats); o={...o,b2bLeads:s.totalLeads}; $("dbDot").classList.remove("off");$("dbTxt").textContent="DB Connected";
-  }catch{ $("dbDot").classList.add("off");$("dbTxt").textContent="DB Offline" }
-  window.OV=o;const d=x=>`<span class="d">${x<0?"↓":"↑"} ${x>0?"+":""}${x}%</span>`;
-  const K=[
-   ["TODAY'S REVENUE","৳"+fmt(o.revenueToday),"c-green",d(o.revenueDelta),o.ordersTodayNote,"orders"],
-   ["ORDERS TODAY",fmt(o.ordersToday),"",d(o.ordersDelta),fmt(o.ordersTotal??o.ordersToday)+" total recorded orders in database","orders"],
-   ["AI ORDERS TODAY",fmt(o.aiOrders),"c-green",d(o.aiDelta),"Automatically taken by AI agent","agent",1],
-   ["COLLECTED REVENUE","৳"+fmt(o.collected),"c-green",d(o.collectedDelta),"Total lifetime volume in workspace","analytics"],
-   ["MESSENGER OPEN THREADS",fmt(o.openThreads),"c-blue",d(o.threadsDelta),fmt(o.openThreads)+" active conversation(s) in inbox","inbox"],
-   ["NEEDS HUMAN REVIEW",fmt(o.needsReview),"c-blue",d(o.reviewDelta),o.needsReview+" pending escalations","inbox"],
-   ["TOTAL PRODUCTS",fmt(o.products),"c-blue",d(o.productsDelta),fmt(o.products)+" total units","inventory"],
-   ["B2B LEADS",fmt(o.b2bLeads),"c-purple",d(o.leadsDelta),fmt(o.b2bLeads)+" retail & boutique leads discovered","leads"]];
-  $("kpis").innerHTML=K.map(([l,v,c,dl,cap,view,auto])=>`<div class="card kpi ${auto?"auto":""}" data-view="${view}" style="cursor:pointer"><div class="l"><span>${l}</span>${auto?'<span class="auto-tag">AUTONOMOUS</span>':""}</div><div class="v"><span class="${c}">${v}</span>${dl}</div><p>${esc(cap)}</p></div>`).join("");
-  loadOrders("ordersBody",5);
-}
-async function loadOrders(target,limit){
-  let rows;
-  try{ rows=await getJSON(`${CFG.api.orders}?limit=${limit||100}${limit?"&today=1&ai=1":""}`) }
-  catch{ rows=SAMPLE.orders.slice(0,limit||99) }
-  $(target).innerHTML=rows.length?rows.map(r=>`<tr><td><b>${esc(r.no)}</b></td><td>${esc(r.customer)}</td><td>${esc(r.phone)}</td><td>${esc(r.address)}</td><td class="c-green"><b>৳${Number(r.total).toLocaleString("en-IN",{minimumFractionDigits:2})}</b></td><td>${pill(r.payment,payC(r.payment))}</td><td>${pill(r.channel,chanC(r.channel))}</td><td>${pill(r.status,statC(r.status))}</td></tr>`).join(""):`<tr><td colspan="8" class="empty">No AI orders yet today.</td></tr>`;
-  if(target==="ordersBody")$("ordersTitle").textContent=`AI orders placed today (${fmt((window.OV||SAMPLE.overview).aiOrders)})`;
-}
+      /* ================= navigation ================= */
+      $("nav").innerHTML = NAV.map(
+        ([g, items]) =>
+          `<div class="grp">${g}</div>` +
+          items
+            .map(
+              ([k, t]) =>
+                `<button class="nav" data-view="${k}">${icon(k)}${t}</button>`,
+            )
+            .join(""),
+      ).join("");
+      $("logo").innerHTML = icon("send");
+      $("bell").innerHTML = icon("bell");
+      $("logout").innerHTML = icon("logout");
+      $("refresh").innerHTML = icon("refresh") + "Refresh";
+      $("wsChip").innerHTML = icon("test") + esc(CFG.workspace);
+      $("aiIco").innerHTML = icon("agent");
+      document
+        .querySelectorAll(".ar")
+        .forEach((e) => (e.innerHTML = icon("arrow")));
+      $("uName").textContent = CFG.user.name;
+      $("uMail").textContent = CFG.user.email;
+      $("uAv").textContent = CFG.user.name[0].toUpperCase();
+      $("wsTag").textContent = "WORKSPACE: " + CFG.workspace.toUpperCase();
 
-/* ================= lead discovery ================= */
-$("leadForm").addEventListener("submit",function(e){e.preventDefault();
-  busy(this,"Scoring...",async()=>{
-    const p={tenantId:CFG.tenantId,eventId:"form_evt_"+Date.now(),leadId:"lead_"+Date.now(),name:$("leadName").value,email:$("leadEmail").value,message:$("leadMessage").value};
-    try{await post(CFG.n8n.lead,p);await new Promise(r=>setTimeout(r,2000));this.reset();loadLeads();toast("Lead sent to AI for scoring")}
-    catch{toast("Couldn't reach n8n. Check that it's running.",true)}})});
-async function loadLeads(){
-  const box=$("leads-container");
-  try{const L=await getJSON(CFG.api.leads);
-    box.innerHTML=!L.length?empty("No leads yet","Add your first lead and AI will score it."):L.map(l=>{const h=l.aiStatus==="Hot";
-      return `<div class="item ${h?"hot":""}"><div class="item-top"><div><h4>${esc(l.name)}</h4><small>${esc(l.email)}</small></div>${pill(l.aiStatus+" · "+l.aiScore,h?"red":"blue")}</div><div class="quote">${esc(l.aiReason)}</div></div>`}).join("");
-  }catch{box.innerHTML=empty("Couldn't load leads","Check that the backend is running, then refresh.")}
-}
+      const REAL = ["overview", "leads", "comments", "pages"];
+      let current = "overview";
+      function switchView(v) {
+        current = v;
+        document
+          .querySelectorAll("main > section")
+          .forEach((s) => s.classList.add("hidden"));
+        document
+          .querySelectorAll(".nav")
+          .forEach((b) => b.classList.toggle("active", b.dataset.view === v));
+        const id = REAL.includes(v) ? "v-" + v : "v-module";
+        $(id).classList.remove("hidden");
+        $("title").textContent = TITLE[v];
+        $("crumb").textContent = `WORKSPACE / ${LABEL[v].toUpperCase()}`;
+        if (v === "overview") loadOverview();
+        else if (v === "leads") loadLeads();
+        else if (v === "comments") loadContent();
+        else if (v === "pages") loadPages();
+        else renderModule(v);
+      }
+      document.addEventListener("click", (e) => {
+        const b = e.target.closest("[data-view]");
+        if (b) switchView(b.dataset.view);
+      });
+      $("refresh").onclick = () => switchView(current);
 
-/* ================= fb comments / content ================= */
-$("contentForm").addEventListener("submit",function(e){e.preventDefault();
-  busy(this,"Generating...",async()=>{
-    try{await post(CFG.n8n.content,{tenantId:CFG.tenantId,platform:$("contentPlatform").value,topic:$("contentTopic").value});
-      await new Promise(r=>setTimeout(r,3000));this.reset();loadContent();toast("Draft post created")}
-    catch{toast("Couldn't reach n8n. Check that it's running.",true)}})});
-async function loadContent(){
-  const box=$("content-container");
-  try{const I=await getJSON(CFG.api.content);
-    box.innerHTML=!I.length?empty("No posts yet","Write a post and it will appear here as a draft."):I.map(i=>{const ok=i.status==="Approved";
-      return `<div class="item ${ok?"ok":"draft"}"><div class="item-top"><div><h4>${esc(i.platform)} post</h4><small>Topic: ${esc(i.topic)}</small></div>${pill(i.status,ok?"green":"yellow")}</div><p class="post">${esc(i.generatedText)}</p><div class="item-foot"><span>${ok?"Live on "+esc(i.platform):"Waiting for your review"}</span>${ok?pill("Published","green"):`<button class="btn sm" data-approve="${esc(i.id)}" data-platform="${esc(i.platform)}">Approve and publish</button>`}</div></div>`}).join("");
-  }catch{box.innerHTML=empty("Couldn't load posts","Check that the backend is running, then refresh.")}
-}
-document.addEventListener("click",async e=>{const b=e.target.closest("[data-approve]");if(!b)return;
-  try{const r=await post(`/api/content/${b.dataset.approve}/approve`,{platform:b.dataset.platform},"PUT");
-    if(r.ok){loadContent();toast("Published to "+b.dataset.platform)}else toast("Couldn't publish. Check the Node.js terminal.",true)}
-  catch{toast("Couldn't reach the backend.",true)}});
+      /* ================= overview ================= */
+      async function loadOverview() {
+        let o = SAMPLE.overview;
+        try {
+          if (CFG.api.overview) o = await getJSON(CFG.api.overview);
+          const s = await getJSON(CFG.api.stats);
+          o = { ...o, b2bLeads: s.totalLeads };
+          $("dbDot").classList.remove("off");
+          $("dbTxt").textContent = "DB Connected";
+        } catch {
+          $("dbDot").classList.add("off");
+          $("dbTxt").textContent = "DB Offline";
+        }
+        window.OV = o;
+        const d = (x) =>
+          `<span class="d">${x < 0 ? "↓" : "↑"} ${x > 0 ? "+" : ""}${x}%</span>`;
+        const K = [
+          [
+            "TODAY'S REVENUE",
+            "৳" + fmt(o.revenueToday),
+            "c-green",
+            d(o.revenueDelta),
+            o.ordersTodayNote,
+            "orders",
+          ],
+          [
+            "ORDERS TODAY",
+            fmt(o.ordersToday),
+            "",
+            d(o.ordersDelta),
+            fmt(o.ordersTotal ?? o.ordersToday) +
+              " total recorded orders in database",
+            "orders",
+          ],
+          [
+            "AI ORDERS TODAY",
+            fmt(o.aiOrders),
+            "c-green",
+            d(o.aiDelta),
+            "Automatically taken by AI agent",
+            "agent",
+            1,
+          ],
+          [
+            "COLLECTED REVENUE",
+            "৳" + fmt(o.collected),
+            "c-green",
+            d(o.collectedDelta),
+            "Total lifetime volume in workspace",
+            "analytics",
+          ],
+          [
+            "MESSENGER OPEN THREADS",
+            fmt(o.openThreads),
+            "c-blue",
+            d(o.threadsDelta),
+            fmt(o.openThreads) + " active conversation(s) in inbox",
+            "inbox",
+          ],
+          [
+            "NEEDS HUMAN REVIEW",
+            fmt(o.needsReview),
+            "c-blue",
+            d(o.reviewDelta),
+            o.needsReview + " pending escalations",
+            "inbox",
+          ],
+          [
+            "TOTAL PRODUCTS",
+            fmt(o.products),
+            "c-blue",
+            d(o.productsDelta),
+            fmt(o.products) + " total units",
+            "inventory",
+          ],
+          [
+            "B2B LEADS",
+            fmt(o.b2bLeads),
+            "c-purple",
+            d(o.leadsDelta),
+            fmt(o.b2bLeads) + " retail & boutique leads discovered",
+            "leads",
+          ],
+        ];
+        $("kpis").innerHTML = K.map(
+          ([l, v, c, dl, cap, view, auto]) =>
+            `<div class="card kpi ${auto ? "auto" : ""}" data-view="${view}" style="cursor:pointer"><div class="l"><span>${l}</span>${auto ? '<span class="auto-tag">AUTONOMOUS</span>' : ""}</div><div class="v"><span class="${c}">${v}</span>${dl}</div><p>${esc(cap)}</p></div>`,
+        ).join("");
+        loadOrders("ordersBody", 5);
+      }
+      async function loadOrders(target, limit) {
+        let rows;
+        try {
+          rows = await getJSON(
+            `${CFG.api.orders}?limit=${limit || 100}${limit ? "&today=1&ai=1" : ""}`,
+          );
+        } catch {
+          rows = SAMPLE.orders.slice(0, limit || 99);
+        }
+        $(target).innerHTML = rows.length
+          ? rows
+              .map(
+                (r) =>
+                  `<tr><td><b>${esc(r.no)}</b></td><td>${esc(r.customer)}</td><td>${esc(r.phone)}</td><td>${esc(r.address)}</td><td class="c-green"><b>৳${Number(r.total).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</b></td><td>${pill(r.payment, payC(r.payment))}</td><td>${pill(r.channel, chanC(r.channel))}</td><td>${pill(r.status, statC(r.status))}</td></tr>`,
+              )
+              .join("")
+          : `<tr><td colspan="8" class="empty">No AI orders yet today.</td></tr>`;
+        if (target === "ordersBody")
+          $("ordersTitle").textContent =
+            `AI orders placed today (${fmt((window.OV || SAMPLE.overview).aiOrders)})`;
+      }
 
-/* ================= facebook pages ================= */
-$("connectForm").addEventListener("submit",function(e){e.preventDefault();
-  busy(this,"Connecting...",async()=>{
-    try{const r=await post(CFG.api.connectPage,{organizationId:CFG.tenantId,platform:$("intPlatform").value,accountName:$("intName").value,accountId:$("intId").value,accessToken:$("intToken").value});
-      if(!r.ok)throw 0;this.reset();loadPages();toast("Account connected")}
-    catch{toast("Couldn't connect the account. Check your details.",true)}})});
-async function loadPages(){
-  const box=$("accounts-container");
-  try{const A=await getJSON(CFG.api.pages);
-    box.innerHTML=!A.length?`<div class="card" style="grid-column:1/-1">${empty("No pages connected","Connect one above to start publishing.")}</div>`:A.map(a=>`<div class="card acct"><div class="ico">${esc(a.platform).charAt(0)}</div><div><h4>${esc(a.platform)}</h4><p>${esc(a.accountName)} · ID ${esc(a.accountId)}</p></div><button class="btn sm danger" data-disconnect="${esc(a.id)}">Disconnect</button></div>`).join("");
-  }catch{box.innerHTML=`<div class="card" style="grid-column:1/-1">${empty("Couldn't load pages","Check the backend terminal for errors.")}</div>`}
-}
-document.addEventListener("click",async e=>{const b=e.target.closest("[data-disconnect]");if(!b)return;
-  if(!confirm("Disconnect this page? Approved posts will no longer publish to it."))return;
-  try{const r=await fetch(`/api/integrations/${b.dataset.disconnect}`,{method:"DELETE"});
-    if(r.ok){loadPages();toast("Page disconnected")}else toast("Couldn't disconnect.",true)}catch{toast("Couldn't reach the backend.",true)}});
+      /* ================= lead discovery ================= */
+      $("leadForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+        busy(this, "Scoring...", async () => {
+          const p = {
+            tenantId: CFG.tenantId,
+            eventId: "form_evt_" + Date.now(),
+            leadId: "lead_" + Date.now(),
+            name: $("leadName").value,
+            email: $("leadEmail").value,
+            message: $("leadMessage").value,
+          };
+          try {
+            await post(CFG.n8n.lead, p);
+            await new Promise((r) => setTimeout(r, 2000));
+            this.reset();
+            loadLeads();
+            toast("Lead sent to AI for scoring");
+          } catch {
+            toast("Couldn't reach n8n. Check that it's running.", true);
+          }
+        });
+      });
+      async function loadLeads() {
+        const box = $("leads-container");
+        try {
+          const L = await getJSON(CFG.api.leads);
+          box.innerHTML = !L.length
+            ? empty("No leads yet", "Add your first lead and AI will score it.")
+            : L.map((l) => {
+                const h = l.aiStatus === "Hot";
+                return `<div class="item ${h ? "hot" : ""}"><div class="item-top"><div><h4>${esc(l.name)}</h4><small>${esc(l.email)}</small></div>${pill(l.aiStatus + " · " + l.aiScore, h ? "red" : "blue")}</div><div class="quote">${esc(l.aiReason)}</div></div>`;
+              }).join("");
+        } catch {
+          box.innerHTML = empty(
+            "Couldn't load leads",
+            "Check that the backend is running, then refresh.",
+          );
+        }
+      }
 
-/* ================= modules (orders, inventory, inbox, fraud, courier, agent, analytics, subscription) ================= */
-const STAT=["pending","confirmed","processing","shipped","delivered","cancelled","on_hold"];
-const act=(m,u,b,prompt,label,text,cls="")=>`<button class="btn sm ${cls}" data-call="${m}|${u}"${b?` data-body="${esc(JSON.stringify(b))}"`:""}${prompt?` data-prompt="${prompt}" data-label="${esc(label)}"`:""}>${text}</button>`;
-const riskC=n=>n>=70?"red":n>=30?"yellow":"green";
-const when=t=>t?new Date(t).toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):"";
-const MOD={
- orders:{title:"All orders",url:"/api/orders?limit=100",hint:"Create the first order with the form.",
-  cols:[["ORDER #",r=>`<b>${esc(r.no)}</b>`],["CUSTOMER",r=>esc(r.customer)],["PHONE",r=>esc(r.phone)],["ADDRESS",r=>esc(r.address)],["TOTAL (৳)",r=>`<b class="c-green">৳${fmt(r.total)}</b>`],["PAYMENT",r=>pill(r.payment,payC(r.payment))],["CHANNEL",r=>pill(r.channel,chanC(r.channel))],["STATUS",r=>`<select data-status="${r.id}">${STAT.map(x=>`<option ${x===r.status?"selected":""}>${x}</option>`).join("")}</select>`]],
-  form:{title:"New order",url:"/api/orders",f:[["customerName","Customer"],["phone","Phone","tel"],["address","Delivery address"],["total","Total (৳)","number"],["paymentMethod","Payment",["COD","bKash","Nagad","Card"]]]}},
- inventory:{title:"Products",url:"/api/products",hint:"Add your first product with the form.",
-  cols:[["PRODUCT",r=>`<b>${esc(r.name)}</b>`],["SKU",r=>esc(r.sku)],["PRICE (৳)",r=>fmt(r.price)],["STOCK",r=>pill(r.stock+(r.stock<=r.lowStockAt?" · low":""),r.stock<=r.lowStockAt?"red":"green")],["CATEGORY",r=>esc(r.category)],["",r=>act("DELETE","/api/products/"+r.id,null,"","","Delete","danger")]],
-  form:{title:"Add product",url:"/api/products",f:[["name","Name"],["sku","SKU"],["price","Price (৳)","number"],["stock","Stock","number"],["category","Category"]]}},
- inbox:{title:"Conversations",url:"/api/conversations",hint:"Messages appear here when n8n posts them to /api/inbox/inbound.",
-  cols:[["CUSTOMER",r=>`<b>${esc(r.customer)}</b>${r.unread?` ${pill(r.unread+" new","blue")}`:""}`],["CHANNEL",r=>esc(r.channel)],["LAST MESSAGE",r=>esc((r.last||"").slice(0,70))],["STATUS",r=>pill(r.status.replace("_"," "),{needs_review:"red",open:"blue",closed:"grey"}[r.status])],["UPDATED",r=>when(r.time)],["",r=>act("POST",`/api/conversations/${r.id}/reply`,null,"text","Your reply to "+r.customer,"Reply")+act("PUT","/api/conversations/"+r.id,{status:"closed"},"","","Resolve","danger")]]},
- fraud:{title:"Risky orders",url:"/api/fraud/orders",hint:"No orders have been flagged. That's a good sign.",
-  cols:[["ORDER #",r=>`<b>${esc(r.no)}</b>`],["CUSTOMER",r=>esc(r.customer)],["PHONE",r=>esc(r.phone)],["RISK",r=>pill(r.risk+" / 100",riskC(r.risk))],["WHY",r=>esc(r.reasons.join("; "))],["STATUS",r=>pill(r.status,statC(r.status))],["",r=>act("POST","/api/fraud/blacklist",{phone:r.phone,reason:"Blocked from Fraud Shield"},"","","Block phone","danger")]]},
- courier:{title:"Shipments",url:"/api/courier/shipments",hint:"Confirmed orders show up here, ready to ship.",
-  cols:[["ORDER #",r=>`<b>${esc(r.no)}</b>`],["CUSTOMER",r=>esc(r.customer)],["ADDRESS",r=>esc(r.address)],["COURIER",r=>esc(r.courier||"—")],["TRACKING",r=>esc(r.tracking||"—")],["STATUS",r=>pill(r.status,statC(r.status))],["",r=>r.courier?"":act("POST",`/api/orders/${r.id}/ship`,null,"courier","Courier (Pathao, Steadfast or RedX)","Ship")]]}
-};
-const failBox=(v)=>`<div class="card">${empty("Couldn't load "+LABEL[v],"Check that the backend is running, then refresh.")}</div>`;
-async function renderModule(v){
-  const box=$("v-module");
-  if(v==="agent")return renderAgent(box);
-  if(v==="analytics")return renderAnalytics(box);
-  if(v==="subscription")return renderSub(box);
-  const m=MOD[v];box.innerHTML='<div class="skel"></div>';
-  let rows;try{rows=await getJSON(m.url)}catch{box.innerHTML=failBox(v);return}
-  const table=`<div class="card"><h3>${m.title}</h3><p class="sub">${rows.length} record(s)</p>${rows.length?`<div class="tbl"><table><thead><tr>${m.cols.map(c=>`<th>${c[0]}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${m.cols.map(c=>`<td>${c[1](r)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`:empty("Nothing here yet",m.hint)}</div>`;
-  if(!m.form){box.innerHTML=table;return}
-  const fld=([k,l,t])=>`<div><label>${l}</label>${Array.isArray(t)?`<select name="${k}">${t.map(o=>`<option>${o}</option>`).join("")}</select>`:`<input name="${k}" type="${t||"text"}" step="any" required />`}</div>`;
-  box.innerHTML=`<div class="split"><div class="card"><h3>${m.form.title}</h3><p class="sub">&nbsp;</p><form class="stack" data-post="${m.form.url}">${m.form.f.map(fld).join("")}<button class="btn full">Save</button></form></div>${table}</div>`;
-}
-async function renderAgent(box){
-  let c;try{c=await getJSON("/api/agent")}catch{box.innerHTML=failBox("agent");return}
-  const yn=(k)=>`<select name="${k}"><option value="true" ${c[k]?"selected":""}>On</option><option value="false" ${c[k]?"":"selected"}>Off</option></select>`;
-  box.innerHTML=`<div class="card" style="max-width:620px"><h3>AI agent settings</h3><p class="sub">Controls how the agent handles Messenger chats and orders.</p><form class="stack" data-put="/api/agent">
+      /* ================= fb comments / content ================= */
+      $("contentForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+        busy(this, "Generating...", async () => {
+          try {
+            await post(CFG.n8n.content, {
+              tenantId: CFG.tenantId,
+              platform: $("contentPlatform").value,
+              topic: $("contentTopic").value,
+            });
+            await new Promise((r) => setTimeout(r, 3000));
+            this.reset();
+            loadContent();
+            toast("Draft post created");
+          } catch {
+            toast("Couldn't reach n8n. Check that it's running.", true);
+          }
+        });
+      });
+      async function loadContent() {
+        const box = $("content-container");
+        try {
+          const I = await getJSON(CFG.api.content);
+          box.innerHTML = !I.length
+            ? empty(
+                "No posts yet",
+                "Write a post and it will appear here as a draft.",
+              )
+            : I.map((i) => {
+                const ok = i.status === "Approved";
+                return `<div class="item ${ok ? "ok" : "draft"}"><div class="item-top"><div><h4>${esc(i.platform)} post</h4><small>Topic: ${esc(i.topic)}</small></div>${pill(i.status, ok ? "green" : "yellow")}</div><p class="post">${esc(i.generatedText)}</p><div class="item-foot"><span>${ok ? "Live on " + esc(i.platform) : "Waiting for your review"}</span>${ok ? pill("Published", "green") : `<button class="btn sm" data-approve="${esc(i.id)}" data-platform="${esc(i.platform)}">Approve and publish</button>`}</div></div>`;
+              }).join("");
+        } catch {
+          box.innerHTML = empty(
+            "Couldn't load posts",
+            "Check that the backend is running, then refresh.",
+          );
+        }
+      }
+      document.addEventListener("click", async (e) => {
+        const b = e.target.closest("[data-approve]");
+        if (!b) return;
+        try {
+          const r = await post(
+            `/api/content/${b.dataset.approve}/approve`,
+            { platform: b.dataset.platform },
+            "PUT",
+          );
+          if (r.ok) {
+            loadContent();
+            toast("Published to " + b.dataset.platform);
+          } else toast("Couldn't publish. Check the Node.js terminal.", true);
+        } catch {
+          toast("Couldn't reach the backend.", true);
+        }
+      });
+
+      /* ================= facebook pages ================= */
+      $("connectForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+        busy(this, "Connecting...", async () => {
+          try {
+            const r = await post(CFG.api.connectPage, {
+              organizationId: CFG.tenantId,
+              platform: $("intPlatform").value,
+              accountName: $("intName").value,
+              accountId: $("intId").value,
+              accessToken: $("intToken").value,
+            });
+            if (!r.ok) throw 0;
+            this.reset();
+            loadPages();
+            toast("Account connected");
+          } catch {
+            toast("Couldn't connect the account. Check your details.", true);
+          }
+        });
+      });
+      async function loadPages() {
+        const box = $("accounts-container");
+        try {
+          const A = await getJSON(CFG.api.pages);
+          box.innerHTML = !A.length
+            ? `<div class="card" style="grid-column:1/-1">${empty("No pages connected", "Connect one above to start publishing.")}</div>`
+            : A.map(
+                (a) =>
+                  `<div class="card acct"><div class="ico">${esc(a.platform).charAt(0)}</div><div><h4>${esc(a.platform)}</h4><p>${esc(a.accountName)} · ID ${esc(a.accountId)}</p></div><button class="btn sm danger" data-disconnect="${esc(a.id)}">Disconnect</button></div>`,
+              ).join("");
+        } catch {
+          box.innerHTML = `<div class="card" style="grid-column:1/-1">${empty("Couldn't load pages", "Check the backend terminal for errors.")}</div>`;
+        }
+      }
+      document.addEventListener("click", async (e) => {
+        const b = e.target.closest("[data-disconnect]");
+        if (!b) return;
+        if (
+          !confirm(
+            "Disconnect this page? Approved posts will no longer publish to it.",
+          )
+        )
+          return;
+        try {
+          const r = await fetch(`/api/integrations/${b.dataset.disconnect}`, {
+            method: "DELETE",
+          });
+          if (r.ok) {
+            loadPages();
+            toast("Page disconnected");
+          } else toast("Couldn't disconnect.", true);
+        } catch {
+          toast("Couldn't reach the backend.", true);
+        }
+      });
+
+      /* ================= modules (orders, inventory, inbox, fraud, courier, agent, analytics, subscription) ================= */
+      const STAT = [
+        "pending",
+        "confirmed",
+        "processing",
+        "shipped",
+        "delivered",
+        "cancelled",
+        "on_hold",
+      ];
+      const act = (m, u, b, prompt, label, text, cls = "") =>
+        `<button class="btn sm ${cls}" data-call="${m}|${u}"${b ? ` data-body="${esc(JSON.stringify(b))}"` : ""}${prompt ? ` data-prompt="${prompt}" data-label="${esc(label)}"` : ""}>${text}</button>`;
+      const riskC = (n) => (n >= 70 ? "red" : n >= 30 ? "yellow" : "green");
+      const when = (t) =>
+        t
+          ? new Date(t).toLocaleString([], {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "";
+      const MOD = {
+        orders: {
+          title: "All orders",
+          url: "/api/orders?limit=100",
+          hint: "Create the first order with the form.",
+          cols: [
+            ["ORDER #", (r) => `<b>${esc(r.no)}</b>`],
+            ["CUSTOMER", (r) => esc(r.customer)],
+            ["PHONE", (r) => esc(r.phone)],
+            ["ADDRESS", (r) => esc(r.address)],
+            ["TOTAL (৳)", (r) => `<b class="c-green">৳${fmt(r.total)}</b>`],
+            ["PAYMENT", (r) => pill(r.payment, payC(r.payment))],
+            ["CHANNEL", (r) => pill(r.channel, chanC(r.channel))],
+            [
+              "STATUS",
+              (r) =>
+                `<select data-status="${r.id}">${STAT.map((x) => `<option ${x === r.status ? "selected" : ""}>${x}</option>`).join("")}</select>`,
+            ],
+          ],
+          form: {
+            title: "New order",
+            url: "/api/orders",
+            f: [
+              ["customerName", "Customer"],
+              ["phone", "Phone", "tel"],
+              ["address", "Delivery address"],
+              ["total", "Total (৳)", "number"],
+              ["paymentMethod", "Payment", ["COD", "bKash", "Nagad", "Card"]],
+            ],
+          },
+        },
+        inventory: {
+          title: "Products",
+          url: "/api/products",
+          hint: "Add your first product with the form.",
+          cols: [
+            ["PRODUCT", (r) => `<b>${esc(r.name)}</b>`],
+            ["SKU", (r) => esc(r.sku)],
+            ["PRICE (৳)", (r) => fmt(r.price)],
+            [
+              "STOCK",
+              (r) =>
+                pill(
+                  r.stock + (r.stock <= r.lowStockAt ? " · low" : ""),
+                  r.stock <= r.lowStockAt ? "red" : "green",
+                ),
+            ],
+            ["CATEGORY", (r) => esc(r.category)],
+            [
+              "",
+              (r) =>
+                act(
+                  "DELETE",
+                  "/api/products/" + r.id,
+                  null,
+                  "",
+                  "",
+                  "Delete",
+                  "danger",
+                ),
+            ],
+          ],
+          form: {
+            title: "Add product",
+            url: "/api/products",
+            f: [
+              ["name", "Name"],
+              ["sku", "SKU"],
+              ["price", "Price (৳)", "number"],
+              ["stock", "Stock", "number"],
+              ["category", "Category"],
+            ],
+          },
+        },
+        inbox: {
+          title: "Conversations",
+          url: "/api/conversations",
+          hint: "Messages appear here when n8n posts them to /api/inbox/inbound.",
+          cols: [
+            [
+              "CUSTOMER",
+              (r) =>
+                `<b>${esc(r.customer)}</b>${r.unread ? ` ${pill(r.unread + " new", "blue")}` : ""}`,
+            ],
+            ["CHANNEL", (r) => esc(r.channel)],
+            ["LAST MESSAGE", (r) => esc((r.last || "").slice(0, 70))],
+            [
+              "STATUS",
+              (r) =>
+                pill(
+                  r.status.replace("_", " "),
+                  { needs_review: "red", open: "blue", closed: "grey" }[
+                    r.status
+                  ],
+                ),
+            ],
+            ["UPDATED", (r) => when(r.time)],
+            [
+              "",
+              (r) =>
+                act(
+                  "POST",
+                  `/api/conversations/${r.id}/reply`,
+                  null,
+                  "text",
+                  "Your reply to " + r.customer,
+                  "Reply",
+                ) +
+                act(
+                  "PUT",
+                  "/api/conversations/" + r.id,
+                  { status: "closed" },
+                  "",
+                  "",
+                  "Resolve",
+                  "danger",
+                ),
+            ],
+          ],
+        },
+        fraud: {
+          title: "Risky orders",
+          url: "/api/fraud/orders",
+          hint: "No orders have been flagged. That's a good sign.",
+          cols: [
+            ["ORDER #", (r) => `<b>${esc(r.no)}</b>`],
+            ["CUSTOMER", (r) => esc(r.customer)],
+            ["PHONE", (r) => esc(r.phone)],
+            ["RISK", (r) => pill(r.risk + " / 100", riskC(r.risk))],
+            ["WHY", (r) => esc(r.reasons.join("; "))],
+            ["STATUS", (r) => pill(r.status, statC(r.status))],
+            [
+              "",
+              (r) =>
+                act(
+                  "POST",
+                  "/api/fraud/blacklist",
+                  { phone: r.phone, reason: "Blocked from Fraud Shield" },
+                  "",
+                  "",
+                  "Block phone",
+                  "danger",
+                ),
+            ],
+          ],
+        },
+        courier: {
+          title: "Shipments",
+          url: "/api/courier/shipments",
+          hint: "Confirmed orders show up here, ready to ship.",
+          cols: [
+            ["ORDER #", (r) => `<b>${esc(r.no)}</b>`],
+            ["CUSTOMER", (r) => esc(r.customer)],
+            ["ADDRESS", (r) => esc(r.address)],
+            ["COURIER", (r) => esc(r.courier || "—")],
+            ["TRACKING", (r) => esc(r.tracking || "—")],
+            ["STATUS", (r) => pill(r.status, statC(r.status))],
+            [
+              "",
+              (r) =>
+                r.courier
+                  ? ""
+                  : act(
+                      "POST",
+                      `/api/orders/${r.id}/ship`,
+                      null,
+                      "courier",
+                      "Courier (Pathao, Steadfast or RedX)",
+                      "Ship",
+                    ),
+            ],
+          ],
+        },
+      };
+      const failBox = (v) =>
+        `<div class="card">${empty("Couldn't load " + LABEL[v], "Check that the backend is running, then refresh.")}</div>`;
+      async function renderModule(v) {
+        const box = $("v-module");
+        if (v === "agent") return renderAgent(box);
+        if (v === "analytics") return renderAnalytics(box);
+        if (v === "subscription") return renderSub(box);
+        const m = MOD[v];
+        box.innerHTML = '<div class="skel"></div>';
+        let rows;
+        try {
+          rows = await getJSON(m.url);
+        } catch {
+          box.innerHTML = failBox(v);
+          return;
+        }
+        const table = `<div class="card"><h3>${m.title}</h3><p class="sub">${rows.length} record(s)</p>${rows.length ? `<div class="tbl"><table><thead><tr>${m.cols.map((c) => `<th>${c[0]}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${m.cols.map((c) => `<td>${c[1](r)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>` : empty("Nothing here yet", m.hint)}</div>`;
+        if (!m.form) {
+          box.innerHTML = table;
+          return;
+        }
+        const fld = ([k, l, t]) =>
+          `<div><label>${l}</label>${Array.isArray(t) ? `<select name="${k}">${t.map((o) => `<option>${o}</option>`).join("")}</select>` : `<input name="${k}" type="${t || "text"}" step="any" required />`}</div>`;
+        box.innerHTML = `<div class="split"><div class="card"><h3>${m.form.title}</h3><p class="sub">&nbsp;</p><form class="stack" data-post="${m.form.url}">${m.form.f.map(fld).join("")}<button class="btn full">Save</button></form></div>${table}</div>`;
+      }
+      async function renderAgent(box) {
+        let c;
+        try {
+          c = await getJSON("/api/agent");
+        } catch {
+          box.innerHTML = failBox("agent");
+          return;
+        }
+        const yn = (k) =>
+          `<select name="${k}"><option value="true" ${c[k] ? "selected" : ""}>On</option><option value="false" ${c[k] ? "" : "selected"}>Off</option></select>`;
+        box.innerHTML = `<div class="card" style="max-width:620px"><h3>AI agent settings</h3><p class="sub">Controls how the agent handles Messenger chats and orders.</p><form class="stack" data-put="/api/agent">
   <div><label>Agent status</label>${yn("enabled")}</div><div><label>Auto-confirm orders</label>${yn("autoConfirm")}</div>
-  <div><label>Tone</label><select name="tone">${["friendly","formal","casual"].map(t=>`<option ${t===c.tone?"selected":""}>${t}</option>`).join("")}</select></div>
+  <div><label>Tone</label><select name="tone">${["friendly", "formal", "casual"].map((t) => `<option ${t === c.tone ? "selected" : ""}>${t}</option>`).join("")}</select></div>
   <div><label>Hand over to a human below this confidence (%)</label><input name="escalateBelow" type="number" min="0" max="100" value="${c.escalateBelow}" /></div>
   <div><label>Greeting</label><textarea name="greeting" rows="3">${esc(c.greeting)}</textarea></div><button class="btn">Save settings</button></form></div>`;
-}
-async function renderAnalytics(box){
-  let a;try{a=await getJSON("/api/analytics")}catch{box.innerHTML=failBox("analytics");return}
-  const max=Math.max(1,...a.daily.map(d=>d.revenue));
-  const list=(rows,k,v)=>rows.length?rows.map(r=>`<div class="head"><span>${esc(r[k])}</span><b>${v(r)}</b></div>`).join(""):empty("No data yet","");
-  box.innerHTML=`<div class="card"><h3>Revenue, last 7 days</h3><p class="sub">Cancelled orders are excluded</p><div style="display:flex;gap:12px;align-items:flex-end;min-height:200px">${a.daily.map(d=>`<div style="flex:1;text-align:center;font-size:12px;color:var(--muted)"><div title="${d.orders} orders" style="height:${Math.round(d.revenue/max*140)+3}px;background:var(--lime);border-radius:6px 6px 0 0"></div><b style="color:var(--ink)">৳${fmt(d.revenue)}</b><br>${d.date.slice(5)}</div>`).join("")}</div></div>
-  <div class="split" style="grid-template-columns:1fr 1fr;margin-top:14px"><div class="card"><h3>By channel</h3><p class="sub">Orders and revenue</p>${list(a.channels,"channel",r=>`${r.orders} · ৳${fmt(r.revenue)}`)}</div><div class="card"><h3>By status</h3><p class="sub">All orders</p>${list(a.statuses,"status",r=>r.count)}</div></div>`;
-}
-async function renderSub(box){
-  let s;try{s=await getJSON("/api/subscription")}catch{box.innerHTML=failBox("subscription");return}
-  const bar=(l,u,m)=>`<div class="head"><span>${l}</span><b>${fmt(u)} / ${fmt(m)}</b></div><div style="height:8px;background:var(--bg);border-radius:9px;margin-bottom:14px"><div style="width:${Math.min(100,Math.round(u/m*100))}%;height:100%;background:var(--lime);border-radius:9px"></div></div>`;
-  box.innerHTML=`<div class="card" style="max-width:760px"><div class="head"><h3>Current plan: ${esc(s.plan)}</h3>${pill(s.status,"green")}</div><p class="sub">${s.renewsAt?"Renews "+new Date(s.renewsAt).toLocaleDateString():"The free plan never expires"}</p>
-  ${bar("AI orders this month",s.usage.aiOrders,s.limits.aiOrders)}${bar("Connected pages",s.usage.pages,s.limits.pages)}
-  <div class="row">${Object.entries(s.plans).map(([k,p])=>act("PUT","/api/subscription",{plan:k},"","",`${k[0].toUpperCase()+k.slice(1)} · ৳${fmt(p.price)}/mo`,k===s.plan?"":"white")).join("")}</div></div>`;
-}
-// generic actions: buttons, forms, order status
-document.addEventListener("click",async e=>{const b=e.target.closest("[data-call]");if(!b)return;
-  const [method,url]=b.dataset.call.split("|");let body=b.dataset.body?JSON.parse(b.dataset.body):undefined;
-  if(b.dataset.prompt){const v=prompt(b.dataset.label);if(!v)return;body={...body,[b.dataset.prompt]:v}}
-  if(method==="DELETE"&&!confirm("Delete this record?"))return;
-  try{const r=await fetch(url,{method,headers:{"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
-    if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||"Request failed");toast("Done");renderModule(current)}catch(err){toast(err.message,true)}});
-document.addEventListener("submit",async e=>{const f=e.target.closest("[data-post],[data-put]");if(!f)return;e.preventDefault();
-  const body={};new FormData(f).forEach((v,k)=>{const el=f.elements[k];body[k]=v==="true"?true:v==="false"?false:el.type==="number"?Number(v):v});
-  try{const r=await post(f.dataset.post||f.dataset.put,body,f.dataset.put?"PUT":"POST");
-    if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||"Request failed");toast("Saved");renderModule(current)}catch(err){toast(err.message,true)}});
-document.addEventListener("change",async e=>{const s=e.target.closest("[data-status]");if(!s)return;
-  try{const r=await post("/api/orders/"+s.dataset.status,{status:s.value},"PUT");if(!r.ok)throw 0;toast("Status updated")}catch{toast("Couldn't update the status.",true);renderModule(current)}});
+      }
+      async function renderAnalytics(box) {
+        let a;
+        try {
+          a = await getJSON("/api/analytics");
+        } catch {
+          box.innerHTML = failBox("analytics");
+          return;
+        }
+        const max = Math.max(1, ...a.daily.map((d) => d.revenue));
+        const list = (rows, k, v) =>
+          rows.length
+            ? rows
+                .map(
+                  (r) =>
+                    `<div class="head"><span>${esc(r[k])}</span><b>${v(r)}</b></div>`,
+                )
+                .join("")
+            : empty("No data yet", "");
+        box.innerHTML = `<div class="card"><h3>Revenue, last 7 days</h3><p class="sub">Cancelled orders are excluded</p><div style="display:flex;gap:12px;align-items:flex-end;min-height:200px">${a.daily.map((d) => `<div style="flex:1;text-align:center;font-size:12px;color:var(--muted)"><div title="${d.orders} orders" style="height:${Math.round((d.revenue / max) * 140) + 3}px;background:var(--lime);border-radius:6px 6px 0 0"></div><b style="color:var(--ink)">৳${fmt(d.revenue)}</b><br>${d.date.slice(5)}</div>`).join("")}</div></div>
+  <div class="split" style="grid-template-columns:1fr 1fr;margin-top:14px"><div class="card"><h3>By channel</h3><p class="sub">Orders and revenue</p>${list(a.channels, "channel", (r) => `${r.orders} · ৳${fmt(r.revenue)}`)}</div><div class="card"><h3>By status</h3><p class="sub">All orders</p>${list(a.statuses, "status", (r) => r.count)}</div></div>`;
+      }
+      async function renderSub(box) {
+        let s;
+        try {
+          s = await getJSON("/api/subscription");
+        } catch {
+          box.innerHTML = failBox("subscription");
+          return;
+        }
+        const bar = (l, u, m) =>
+          `<div class="head"><span>${l}</span><b>${fmt(u)} / ${fmt(m)}</b></div><div style="height:8px;background:var(--bg);border-radius:9px;margin-bottom:14px"><div style="width:${Math.min(100, Math.round((u / m) * 100))}%;height:100%;background:var(--lime);border-radius:9px"></div></div>`;
+        box.innerHTML = `<div class="card" style="max-width:760px"><div class="head"><h3>Current plan: ${esc(s.plan)}</h3>${pill(s.status, "green")}</div><p class="sub">${s.renewsAt ? "Renews " + new Date(s.renewsAt).toLocaleDateString() : "The free plan never expires"}</p>
+  ${bar("AI orders this month", s.usage.aiOrders, s.limits.aiOrders)}${bar("Connected pages", s.usage.pages, s.limits.pages)}
+  <div class="row">${Object.entries(s.plans)
+    .map(([k, p]) =>
+      act(
+        "PUT",
+        "/api/subscription",
+        { plan: k },
+        "",
+        "",
+        `${k[0].toUpperCase() + k.slice(1)} · ৳${fmt(p.price)}/mo`,
+        k === s.plan ? "" : "white",
+      ),
+    )
+    .join("")}</div></div>`;
+      }
+      // generic actions: buttons, forms, order status
+      document.addEventListener("click", async (e) => {
+        const b = e.target.closest("[data-call]");
+        if (!b) return;
+        const [method, url] = b.dataset.call.split("|");
+        let body = b.dataset.body ? JSON.parse(b.dataset.body) : undefined;
+        if (b.dataset.prompt) {
+          const v = prompt(b.dataset.label);
+          if (!v) return;
+          body = { ...body, [b.dataset.prompt]: v };
+        }
+        if (method === "DELETE" && !confirm("Delete this record?")) return;
+        try {
+          const r = await fetch(url, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: body ? JSON.stringify(body) : undefined,
+          });
+          if (!r.ok)
+            throw new Error(
+              (await r.json().catch(() => ({}))).error || "Request failed",
+            );
+          toast("Done");
+          renderModule(current);
+        } catch (err) {
+          toast(err.message, true);
+        }
+      });
+      document.addEventListener("submit", async (e) => {
+        const f = e.target.closest("[data-post],[data-put]");
+        if (!f) return;
+        e.preventDefault();
+        const body = {};
+        new FormData(f).forEach((v, k) => {
+          const el = f.elements[k];
+          body[k] =
+            v === "true"
+              ? true
+              : v === "false"
+                ? false
+                : el.type === "number"
+                  ? Number(v)
+                  : v;
+        });
+        try {
+          const r = await post(
+            f.dataset.post || f.dataset.put,
+            body,
+            f.dataset.put ? "PUT" : "POST",
+          );
+          if (!r.ok)
+            throw new Error(
+              (await r.json().catch(() => ({}))).error || "Request failed",
+            );
+          toast("Saved");
+          renderModule(current);
+        } catch (err) {
+          toast(err.message, true);
+        }
+      });
+      document.addEventListener("change", async (e) => {
+        const s = e.target.closest("[data-status]");
+        if (!s) return;
+        try {
+          const r = await post(
+            "/api/orders/" + s.dataset.status,
+            { status: s.value },
+            "PUT",
+          );
+          if (!r.ok) throw 0;
+          toast("Status updated");
+        } catch {
+          toast("Couldn't update the status.", true);
+          renderModule(current);
+        }
+      });
 
-switchView("overview");
-</script>
-</body>
+      switchView("overview");
+    </script>
+  </body>
 </html>

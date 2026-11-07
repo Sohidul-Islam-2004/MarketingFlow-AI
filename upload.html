@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8" /><title>Upload Video</title></head>
+<body>
+  <h3>Upload a video</h3>
+  <form id="f">
+    <input type="file" id="video" accept="video/*" required /><br /><br />
+    <textarea id="caption" placeholder="Caption…" required></textarea><br /><br />
+    <button type="submit">Upload</button>
+  </form>
+  <p id="status"></p>
+
+  <script>
+    document.getElementById("f").onsubmit = async (e) => {
+      e.preventDefault();
+      const status = document.getElementById("status");
+      status.textContent = "Uploading…";
+
+      const fd = new FormData();
+      fd.append("data", document.getElementById("video").files[0]);
+      fd.append("caption", document.getElementById("caption").value);
+
+      try {
+        const res = await fetch("http://localhost:3000/upload", {
+          method: "POST",
+          body: fd,
+        });
+        const json = await res.json();
+        status.textContent = res.ok ? "✅ Sent to n8n!" : "❌ " + json.error;
+      } catch (err) {
+        status.textContent = "❌ " + err.message;
+      }
+    };
+  </script>
+</body>
+</html>
