@@ -1,37 +1,52 @@
-const express = require('express');
-const cors = require('cors');
-const { PrismaClient } = require('@prisma/client');
-const path = require('path');
-require('dotenv').config();
+const express = require("express");
+const cors = require("cors");
+const mongoose = require("mongoose");
+const path = require("path");
+require("dotenv").config();
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '8.8.4.4']); // Use Google DNS
+
+
+// ... rest of your code
+const {
+  Organization,
+  Lead,
+  Task,
+  ContentItem,
+  WebhookEvent,
+  SocialAccount,
+} = require("./schema.js");
 
 const app = express();
-const prisma = new PrismaClient();
-
 app.use(cors());
 app.use(express.json());
-
-// Serve static HTML files (index.html and contact.html)
 app.use(express.static(__dirname));
+
+// ==========================================
+// Connect to MongoDB
+// ==========================================
+mongoose
+  .connect(process.env.DATABASE_URL)
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch((err) => {
+    console.error("❌ MongoDB connection error:", err);
+    process.exit(1);
+  });
 
 // ==========================================
 // ENDPOINT 1: Deduplication Check
 // ==========================================
-app.post('/api/leads/check-duplicate', async (req, res) => {
+app.post("/api/leads/check-duplicate", async (req, res) => {
   const { tenantId, eventId } = req.body;
   try {
-    const existingEvent = await prisma.webhookEvent.findUnique({
-      where: { externalEventId: eventId }
-    });
-
+    const existingEvent = await WebhookEvent.findOne({ externalEventId: eventId });
     if (existingEvent) return res.json({ isDuplicate: true });
 
-    await prisma.webhookEvent.create({
-      data: {
-        tenantId: tenantId,
-        externalEventId: eventId,
-        provider: "n8n",
-        processingStatus: "processed"
-      }
+    await WebhookEvent.create({
+      tenantId,
+      externalEventId: eventId,
+      provider: "n8n",
+      processingStatus: "processed",
     });
 
     return res.json({ isDuplicate: false });
@@ -44,22 +59,21 @@ app.post('/api/leads/check-duplicate', async (req, res) => {
 // ==========================================
 // ENDPOINT 2: Save Lead with AI Score
 // ==========================================
-app.post('/api/leads/create', async (req, res) => {
+app.post("/api/leads/create", async (req, res) => {
   const { tenantId, leadId, name, email, aiScore, aiStatus, aiReason } = req.body;
   try {
-    const newLead = await prisma.lead.create({
-      data: {
-        id: leadId,
-        organizationId: tenantId, // Maps tenantId to organizationId
-        name,
-        email,
-        aiScore: parseInt(aiScore) || 0,
-        aiStatus: aiStatus || "Cold",
-        aiReason
-      }
+    const newLead = await Lead.create({
+      _id: leadId,
+      organizationId: tenantId,
+      name,
+      email,
+      aiScore: parseInt(aiScore, 10) || 0,
+      aiStatus: aiStatus || "Cold",
+      aiReason,
     });
     res.json({ success: true, lead: newLead });
   } catch (error) {
+    if (error.code === 11000) return res.status(409).json({ error: "Lead already exists" });
     console.error("Lead Save Error:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
@@ -68,16 +82,14 @@ app.post('/api/leads/create', async (req, res) => {
 // ==========================================
 // ENDPOINT 3: Create CRM Task
 // ==========================================
-app.post('/api/tasks/create', async (req, res) => {
+app.post("/api/tasks/create", async (req, res) => {
   const { tenantId, leadId, title, priority } = req.body;
   try {
-    const newTask = await prisma.task.create({
-      data: {
-        organizationId: tenantId,
-        leadId: leadId,
-        title: title,
-        priority: priority || "High"
-      }
+    const newTask = await Task.create({
+      organizationId: tenantId,
+      leadId: leadId || null,
+      title,
+      priority: priority || "High",
     });
     res.json({ success: true, task: newTask });
   } catch (error) {
@@ -87,30 +99,18 @@ app.post('/api/tasks/create', async (req, res) => {
 });
 
 // ==========================================
-// ENDPOINT 4: Save AI Generated Content
+// ENDPOINT 4: Save AI Generated Content (embedded variants)
 // ==========================================
-app.post('/api/content/create', async (req, res) => {
+app.post("/api/content/create", async (req, res) => {
   const { tenantId, platform, topic, generatedText } = req.body;
   try {
-    // 1. Create the Main Content Item
-    const newContent = await prisma.contentItem.create({
-      data: {
-        organizationId: tenantId,
-        title: topic,       // Maps to "title" in schema
-        body: generatedText, // Maps to "body" in schema
-        status: "Draft"
-      }
+    const newContent = await ContentItem.create({
+      organizationId: tenantId,
+      title: topic,
+      body: generatedText,
+      status: "Draft",
+      variants: [{ platform, caption: generatedText }],
     });
-
-    // 2. Create the Platform Variant
-    await prisma.contentVariant.create({
-      data: {
-        contentId: newContent.id,
-        platform: platform,
-        caption: generatedText
-      }
-    });
-
     res.json({ success: true, content: newContent });
   } catch (error) {
     console.error("Content Error:", error);
@@ -119,11 +119,11 @@ app.post('/api/content/create', async (req, res) => {
 });
 
 // ==========================================
-// ENDPOINT 5: Get All Leads (For Dashboard)
+// ENDPOINT 5: Get All Leads
 // ==========================================
-app.get('/api/leads', async (req, res) => {
+app.get("/api/leads", async (_req, res) => {
   try {
-    const leads = await prisma.lead.findMany({ orderBy: { createdAt: 'desc' } });
+    const leads = await Lead.find().sort({ createdAt: -1 });
     res.json(leads);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch leads" });
@@ -131,24 +131,19 @@ app.get('/api/leads', async (req, res) => {
 });
 
 // ==========================================
-// ENDPOINT 6: Get All Content (For Dashboard)
+// ENDPOINT 6: Get All Content
 // ==========================================
-app.get('/api/content', async (req, res) => {
+app.get("/api/content", async (_req, res) => {
   try {
-    // Fetch ContentItems and include their platform variants
-    const content = await prisma.contentItem.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: { variants: true }
-    });
+    const content = await ContentItem.find().sort({ createdAt: -1 });
 
-    // Format it so the frontend still sees 'platform', 'topic', and 'generatedText'
-    const formattedContent = content.map(item => ({
-      id: item.id,
-      platform: item.variants[0]?.platform || "General",
+    const formattedContent = content.map((item) => ({
+      id: String(item._id),
+      platform: item.variants?.[0]?.platform || "General",
       topic: item.title,
       generatedText: item.body,
       status: item.status,
-      createdAt: item.createdAt
+      createdAt: item.createdAt,
     }));
 
     res.json(formattedContent);
@@ -157,17 +152,23 @@ app.get('/api/content', async (req, res) => {
     res.status(500).json({ error: "Failed to fetch content" });
   }
 });
+
 // ==========================================
 // ENDPOINT 9: Save a Connected Account
 // ==========================================
-app.post('/api/integrations/connect', async (req, res) => {
+app.post("/api/integrations/connect", async (req, res) => {
   const { organizationId, platform, accountName, accountId, accessToken } = req.body;
   try {
-    const newAccount = await prisma.socialAccount.create({
-      data: { organizationId, platform, accountName, accountId, accessToken }
+    const newAccount = await SocialAccount.create({
+      organizationId,
+      platform,
+      accountName,
+      accountId,
+      accessToken,
     });
     res.json({ success: true, account: newAccount });
   } catch (error) {
+    console.error("Connect Account Error:", error);
     res.status(500).json({ error: "Failed to connect account" });
   }
 });
@@ -175,81 +176,76 @@ app.post('/api/integrations/connect', async (req, res) => {
 // ==========================================
 // ENDPOINT 10: Get All Connected Accounts
 // ==========================================
-app.get('/api/integrations', async (req, res) => {
+app.get("/api/integrations", async (_req, res) => {
   try {
-    // For MVP, we fetch all accounts for org_123
-    const accounts = await prisma.socialAccount.findMany({
-      where: { organizationId: "org_123" }
-    });
-    console.log(accounts);
+    const accounts = await SocialAccount.find({ organizationId: "org_123" });
     res.json(accounts);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch accounts" });
   }
 });
+
 // ==========================================
 // ENDPOINT 7: Approve Content & Send to Facebook
 // ==========================================
-app.put('/api/content/:id/approve', async (req, res) => {
+app.put("/api/content/:id/approve", async (req, res) => {
   const { id } = req.params;
-  const { platform } = req.body; // Frontend will tell us which platform to post to
-
+  const { platform } = req.body;
   try {
-    // 1. Update DB
-    const updatedContent = await prisma.contentItem.update({
-      where: { id: id }, data: { status: "Approved" }
+    const updatedContent = await ContentItem.findByIdAndUpdate(
+      id,
+      { status: "Approved" },
+      { new: true }
+    );
+    if (!updatedContent) return res.status(404).json({ error: "Content not found" });
+
+    const account = await SocialAccount.findOne({
+      organizationId: "org_123",
+      platform,
     });
+    if (!account) {
+      return res.status(400).json({ error: "No account connected for this platform" });
+    }
 
-    // 2. Find the connected account for this platform
-    const account = await prisma.socialAccount.findFirst({
-      where: { organizationId: "org_123", platform: platform }
-    });
-
-    if (!account) return res.status(400).json({ error: "No account connected for this platform" });
-
-    // 3. Send the DYNAMIC token and ID to n8n
-    await fetch('http://localhost:5678/webhook-test/publish-facebook', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    await fetch("http://localhost:5678/webhook-test/publish-facebook", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         postText: updatedContent.body,
-        pageId: account.accountId,       // <--- THIS MUST BE HERE
-        accessToken: account.accessToken // <--- THIS MUST BE HERE
-      })
+        pageId: account.accountId,
+        accessToken: account.accessToken,
+      }),
     });
 
     res.json({ success: true });
   } catch (error) {
+    console.error("Approve Error:", error);
     res.status(500).json({ error: "Failed to approve" });
   }
 });
-// ==========================================
-// ENDPOINT 8: Get Dashboard Analytics (KPIs)
-// ==========================================
-app.get('/api/stats', async (req, res) => {
-  try {
-    const totalLeads = await prisma.lead.count();
-    const hotLeads = await prisma.lead.count({ where: { aiStatus: 'Hot' } });
-    const totalContent = await prisma.contentItem.count();
-    const publishedContent = await prisma.contentItem.count({ where: { status: 'Approved' } });
 
-    res.json({
-      totalLeads,
-      hotLeads,
-      totalContent,
-      publishedContent
-    });
+// ==========================================
+// ENDPOINT 8: Dashboard Analytics (KPIs)
+// ==========================================
+app.get("/api/stats", async (_req, res) => {
+  try {
+    const [totalLeads, hotLeads, totalContent, publishedContent] = await Promise.all([
+      Lead.countDocuments(),
+      Lead.countDocuments({ aiStatus: "Hot" }),
+      ContentItem.countDocuments(),
+      ContentItem.countDocuments({ status: "Approved" }),
+    ]);
+    res.json({ totalLeads, hotLeads, totalContent, publishedContent });
   } catch (error) {
     console.error("Stats Error:", error);
     res.status(500).json({ error: "Failed to fetch stats" });
   }
 });
 
+// ==========================================
 // Start Server
+// ==========================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Backend running on http://localhost:${PORT}`);
 });
-
-
-// yes cloned
