@@ -52,6 +52,21 @@ const organizationSchema = new Schema(
     planRenewsAt: { type: Date, default: null },
     marketingSettings: { type: marketingSettingsSchema, default: () => ({}) },
     metaBusinesses: { type: [{ id: String, name: String }], default: [] },
+    // Workspace profile (FR-AUTH-011)
+    logoUrl: { type: String, default: null },
+    businessPhone: { type: String, default: "" },
+    returnPolicy: { type: String, default: "" },
+    defaultLanguage: { type: String, default: "bn" },
+    orderPrefix: { type: String, default: "ORD-" },
+    // Delivery zones (FR-ORD-006). Empty = built-in defaults (Inside Dhaka 80 / Suburbs 100 / Outside 130)
+    zones: { type: [{ name: String, fee: Number, districts: [String], areas: [String], isDefault: Boolean, freeOver: Number }], default: [] },
+    // Fraud Shield settings (FR-FRD-007)
+    fraud: {
+      enabled: { type: Boolean, default: true },
+      refuseBlocked: { type: Boolean, default: true },
+      threshold: { type: Number, default: 60 },
+      lookbackDays: { type: Number, default: 30 },
+    },
   },
   baseOpts()
 );
@@ -592,14 +607,57 @@ const productSchema = new Schema(
     lowStockAt: { type: Number, default: 5 },
     category: { type: String, default: "General" },
     imageUrl: { type: String, default: null },
+    // R1 inventory: every product has >= 1 variant; stock = SUM(variant.available)
+    status: { type: String, default: "active" }, // active | archived
+    nameBn: { type: String, default: "" },
+    description: { type: String, default: "" },
+    comparePrice: { type: Number, default: null },
+    costPrice: { type: Number, default: null },
+    weight: { type: Number, default: null }, // kg
+    variants: {
+      type: [{
+        _id: { type: String, default: genId },
+        sku: String,
+        name: { type: String, default: "Default" }, // e.g. "M", "L / Red"
+        size: { type: String, default: "" },
+        color: { type: String, default: "" },
+        price: { type: Number, default: null }, // optional override
+        onHand: { type: Number, default: 0 },
+        reserved: { type: Number, default: 0 },
+        available: { type: Number, default: 0 }, // = onHand - reserved (kept in sync atomically)
+      }],
+      default: [],
+    },
   },
   baseOpts(withUpdates)
 );
 productSchema.index({ organizationId: 1, sku: 1 }, { unique: true });
 
+// Every stock change writes a movement row (FR-INV-006)
+const stockMovementSchema = new Schema(
+  {
+    _id: { type: String, default: genId },
+    organizationId: { type: String, required: true, index: true },
+    productId: String,
+    variantId: String,
+    label: String, // product · variant
+    onHandDelta: { type: Number, default: 0 },
+    reservedDelta: { type: Number, default: 0 },
+    reason: String, // restock | damage | count_correction | return | order_reserve | order_release | order_ship | initial
+    orderId: { type: String, default: null },
+    by: { type: String, default: "system" },
+    note: { type: String, default: "" },
+  },
+  baseOpts()
+);
+stockMovementSchema.index({ organizationId: 1, productId: 1, createdAt: -1 });
+
 const orderItemSchema = new Schema(
   {
     productId: { type: String, default: null },
+    variantId: { type: String, default: null },
+    variantName: { type: String, default: null },
+    sku: { type: String, default: null },
     name: { type: String, required: true },
     qty: { type: Number, default: 1, min: 1 },
     price: { type: Number, default: 0 },
@@ -626,11 +684,32 @@ const orderSchema = new Schema(
     riskScore: { type: Number, default: 0 },
     riskReasons: { type: [String], default: [] },
     courier: {
-      provider: { type: String, default: null },
-      trackingId: { type: String, default: null },
+      provider: { type: String, default: null }, // steadfast | pathao | redx | local
+      trackingId: { type: String, default: null }, // tracking code
+      consignmentId: { type: String, default: null },
+      status: { type: String, default: null }, // raw courier status
+      charge: { type: Number, default: null },
+      bookedAt: { type: Date, default: null },
+      lastSyncAt: { type: Date, default: null },
       shippedAt: { type: Date, default: null },
+      accountId: { type: String, default: null }, // CourierAccount used for booking
     },
     deliveryFee: { type: Number, default: 0 },
+    subtotal: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 },
+    district: { type: String, default: null },
+    zone: { type: String, default: null }, // delivery zone name
+    addressKey: { type: String, default: null }, // normalised address for fraud checks
+    createdBy: { type: String, default: "user" }, // ai_agent | user | n8n | comment
+    idemKey: { type: String, default: null }, // idempotency key (AI: conversation + draft version)
+    createdByName: { type: String, default: null },
+    sourceCommentId: { type: String, default: null },
+    riskBand: { type: String, default: "low" },
+    riskSignals: { type: [{ code: String, points: Number, reason: String }], default: [] },
+    paymentRef: { type: String, default: null },
+    notes: { type: String, default: "" },
+    events: { type: [{ from: String, to: String, by: String, note: String, at: { type: Date, default: Date.now } }], default: [] },
+    returnInfo: { type: Mixed, default: null }, // { items:[{line, qty}], reason, requestedAt, resolution }
     conversationId: { type: String, default: null },
     psid: { type: String, default: null },
     // Marketing attribution (campaign ROI / lead conversion)
@@ -649,6 +728,8 @@ orderSchema.index({ organizationId: 1, orderNo: 1 }, { unique: true });
 orderSchema.index({ organizationId: 1, createdAt: -1 });
 orderSchema.index({ organizationId: 1, status: 1 });
 orderSchema.index({ organizationId: 1, "attribution.campaign": 1 });
+orderSchema.index({ organizationId: 1, idemKey: 1 });
+orderSchema.index({ organizationId: 1, addressKey: 1, createdAt: -1 });
 
 /* ============ 5. MESSENGER INBOX ============ */
 const messageSchema = new Schema(
@@ -700,8 +781,10 @@ const blacklistSchema = new Schema(
   {
     _id: { type: String, default: genId },
     organizationId: { type: String, required: true, index: true },
-    phone: { type: String, required: true },
+    phone: { type: String, required: true }, // value: phone, psid or normalised address
+    type: { type: String, default: "phone" }, // phone | psid | address
     reason: { type: String, default: "Blocked manually" },
+    by: { type: String, default: null },
   },
   baseOpts()
 );
@@ -769,6 +852,9 @@ const socialAccountSchema = new Schema(
     tokenExpiresAt: { type: Date, default: null },
     lastCheckedAt: { type: Date, default: null },
     lastSyncedAt: { type: Date, default: null },
+    lastWebhookAt: { type: Date, default: null },
+    // Per-Page automation (FR-PAGE-005): { autoReply, delaySec, manualApproval, privateReply, persona, language, blockedKeywords[], workingHours }
+    pageConfig: { type: Mixed, default: null },
   },
   baseOpts(withUpdates)
 );
@@ -805,6 +891,127 @@ const aiUsageSchema = new Schema(
 );
 aiUsageSchema.index({ organizationId: 1, createdAt: -1 });
 
+/* ============ 11. AUTH, TEAM, AUDIT (R1) ============ */
+const userSchema = new Schema(
+  {
+    _id: { type: String, default: genId },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    name: { type: String, required: true },
+    passwordHash: { type: String, required: true, select: false }, // scrypt$salt$hash
+    isSuperAdmin: { type: Boolean, default: false },
+    lastLoginAt: { type: Date, default: null },
+    failedLogins: { type: Number, default: 0 },
+    lockedUntil: { type: Date, default: null },
+    lastOrgId: { type: String, default: null },
+  },
+  baseOpts(withUpdates)
+);
+
+const membershipSchema = new Schema(
+  {
+    _id: { type: String, default: genId },
+    organizationId: { type: String, required: true, index: true },
+    userId: { type: String, default: null, index: true },
+    email: { type: String, required: true, lowercase: true },
+    // owner | manager | agent | fulfilment | lead_exec | viewer
+    role: { type: String, default: "agent" },
+    status: { type: String, default: "invited" }, // invited | active | suspended | removed
+    pageIds: { type: [String], default: [] }, // page scoping (empty = all pages)
+    inviteTokenHash: { type: String, default: null, select: false },
+    inviteExpiresAt: { type: Date, default: null },
+    invitedBy: { type: String, default: null },
+  },
+  baseOpts(withUpdates)
+);
+membershipSchema.index({ organizationId: 1, email: 1 }, { unique: true });
+
+const sessionSchema = new Schema(
+  {
+    _id: { type: String, required: true }, // sha256(token)
+    userId: { type: String, required: true, index: true },
+    organizationId: { type: String, default: null },
+    expiresAt: { type: Date, required: true },
+    ip: String,
+    ua: String,
+  },
+  baseOpts()
+);
+sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+const auditLogSchema = new Schema(
+  {
+    _id: { type: String, default: genId },
+    organizationId: { type: String, default: null, index: true },
+    userId: { type: String, default: null },
+    userName: { type: String, default: "system" },
+    action: { type: String, required: true }, // e.g. auth.login, order.transition, member.invite
+    target: { type: String, default: null },
+    meta: { type: Mixed, default: {} },
+    ip: { type: String, default: null },
+  },
+  baseOpts()
+);
+auditLogSchema.index({ organizationId: 1, createdAt: -1 });
+
+/* ============ 12. COMMENT ENGINE (R1) ============ */
+const commentSchema = new Schema(
+  {
+    _id: { type: String, default: genId },
+    organizationId: { type: String, required: true, index: true },
+    pageId: { type: String, required: true },
+    commentId: { type: String, required: true },
+    postId: { type: String, default: null },
+    parentId: { type: String, default: null },
+    fromId: { type: String, default: null },
+    fromName: { type: String, default: "Someone" },
+    message: { type: String, default: "" },
+    intent: { type: String, default: "general" }, // price | availability | size_colour | delivery | order_intent | complaint | recommendation | general | spam
+    sentiment: { type: String, default: "neutral" }, // positive | neutral | negative
+    // new | scheduled | pending_approval | replied | needs_human | spam | ignored | failed | hidden | deleted
+    status: { type: String, default: "new" },
+    productIds: { type: [String], default: [] },
+    publicReply: { type: Mixed, default: null }, // { text, source:'template'|'ai'|'agent', status, dueAt, sentAt, replyId, error, by }
+    privateReply: { type: Mixed, default: null }, // { status:'sent'|'failed'|'skipped', sentAt, error, conversationId }
+    dueAt: { type: Date, default: null },
+    reason: { type: String, default: null },
+  },
+  baseOpts(withUpdates)
+);
+commentSchema.index({ organizationId: 1, commentId: 1 }, { unique: true });
+commentSchema.index({ organizationId: 1, status: 1, createdAt: -1 });
+commentSchema.index({ status: 1, dueAt: 1 });
+
+// Facebook post -> catalogue products (FR-INV-011)
+const postProductSchema = new Schema(
+  {
+    _id: { type: String, default: genId },
+    organizationId: { type: String, required: true },
+    pageId: String,
+    postId: { type: String, required: true },
+    productIds: { type: [String], default: [] },
+    caption: { type: String, default: "" },
+  },
+  baseOpts(withUpdates)
+);
+postProductSchema.index({ organizationId: 1, postId: 1 }, { unique: true });
+
+/* ============ 13. COURIER ACCOUNTS (R1) ============ */
+const courierAccountSchema = new Schema(
+  {
+    _id: { type: String, default: genId },
+    organizationId: { type: String, required: true, index: true },
+    provider: { type: String, required: true }, // steadfast | pathao | local
+    label: { type: String, default: "" },
+    credentialsEnc: { type: String, default: null, select: false }, // encrypted JSON
+    storeId: { type: String, default: null }, // Pathao store
+    sandbox: { type: Boolean, default: false },
+    isDefault: { type: Boolean, default: false },
+    active: { type: Boolean, default: true },
+    lastError: { type: String, default: null },
+  },
+  baseOpts(withUpdates)
+);
+
 /* ============ MODELS ============ */
 const Organization = model("Organization", organizationSchema);
 const Counter = model("Counter", counterSchema);
@@ -835,6 +1042,14 @@ const WebhookEvent = model("WebhookEvent", webhookEventSchema);
 const SocialAccount = model("SocialAccount", socialAccountSchema);
 const Notification = model("Notification", notificationSchema);
 const AiUsage = model("AiUsage", aiUsageSchema);
+const StockMovement = model("StockMovement", stockMovementSchema);
+const User = model("User", userSchema);
+const Membership = model("Membership", membershipSchema);
+const Session = model("Session", sessionSchema);
+const AuditLog = model("AuditLog", auditLogSchema);
+const Comment = model("Comment", commentSchema);
+const PostProduct = model("PostProduct", postProductSchema);
+const CourierAccount = model("CourierAccount", courierAccountSchema);
 
 async function nextOrderNo(orgId) {
   const c = await Counter.findOneAndUpdate(
@@ -842,7 +1057,8 @@ async function nextOrderNo(orgId) {
     { $inc: { seq: 1 } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
-  return `ORD-${100000 + c.seq}`;
+  const o = await Organization.findById(orgId).select("orderPrefix").lean().catch(() => null);
+  return `${o?.orderPrefix || "ORD-"}${100000 + c.seq}`;
 }
 
 async function deleteOrganizationCascade(orgId) {
@@ -868,6 +1084,12 @@ async function deleteOrganizationCascade(orgId) {
     CompetitorSnapshot.deleteMany(by),
     Notification.deleteMany(by),
     AiUsage.deleteMany(by),
+    StockMovement.deleteMany(by),
+    Membership.deleteMany(by),
+    AuditLog.deleteMany(by),
+    Comment.deleteMany(by),
+    PostProduct.deleteMany(by),
+    CourierAccount.deleteMany(by),
     SocialAccount.deleteMany(by),
     Product.deleteMany(by),
     Order.deleteMany(by),
@@ -909,6 +1131,14 @@ module.exports = {
   SocialAccount,
   Notification,
   AiUsage,
+  StockMovement,
+  User,
+  Membership,
+  Session,
+  AuditLog,
+  Comment,
+  PostProduct,
+  CourierAccount,
   nextOrderNo,
   deleteOrganizationCascade,
 };

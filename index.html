@@ -1560,6 +1560,91 @@
           min-height: 420px;
         }
       }
+
+      /* ---------- R1: auth, chips, misc ---------- */
+      .auth {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        background: radial-gradient(circle at 20% 10%, #eaf8c9, var(--bg) 55%);
+        display: grid;
+        place-items: center;
+        padding: 20px;
+      }
+      .auth-card {
+        width: 100%;
+        max-width: 420px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 26px;
+        box-shadow: 0 20px 60px rgba(14, 26, 20, 0.08);
+      }
+      .auth-card .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 18px;
+        color: var(--ink);
+      }
+      .auth-card .brand .logo {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: var(--lime);
+        display: grid;
+        place-items: center;
+      }
+      .auth-card .tabs {
+        margin: 6px 0 14px;
+      }
+      body.locked {
+        overflow: hidden;
+      }
+      .chip.on {
+        background: var(--ink);
+        color: #fff;
+        border-color: var(--ink);
+      }
+      .zrow label {
+        font-size: 12px;
+      }
+      .box h5 {
+        margin: 0 0 8px;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .box {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        background: #fff;
+      }
+      select[multiple] {
+        padding: 4px;
+      }
+      input.chip,
+      select.chip {
+        width: auto;
+      }
+      input#oQ,
+      input#iQ,
+      input#cmQ {
+        min-width: 240px;
+      }
+      .kpis.k5 {
+        grid-template-columns: repeat(5, 1fr);
+      }
+      @media (max-width: 1100px) {
+        .kpis.k5 {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
     </style>
   </head>
   <body>
@@ -1669,6 +1754,7 @@
       </section>
     </main>
     <div class="toasts" id="toasts" aria-live="polite"></div>
+    <div id="auth" class="auth hidden"></div>
 
     <dialog id="dlg">
       <form method="dialog" id="dlgForm">
@@ -1869,31 +1955,33 @@
         setTimeout(() => t.remove(), err ? 7000 : 4000);
       }
       async function getJSON(url) {
-        const r = await fetch(url);
+        const r = await fetch(url, { credentials: "same-origin" });
+        if (r.status === 401 && typeof showAuth === "function") showAuth();
         if (!r.ok) throw new Error(r.status);
         return r.json();
       }
       const post = (url, body, method = "POST") =>
         fetch(url, {
           method,
-          headers: {
-            "Content-Type": "application/json",
-            "x-user-name": CFG.user.name,
-          },
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
       // JSON API helper: throws Error(message from server)
       async function api(url, { method = "GET", body } = {}) {
         const r = await fetch(url, {
           method,
-          headers: {
-            "Content-Type": "application/json",
-            "x-user-name": CFG.user.name,
-            "x-tenant-id": CFG.tenantId,
-          },
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
           body: body !== undefined ? JSON.stringify(body) : undefined,
         });
         const j = await r.json().catch(() => ({}));
+        if (
+          r.status === 401 &&
+          j.code === "AUTH_REQUIRED" &&
+          typeof showAuth === "function"
+        )
+          showAuth();
         if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`);
         return j;
       }
@@ -1907,10 +1995,7 @@
         Object.entries(extra).forEach(([k, v]) => v != null && fd.append(k, v));
         const r = await fetch("/api/assets/upload", {
           method: "POST",
-          headers: {
-            "x-user-name": CFG.user.name,
-            "x-tenant-id": CFG.tenantId,
-          },
+          credentials: "same-origin",
           body: fd,
         });
         const j = await r.json().catch(() => ({}));
@@ -1931,9 +2016,20 @@
         ({
           confirmed: "green",
           processing: "blue",
+          packed: "blue",
+          shipped: "purple",
+          out_for_delivery: "purple",
           delivered: "green",
           cancelled: "red",
+          rejected: "red",
+          on_hold: "red",
           pending: "yellow",
+          failed_delivery: "red",
+          return_requested: "yellow",
+          returned_to_sender: "grey",
+          returned_restocked: "grey",
+          returned_damaged: "red",
+          return_rejected: "grey",
         })[String(s).toLowerCase()] || "grey";
       const cStat = (s) =>
         ({
@@ -1992,7 +2088,7 @@
           ? `<div class="tbl"><table><thead><tr>${cols.map((c) => `<th>${c[0]}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${cols.map((c) => `<td>${c[1](r)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`
           : empty(emptyMsg, "");
       const kpiCards = (items) =>
-        `<div class="kpis">${items.map(([l, v, s, c]) => `<div class="card kpi"><div class="l"><span>${esc(l)}</span></div><div class="v"><span class="${c || ""}">${v}</span></div><p>${s || ""}</p></div>`).join("")}</div>`;
+        `<div class="kpis ${items.length === 5 ? "k5" : ""}">${items.map(([l, v, s, c]) => `<div class="card kpi"><div class="l"><span>${esc(l)}</span></div><div class="v"><span class="${c || ""}">${v}</span></div><p>${s || ""}</p></div>`).join("")}</div>`;
       const progress = (p) =>
         `<div class="bar"><i class="${p >= 100 ? "red" : p >= 80 ? "amber" : ""}" style="width:${Math.min(100, Math.max(0, p || 0))}%"></i></div>`;
       const linesOf = (v) =>
@@ -2316,7 +2412,7 @@
             "pages",
           ].includes(v),
         );
-        if (v === "overview") {
+        if (v === "overview" && !MKT.overview) {
           $("v-overview").classList.remove("hidden");
           return loadOverview();
         }
@@ -2760,7 +2856,9 @@
           `<div class="head"><span>${l}</span><b>${fmt(u)} / ${fmt(m)}</b></div><div style="height:8px;background:var(--bg);border-radius:9px;margin-bottom:14px"><div style="width:${Math.min(100, Math.round((u / m) * 100))}%;height:100%;background:var(--lime);border-radius:9px"></div></div>`;
         box.innerHTML = `<div class="card" style="max-width:760px"><div class="head"><h3>Current plan: ${esc(s.plan)}</h3>${pill(s.status, "green")}</div><p class="sub">${s.renewsAt ? "Renews " + new Date(s.renewsAt).toLocaleDateString() : "The free plan never expires"}</p>
   ${bar("AI orders this month", s.usage.aiOrders, s.limits.aiOrders)}${bar("Connected pages", s.usage.pages, s.limits.pages)}
-  <div class="row">${Object.entries(s.plans)
+  ${s.canChange ? "" : `<p class="small muted">To upgrade, contact us. Plans are activated by the platform admin after payment.</p>`}<div class="row ${s.canChange ? "" : "hidden"}">${Object.entries(
+    s.plans,
+  )
     .map(([k, p]) =>
       act(
         "PUT",
@@ -6661,10 +6759,10 @@
         box.innerHTML = `<div class="ib-top"><div class="chip" style="cursor:default"><i class="dot"></i><span id="ibHandled">0 handled by AI</span></div>
             <button class="chip" data-do="ibAlerts" id="ibAlertBtn">${icon("bell")}${IB.alerts ? "Alerts on" : "Enable alerts"}</button>
             <button class="chip" data-do="ibSettings">${icon("msettings")}Inbox settings</button>
-            <button class="btn" data-do="ibSimulate">${icon("agent")}Simulate customer</button></div>
+            ${ME?.sandbox ? `<button class="btn" data-do="ibSimulate">${icon("agent")}Simulate customer</button>` : ""}</div>
           <div class="ib">
             <div><div class="ib-list-h"><input id="ibQ" placeholder="Search name, phone or message…" value="${esc(IB.q)}"><div class="ib-tabs" id="ibTabs"></div></div><div class="ib-items" id="ibList"></div></div>
-            <div id="ibChat"><div class="ib-empty"><div><b>Select a conversation</b><p class="small">Or press “Simulate customer” to test the AI agent without Facebook.</p></div></div></div>
+            <div id="ibChat"><div class="ib-empty"><div><b>Select a conversation</b><p class="small">Messages from your connected Pages appear here.</p></div></div></div>
             <div class="ib-side" id="ibSide"><div class="ib-empty small">Customer details and order draft appear here.</div></div>
           </div>`;
         let t;
@@ -6837,17 +6935,17 @@
             <div class="kv"><span>Phone</span><b>${esc(d.phone || "—")}</b></div><div class="kv"><span>PSID</span><b class="small">${esc(c.psid)}</b></div>
             <div class="kv"><span>Page</span><b>${esc(c.pageName || c.channel)}</b></div><div class="kv"><span>Window</span>${pill(c.windowOpen ? "Open" : "Closed", c.windowOpen ? "green" : "red")}</div>
             ${c.source?.type === "comment" ? `<div class="data mt"><div class="mini small"><div class="muted" style="font-size:10px;letter-spacing:.08em">STARTED FROM COMMENT</div>“${esc(c.source.text || "")}”</div></div>` : ""}
-            ${c.handoffReason && c.status === "needs_review" ? `<div class="warn small">Why: ${esc(c.handoffReason)}</div>` : ""}</div>
+            ${c.handoffReason && c.status === "needs_review" ? `<div class="warn small">Why: ${esc(c.handoffReason)}</div>` : ""}${c.blocked ? `<div class="warn small">⛔ This customer is on the Fraud Shield block list.</div>` : ""}</div>
           <div class="box"><h5>AI AUTO-PILOT <label class="row small" style="gap:6px;margin:0;color:var(--ink)"><span class="sw"><input type="checkbox" data-chg="ibAi" ${!c.aiPaused ? "checked" : ""}><i></i></span>${!c.aiPaused ? "ON" : "OFF"}</label></h5>
             <p class="small muted" style="margin:0 0 10px">${!c.aiEnabled ? "AI is switched off for the whole inbox (AI Agent settings)." : "The AI answers, collects order details and places COD orders after the customer confirms."}</p>
             <button class="btn full ${c.aiPaused ? "" : "dark"}" data-do="ibTakeover">${c.aiPaused ? "Hand back to AI" : "Pause AI / Take over"}</button></div>
           <div class="box"><h5>ORDER DRAFT ${pill(dl, dc)}</h5>
-            ${d.items?.length ? d.items.map((i) => `<div class="kv"><span>${esc(i.name)}${i.variant ? ` (${esc(i.variant)})` : ""} × ${i.qty}</span><b>৳${fmt(i.price * i.qty)}</b></div>`).join("") + `<div class="kv"><span>Delivery</span><b>৳${fmt(c.totals.fee)}</b></div><div class="kv"><span><b style="color:var(--ink)">Total (COD)</b></span><b>৳${fmt(c.totals.total)}</b></div>` : `<p class="small muted">No products selected yet.</p>`}
+            ${d.items?.length ? d.items.map((i) => `<div class="kv"><span>${esc(i.name)}${i.variant ? ` (${esc(i.variant)})` : ""} × ${i.qty}</span><b>৳${fmt(i.price * i.qty)}</b></div>`).join("") + `<div class="kv"><span>Delivery${c.totals.zone ? ` (${esc(c.totals.zone)})` : ""}</span><b>৳${fmt(c.totals.fee)}</b></div><div class="kv"><span><b style="color:var(--ink)">Total (COD)</b></span><b>৳${fmt(c.totals.total)}</b></div>` : `<p class="small muted">No products selected yet.</p>`}
             <div class="kv"><span>Name</span><b>${esc(d.name || "—")}</b></div><div class="kv"><span>Phone</span><b>${esc(d.phone || "—")}</b></div>
-            <div class="kv"><span>Address</span><b>${esc(d.address || "—")}${d.area ? ` · ${d.area === "inside" ? "Inside" : "Outside"} Dhaka` : ""}</b></div>
+            <div class="kv"><span>Address</span><b>${esc(d.address || "—")}${d.district ? ` · ${esc(d.district)}` : ""}</b></div>
             ${c.missing?.length && d.status !== "placed" ? `<p class="small muted">Missing: ${esc(c.missing.join(", "))}</p>` : ""}
             <div class="row mt"><button class="btn sm bd" data-do="ibDraft">Edit details</button><button class="btn sm" data-do="ibPlace" ${c.missing?.length || d.status === "placed" ? "disabled" : ""}>Place order</button></div></div>
-          ${c.orders?.length ? `<div class="box"><h5>ORDERS</h5>${c.orders.map((o) => `<div class="kv"><span>#${esc(o.no)} · ৳${fmt(o.total)}</span>${pill(o.status, o.status === "on_hold" ? "red" : statC(o.status))}</div>`).join("")}<button class="btn sm bd full mt" data-view="orders">Open Orders</button></div>` : ""}`;
+          ${c.orders?.length ? `<div class="box"><h5>ORDERS</h5>${c.orders.map((o) => `<div class="kv"><span>#${esc(o.no)} · ৳${fmt(o.total)}</span>${pill(o.status, o.status === "on_hold" ? "red" : statC(o.status))}</div>`).join("")}<button class="btn sm bd full mt" data-do="openOrder" data-id="${esc(c.orders[0].id)}">Open latest order</button></div>` : ""}`;
       }
 
       DO.ibTab = (el) => {
@@ -6943,34 +7041,24 @@
       DO.ibDraft = async () => {
         const c = IB.conv,
           d = c.orderDraft || { items: [] };
-        const products = await GET("/api/products");
+        const [products, places] = await Promise.all([
+          GET("/api/products"),
+          GET("/api/places"),
+        ]);
         const row = (i = {}) =>
-          `<div class="f3 mt drow"><div><select name="pid[]"><option value="">— product —</option>${opts(
-            products.map((p) => [
-              p.id,
-              `${p.name} · ৳${fmt(p.price)} · stock ${p.stock}`,
-            ]),
-            i.productId,
-          )}</select></div><div><input name="var[]" placeholder="Size / colour" value="${esc(i.variant || "")}"></div><div><input type="number" name="qty[]" min="1" value="${i.qty || 1}"></div></div>`;
+          `<div class="f2 mt drow" style="grid-template-columns:3fr 1fr"><div>${variantSelect(products, "pv[]", i.productId ? `${i.productId}|${i.variantId || ""}` : "")}</div><div><input type="number" name="qty[]" min="1" value="${i.qty || 1}"></div></div>`;
         STATE.draftRow = () => row();
         openModal({
           title: "Order details",
           body: `<div class="f2"><div><label>Name</label><input name="name" value="${esc(d.name || "")}"></div><div><label>Phone</label><input name="phone" value="${esc(d.phone || "")}" placeholder="01XXXXXXXXX"></div></div>
-            <div class="mt"><label>Address</label><textarea name="address" rows="2">${esc(d.address || "")}</textarea></div>
-            <div class="mt"><label>Delivery area</label><select name="area">${opts(
-              [
-                ["", "—"],
-                ["inside", "Inside Dhaka"],
-                ["outside", "Outside Dhaka"],
-              ],
-              d.area || "",
-            )}</select></div>
+            <div class="f2 mt" style="grid-template-columns:2fr 1fr"><div><label>Address (house, road, area/thana)</label><textarea name="address" rows="2">${esc(d.address || "")}</textarea></div><div><label>District</label>${districtInput("district", d.district, places.districts)}</div></div>
+            <p class="small muted">The delivery fee comes from your delivery zones (Workspace → Delivery zones).</p>
             <h4 class="mt">Products</h4><div id="drows">${(d.status === "placed" ? [] : d.items || []).map(row).join("") || row()}</div><button type="button" class="btn sm bd mt" data-do="addDraftRow">+ Product</button>`,
           onSubmit: async (f) => {
-            const items = (f.pid || [])
-              .map((p, i) => ({
-                productId: p,
-                variant: f.var[i],
+            const items = (f.pv || [])
+              .map((v, i) => ({
+                productId: v.split("|")[0],
+                variantId: v.split("|")[1] || null,
                 qty: Number(f.qty[i]) || 1,
               }))
               .filter((x) => x.productId);
@@ -6978,7 +7066,7 @@
               name: f.name,
               phone: f.phone,
               address: f.address,
-              area: f.area,
+              district: f.district,
               items,
             });
             toast("Draft updated");
@@ -7043,11 +7131,11 @@
           title: "Inbox & AI agent settings",
           wide: true,
           body: `<div class="f3"><div><label>AI agent (whole inbox)</label>${yn("enabled")}</div><div><label>Auto-confirm AI orders</label>${yn("autoConfirm")}</div><div><label>Hand to human below confidence (%)</label><input type="number" name="escalateBelow" min="0" max="100" value="${a.escalateBelow ?? 60}"></div></div>
-            <div class="f3 mt"><div><label>Delivery fee inside Dhaka (৳)</label><input type="number" name="deliveryInside" value="${a.deliveryInside ?? 80}"></div><div><label>Delivery fee outside Dhaka (৳)</label><input type="number" name="deliveryOutside" value="${a.deliveryOutside ?? 130}"></div><div><label>Tone</label><select name="tone">${opts(["friendly", "professional", "playful", "formal"], a.tone)}</select></div></div>
+            <div class="f2 mt"><div><label>Tone</label><select name="tone">${opts(["friendly", "professional", "playful", "formal"], a.tone)}</select></div><div><label>Delivery fees</label><button type="button" class="btn sm bd full" data-do="goZones">Edit delivery zones →</button></div></div>
             <div class="mt"><label>Delivery time text</label><input name="deliveryTime" value="${esc(a.deliveryTime || "")}"></div>
-            <div class="mt"><label>Business knowledge the AI may use (policies, exchange/return rules, sizes, hours, location, FAQ)</label><textarea name="knowledge" rows="7" placeholder="Exchange within 3 days if the tag is intact.&#10;Sizes: M (38), L (40), XL (42).&#10;Shop: Badda, Dhaka, open 10am-9pm.">${esc(a.knowledge || "")}</textarea><p class="small muted">The AI also uses your products (name, price, stock) and the default brand's approved facts. Anything not written here, it won't claim.</p></div>
+            <div class="mt"><label>Business knowledge the AI may use (policies, exchange/return rules, sizes, hours, location, FAQ)</label><textarea name="knowledge" rows="7" placeholder="Exchange within 3 days if the tag is intact.&#10;Sizes: M (38), L (40), XL (42).&#10;Shop: Badda, Dhaka, open 10am-9pm.">${esc(a.knowledge || "")}</textarea><p class="small muted">The AI also uses your products (variants, price, stock), delivery zones and the default brand's approved facts. Anything not written here, it won't claim. It can never give discounts.</p></div>
             <div class="mt"><label>Message when handing to a human</label><input name="handoffMessage" value="${esc(a.handoffMessage || "")}"></div>
-            <h4 class="mt">Post comments</h4><div class="f2"><div><label>Private-reply to new comments</label>${yn("commentAutoReply")}</div><div><label>Public reply under the comment (optional)</label><input name="commentPublicReply" value="${esc(a.commentPublicReply || "")}" placeholder="ইনবক্স করা হয়েছে ✅"></div></div>
+            <h4 class="mt">Post comments</h4><p class="small muted">Auto-reply, delay, approval and DM settings are per Page in <b>FB Comments → Pages</b>.</p>
             <div class="mt"><label>Private reply fallback ({name} = first name; used when AI can't answer)</label><textarea name="commentPrivateReply" rows="2">${esc(a.commentPrivateReply || "")}</textarea></div>
             <h4 class="mt">Connect a Page to the inbox</h4><p class="small muted">Meta App Dashboard → Webhooks → Page: subscribe <code>messages</code>, <code>messaging_postbacks</code>, <code>message_echoes</code>, <code>feed</code> · Instagram: <code>messages</code>. Callback: <code>${esc(location.origin)}/webhooks/meta</code></p>
             <div class="row">${pages.map((p) => `<button type="button" class="btn sm bd" data-do="ibSub" data-id="${esc(p.accountId)}">Subscribe ${esc(p.accountName)}</button>`).join("") || "<span class='small muted'>Connect a Facebook Page in Meta Accounts first</span>"}</div>`,
@@ -7081,9 +7169,2148 @@
       TITLE.inbox = "Customer Inbox";
       LABEL.inbox = "Customer Inbox";
 
+      /* =====================================================
+         R1: login, roles, overview metrics, orders, inventory, fraud, courier, comments, workspace
+         ===================================================== */
+      let ME = null;
+      const canDo = (p) => !ME || ME.can?.[p] !== false;
+      const VIEW_MOD = {
+        overview: "analytics",
+        inbox: "inbox",
+        comments: "comments",
+        orders: "orders",
+        fraud: "fraud",
+        inventory: "inventory",
+        courier: "courier",
+        agent: "agent",
+        analytics: "analytics",
+        workspace: "settings",
+        pages: "pages",
+        msettings: "settings",
+        subscription: "billing",
+        leads: "leads",
+      };
+      const modOfView = (v) => VIEW_MOD[v] || "marketing";
+      const STATUS_LABEL = {
+        pending: "Pending",
+        confirmed: "Confirmed",
+        on_hold: "On hold",
+        processing: "Processing",
+        packed: "Packed",
+        shipped: "Shipped",
+        out_for_delivery: "Out for delivery",
+        failed_delivery: "Failed delivery",
+        delivered: "Delivered",
+        return_requested: "Return requested",
+        returned_to_sender: "Returned to sender",
+        returned_restocked: "Returned (restocked)",
+        returned_damaged: "Returned (damaged)",
+        return_rejected: "Return rejected",
+        cancelled: "Cancelled",
+        rejected: "Rejected",
+      };
+      const stPill = (s) => pill(STATUS_LABEL[s] || s, statC(s));
+      const riskPill = (o) =>
+        pill(
+          `${o.risk ?? 0} · ${o.riskBand || "low"}`,
+          o.riskBand === "high"
+            ? "red"
+            : o.riskBand === "medium"
+              ? "yellow"
+              : "green",
+        );
+      const tkf = (n) => "৳" + fmt(n);
+      const qs = (o) =>
+        Object.entries(o)
+          .filter(([, v]) => v !== "" && v != null)
+          .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+          .join("&");
+      let PLACES = null;
+      const places = async () =>
+        (PLACES = PLACES || (await GET("/api/places")));
+      const districtInput = (name, val, list) =>
+        `<input name="${name}" list="dl_${name}" value="${esc(val || "")}" placeholder="e.g. Dhaka"><datalist id="dl_${name}">${(list || []).map((d) => `<option value="${esc(d)}">`).join("")}</datalist>`;
+      const variantSelect = (products, name, sel = "") =>
+        `<select name="${name}"><option value="">— product / variant —</option>${products
+          .filter((p) => p.status !== "archived")
+          .map(
+            (p) =>
+              `<optgroup label="${esc(p.name)}">${(p.variants || []).map((v) => `<option value="${p.id}|${v._id}" ${sel === `${p.id}|${v._id}` || (sel === `${p.id}|` && p.variants.length === 1) ? "selected" : ""} ${v.available <= 0 ? "disabled" : ""}>${esc(v.name === "Default" ? p.name : `${p.name} · ${v.name}`)} · ৳${fmt(v.price ?? p.price)} · ${v.available} left</option>`).join("")}</optgroup>`,
+          )
+          .join("")}</select>`;
+
+      /* ---------- auth screens ---------- */
+      function showAuth(mode) {
+        const box = $("auth");
+        if (!box.classList.contains("hidden") && !mode) return;
+        const invite = sessionStorage.getItem("mf_invite");
+        mode = mode || (invite ? "signup" : "login");
+        box.classList.remove("hidden");
+        document.body.classList.add("locked");
+        const inv = STATE.inviteInfo;
+        box.innerHTML = `<div class="auth-card"><div class="brand" style="padding:0 0 14px"><div class="logo">${icon("send")}</div><span>MarketingFlow AI</span></div>
+          ${inv ? `<div class="ok-box small">You're invited to <b>${esc(inv.orgName)}</b> as <b>${esc(inv.role)}</b> (${esc(inv.email)}).</div>` : ""}
+          <div class="tabs"><button class="tab ${mode === "login" ? "on" : ""}" data-do="authMode" data-m="login">Log in</button><button class="tab ${mode === "signup" ? "on" : ""}" data-do="authMode" data-m="signup">Create account</button></div>
+          <form id="authForm" class="stack">
+            ${mode === "signup" ? `<div><label>Your name</label><input name="name" required autocomplete="name"></div>` : ""}
+            <div><label>Email</label><input name="email" type="email" required autocomplete="email" value="${esc(inv?.email || "")}"></div>
+            <div><label>Password</label><input name="password" type="password" required minlength="${mode === "signup" ? 8 : 1}" autocomplete="${mode === "signup" ? "new-password" : "current-password"}"></div>
+            ${mode === "signup" && !inv ? `<div><label>Business / workspace name</label><input name="workspace" placeholder="e.g. Rahim Fashion"></div>` : ""}
+            <button class="btn full">${mode === "signup" ? "Create account" : "Log in"}</button>
+            <p class="small muted" id="authErr"></p>
+          </form></div>`;
+        $("authForm").onsubmit = async (e) => {
+          e.preventDefault();
+          const f = formData(e.target);
+          const btn = e.target.querySelector("button");
+          btn.disabled = true;
+          try {
+            const r = await fetch(`/api/auth/${mode}`, {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...f, inviteToken: invite || undefined }),
+            });
+            const j = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(j.error || "Failed");
+            sessionStorage.removeItem("mf_invite");
+            location.href = "/";
+          } catch (err) {
+            $("authErr").textContent = err.message;
+            $("authErr").style.color = "var(--red, #c0362c)";
+          } finally {
+            btn.disabled = false;
+          }
+        };
+      }
+      DO.authMode = (el) => {
+        $("auth").classList.add("hidden");
+        showAuth(el.dataset.m);
+      };
+
+      const NAV_R1 = [
+        [
+          "WORKSPACE",
+          [
+            ["overview", "Overview"],
+            ["inbox", "Customer Inbox"],
+            ["comments", "FB Comments"],
+            ["orders", "Orders"],
+            ["inventory", "Inventory"],
+            ["fraud", "Fraud Shield"],
+            ["courier", "Courier Hub"],
+          ],
+        ],
+        NAV[1],
+        [
+          "AI & ANALYTICS",
+          [
+            ["agent", "AI Agent"],
+            ["analytics", "Sales Analytics"],
+          ],
+        ],
+        [
+          "SETTINGS",
+          [
+            ["workspace", "Workspace & Team"],
+            ["pages", "Meta Accounts"],
+            ["msettings", "Marketing Settings"],
+            ["subscription", "Subscription"],
+          ],
+        ],
+      ];
+      Object.assign(LABEL, {
+        comments: "FB Comments",
+        workspace: "Workspace & Team",
+        courier: "Courier Hub",
+        inbox: "Customer Inbox",
+      });
+      Object.assign(TITLE, {
+        overview: "Business overview",
+        comments: "Facebook comment engine",
+        workspace: "Workspace, delivery zones & team",
+        orders: "Orders",
+        inventory: "Inventory & variants",
+        fraud: "Fraud Shield",
+        courier: "Courier Hub",
+        analytics: "Sales analytics",
+        agent: "AI sales agent",
+      });
+      P.workspace = P.msettings;
+      function applyMe() {
+        CFG.user = { name: ME.user.name, email: ME.user.email };
+        CFG.workspace = ME.org.name;
+        CFG.tenantId = ME.org.id;
+        $("uName").textContent = ME.user.name;
+        $("uMail").textContent = `${ME.roleLabel} · ${ME.user.email}`;
+        $("uAv").textContent = (ME.user.name || "U")[0].toUpperCase();
+        $("wsChip").innerHTML =
+          ME.memberships.length > 1
+            ? `${icon("test")}<select id="wsSwitch" style="border:0;background:transparent;font:inherit">${opts(
+                ME.memberships.map((m) => [m.orgId, m.name]),
+                ME.org.id,
+              )}</select>`
+            : icon("test") + esc(ME.org.name);
+        if ($("wsSwitch"))
+          $("wsSwitch").onchange = async (e) => {
+            await POST("/api/auth/switch", { organizationId: e.target.value });
+            location.href = "/";
+          };
+        $("nav").innerHTML = NAV_R1.map(([g, items]) => {
+          const vis = items.filter(([k]) => canDo(`${modOfView(k)}.read`));
+          return vis.length
+            ? `<div class="grp">${g}</div>` +
+                vis
+                  .map(
+                    ([k, t]) =>
+                      `<button class="nav" data-view="${k}">${icon(k)}${t}</button>`,
+                  )
+                  .join("")
+            : "";
+        }).join("");
+      }
+      $("logout").onclick = async () => {
+        await POST("/api/auth/logout").catch(() => {});
+        location.href = "/";
+      };
+      DO.goZones = () => {
+        closeModal();
+        STATE.tabs.workspace = "zones";
+        switchView("workspace");
+      };
+      const noAccess = (box, v) => {
+        box.innerHTML = `<div class="card">${empty("No access", `Your role (${esc(ME?.roleLabel || "")}) can't open ${esc(LABEL[v] || v)}. Ask an Owner to change your role.`)}</div>`;
+      };
+      // Guard every view by role
+      const _switchView = switchView;
+      switchView = async (v) => {
+        if (ME && TITLE[v] && !canDo(`${modOfView(v)}.read`)) {
+          current = v;
+          document
+            .querySelectorAll("main > section")
+            .forEach((s) => s.classList.add("hidden"));
+          const box = $("v-mkt");
+          box.classList.remove("hidden");
+          $("title").textContent = TITLE[v];
+          return noAccess(box, v);
+        }
+        return _switchView(v);
+      };
+
+      /* ---------- overview (metric service) ---------- */
+      STATE.period = STATE.period || "today";
+      MKT.overview = async (box) => {
+        const p = STATE.period,
+          cf = STATE.customRange || {};
+        const m = await GET(
+          `/api/metrics/overview?${qs({ period: p, from: p === "custom" ? cf.from : "", to: p === "custom" ? cf.to : "", refresh: STATE.metricsRefresh ? 1 : "" })}`,
+        );
+        STATE.metricsRefresh = false;
+        $("dbDot").classList.remove("off");
+        $("dbTxt").textContent = "DB Connected";
+        const val = (c) =>
+          c.value == null
+            ? "—"
+            : c.money
+              ? tkf(c.value)
+              : fmt(c.value) + (c.suffix || "");
+        const delta = (c) =>
+          c.delta == null
+            ? ""
+            : `<span class="d" style="color:${c.delta < 0 ? "#c0362c" : "#0b7a2b"}">${c.delta < 0 ? "↓" : "↑"} ${Math.abs(c.delta)}%</span>`;
+        box.innerHTML = `<div class="hero"><div><div class="tag">WORKSPACE: ${esc(CFG.workspace.toUpperCase())}</div><h2>Hi ${esc((ME?.user.name || "").split(" ")[0])}, here's your business.</h2><p>Every number below comes from one metric service, in Bangladesh time. Click a card to see the records behind it.</p>
+            <div class="row">${canDo("orders.write") ? `<button class="btn" data-do="newOrder">+ New order</button>` : ""}${canDo("inventory.write") ? `<button class="btn ghost" data-do="newProduct">+ Add product</button>` : ""}</div></div>
+            <div class="cta"><button class="btn" data-view="inbox">Customer Inbox <span class="ar">${icon("arrow")}</span></button><button class="btn white" data-view="comments">FB Comments <span class="ar">${icon("arrow")}</span></button><button class="btn white" data-view="leads">Leads &amp; CRM <span class="ar">${icon("arrow")}</span></button></div></div>
+          <div class="row" style="justify-content:space-between;margin:14px 0 4px"><div class="row">${["today", "yesterday", "7d", "30d", "month", "custom"].map((k) => `<button class="chip ${p === k ? "on" : ""}" data-do="period" data-p="${k}">${{ today: "Today", yesterday: "Yesterday", "7d": "7 days", "30d": "30 days", month: "This month", custom: "Custom" }[k]}</button>`).join("")}
+            ${p === "custom" ? `<input type="date" id="cFrom" class="chip" value="${esc(cf.from || "")}"><input type="date" id="cTo" class="chip" value="${esc(cf.to || "")}"><button class="btn sm" data-do="applyCustom">Apply</button>` : ""}</div>
+            <span class="small muted">Updated ${when(m.updatedAt)} · <a href="#" data-do="metricsRefresh">refresh</a></span></div>
+          <div class="kpis">${m.cards.map((c) => `<div class="card kpi" data-do="cardLink" data-k="${c.key}" style="cursor:pointer" title="${esc(c.hint || "")}"><div class="l"><span>${esc(c.label.toUpperCase())}</span>${c.incomplete ? '<span class="auto-tag" style="background:#eee;color:#555">INCOMPLETE</span>' : ""}</div><div class="v"><span class="${c.money ? "c-green" : ""}">${val(c)}</span>${delta(c)}</div><p>${esc(c.hint || (c.prev != null ? "vs previous period" : "right now"))}</p></div>`).join("")}</div>
+          <div class="card"><div class="head"><h3>Recent orders</h3><button class="btn sm" data-view="orders">Open Orders <span class="ar">${icon("arrow")}</span></button></div>
+          ${tbl(
+            [
+              [
+                "ORDER",
+                (o) =>
+                  `<a href="#" data-do="openOrder" data-id="${o.id}"><b>${esc(o.no)}</b></a>`,
+              ],
+              ["CUSTOMER", (o) => esc(o.customer)],
+              ["PHONE", (o) => esc(o.phone)],
+              ["TOTAL", (o) => `<b>${tkf(o.total)}</b>`],
+              ["PAYMENT", (o) => pill(o.payment, payC(o.payment))],
+              ["CHANNEL", (o) => pill(o.channel, chanC(o.channel))],
+              ["STATUS", (o) => stPill(o.status)],
+              ["DATE", (o) => when(o.createdAt)],
+            ],
+            m.recent,
+            "No orders yet",
+          )}</div>`;
+        STATE.metricCards = m.cards;
+      };
+      DO.period = (el) => {
+        STATE.period = el.dataset.p;
+        if (el.dataset.p !== "custom") switchView("overview");
+        else {
+          STATE.customRange = STATE.customRange || {
+            from: daysAgoStr(6),
+            to: daysAgoStr(0),
+          };
+          switchView("overview");
+        }
+      };
+      DO.applyCustom = () => {
+        STATE.customRange = { from: $("cFrom").value, to: $("cTo").value };
+        switchView("overview");
+      };
+      DO.metricsRefresh = () => {
+        STATE.metricsRefresh = true;
+        switchView("overview");
+      };
+      DO.cardLink = (el) => {
+        const c = (STATE.metricCards || []).find((x) => x.key === el.dataset.k);
+        if (!c?.link) return;
+        if (c.link.view === "orders") {
+          STATE.ord = { ...ORD0(), ...(c.link.filter || {}) };
+          if (c.link.filter?.from) {
+            STATE.ord.from = ymdLocal(c.link.filter.from);
+            STATE.ord.to = ymdLocal(new Date(c.link.filter.to) - 1);
+          }
+        }
+        if (
+          c.link.view === "inbox" &&
+          c.link.filter?.tab &&
+          typeof IB !== "undefined"
+        )
+          IB.tab = c.link.filter.tab;
+        switchView(c.link.view);
+      };
+
+      /* ---------- orders ---------- */
+      const ORD0 = () => ({
+        status: "",
+        q: "",
+        payment: "",
+        risk: "",
+        channel: "",
+        createdBy: "",
+        from: "",
+        to: "",
+        page: 1,
+        limit: 25,
+      });
+      STATE.ord = ORD0();
+      STATE.sel = new Set();
+      const ORD_TABS = [
+        ["", "All"],
+        ["pending", "Pending"],
+        ["on_hold", "On hold"],
+        ["confirmed", "Confirmed"],
+        ["processing", "Processing"],
+        ["packed", "Packed"],
+        ["shipped,out_for_delivery,failed_delivery", "In transit"],
+        ["delivered", "Delivered"],
+        [
+          "return_requested,returned_to_sender,returned_restocked,returned_damaged,return_rejected",
+          "Returns",
+        ],
+        ["cancelled,rejected", "Cancelled"],
+      ];
+      MKT.orders = async (box) => {
+        const f = STATE.ord;
+        const r = await GET(`/api/orders?${qs(f)}`);
+        const cnt = (k) =>
+          k
+            ? k.split(",").reduce((s, x) => s + (r.counts[x] || 0), 0)
+            : Object.values(r.counts).reduce((a, b) => a + b, 0);
+        const pages = Math.max(1, Math.ceil(r.total / r.limit));
+        STATE.sel = new Set(
+          [...STATE.sel].filter((id) => r.rows.some((o) => o.id === id)),
+        );
+        box.innerHTML = `<div class="tabs">${ORD_TABS.map(([k, l]) => `<button class="tab ${f.status === k ? "on" : ""}" data-do="ordTab" data-k="${k}">${l} <span class="small muted">${cnt(k)}</span></button>`).join("")}</div>
+          <div class="card"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div class="row" style="flex-wrap:wrap;gap:6px"><input id="oQ" class="chip" placeholder="Order no, name, phone, address…" value="${esc(f.q)}" style="min-width:220px">
+              <select class="chip" data-chg="ordF" data-k="payment">${opts(
+                [
+                  ["", "Any payment"],
+                  ["unpaid", "Unpaid"],
+                  ["paid", "Paid"],
+                  ["partial", "Partial"],
+                ],
+                f.payment,
+              )}</select>
+              <select class="chip" data-chg="ordF" data-k="risk">${opts(
+                [
+                  ["", "Any risk"],
+                  ["high", "High risk"],
+                  ["medium", "Medium"],
+                  ["low", "Low"],
+                ],
+                f.risk,
+              )}</select>
+              <select class="chip" data-chg="ordF" data-k="createdBy">${opts(
+                [
+                  ["", "Any source"],
+                  ["ai_agent", "AI agent"],
+                  ["user", "Team"],
+                  ["n8n", "n8n"],
+                ],
+                f.createdBy,
+              )}</select>
+              <input type="date" class="chip" data-chg="ordF" data-k="from" value="${esc(f.from)}"><input type="date" class="chip" data-chg="ordF" data-k="to" value="${esc(f.to)}">
+              ${Object.entries(f).some(([k, v]) => !["page", "limit", "status"].includes(k) && v) ? `<button class="btn sm bd" data-do="ordClear">Clear filters</button>` : ""}</div>
+            <div class="row" style="gap:6px"><a class="btn sm bd" href="/api/orders/export.csv?${qs({ ...f, page: "", limit: "" })}">Export CSV</a>${canDo("orders.write") ? `<button class="btn sm" data-do="newOrder">+ New order</button>` : ""}</div></div>
+            ${canDo("orders.write") ? `<div class="row mt small" id="bulkBar" style="gap:6px"><span class="muted"><b id="selN">${STATE.sel.size}</b> selected:</span><button class="btn sm bd" data-do="bulk" data-to="confirmed">Confirm</button><button class="btn sm bd" data-do="bulk" data-to="processing">Processing</button><button class="btn sm bd" data-do="bulk" data-to="packed">Mark packed</button>${canDo("courier.write") ? `<button class="btn sm bd" data-do="bulkBook">Book courier</button>` : ""}<button class="btn sm bd" data-do="bulkPrint">Print invoices</button></div>` : ""}
+            ${
+              r.rows.length
+                ? `<div class="tbl"><table><thead><tr><th><input type="checkbox" data-chg="selAll" style="width:auto"></th><th>ORDER</th><th>CUSTOMER</th><th>ITEMS</th><th>TOTAL</th><th>PAYMENT</th><th>RISK</th><th>COURIER</th><th>STATUS</th><th>DATE</th></tr></thead><tbody>
+              ${r.rows.map((o) => `<tr><td><input type="checkbox" data-chg="selOne" data-id="${o.id}" ${STATE.sel.has(o.id) ? "checked" : ""} style="width:auto"></td><td><a href="#" data-do="openOrder" data-id="${o.id}"><b>${esc(o.no)}</b></a><div class="small muted">${esc(o.channel)}</div></td><td>${esc(o.customer)}<div class="small muted">${esc(o.phone)} · ${esc(o.district || o.zone || "")}</div></td><td class="small">${o.items.map((i) => `${esc(i.name)}${i.variant ? ` (${esc(i.variant)})` : ""} ×${i.qty}`).join("<br>")}</td><td><b>${tkf(o.total)}</b></td><td>${pill(o.payment, payC(o.payment))}</td><td>${riskPill(o)}</td><td class="small">${o.courier ? `${esc(o.courier)}<br>${esc(o.tracking || "")}` : "—"}</td><td>${stPill(o.status)}</td><td class="small">${when(o.createdAt)}</td></tr>`).join("")}</tbody></table></div>`
+                : empty(
+                    "No orders match",
+                    "Change the filters or create an order.",
+                  )
+            }
+            <div class="row mt" style="justify-content:space-between"><span class="small muted">${fmt(r.total)} order(s) · page ${r.page} of ${pages}</span><span class="row" style="gap:6px"><select class="chip" data-chg="ordF" data-k="limit">${opts([25, 50, 100], f.limit)}</select><button class="btn sm bd" data-do="ordPage" data-p="${r.page - 1}" ${r.page <= 1 ? "disabled" : ""}>‹ Prev</button><button class="btn sm bd" data-do="ordPage" data-p="${r.page + 1}" ${r.page >= pages ? "disabled" : ""}>Next ›</button></span></div></div>`;
+        let t;
+        $("oQ").oninput = (e) => {
+          clearTimeout(t);
+          t = setTimeout(() => {
+            STATE.ord.q = e.target.value;
+            STATE.ord.page = 1;
+            switchView("orders");
+          }, 450);
+        };
+      };
+      DO.ordTab = (el) => {
+        STATE.ord.status = el.dataset.k;
+        STATE.ord.page = 1;
+        switchView("orders");
+      };
+      DO.ordPage = (el) => {
+        STATE.ord.page = Number(el.dataset.p);
+        switchView("orders");
+      };
+      DO.ordClear = () => {
+        STATE.ord = { ...ORD0(), status: STATE.ord.status };
+        switchView("orders");
+      };
+      CHG.ordF = (el) => {
+        STATE.ord[el.dataset.k] = el.value;
+        STATE.ord.page = 1;
+        switchView("orders");
+      };
+      CHG.selOne = (el) => {
+        el.checked
+          ? STATE.sel.add(el.dataset.id)
+          : STATE.sel.delete(el.dataset.id);
+        if ($("selN")) $("selN").textContent = STATE.sel.size;
+      };
+      CHG.selAll = (el) => {
+        document.querySelectorAll("[data-chg=selOne]").forEach((c) => {
+          c.checked = el.checked;
+          CHG.selOne(c);
+        });
+      };
+      DO.bulk = async (el) => {
+        if (!STATE.sel.size) return toast("Select orders first", true);
+        const r = await POST("/api/orders/bulk", {
+          ids: [...STATE.sel],
+          to: el.dataset.to,
+        });
+        toast(
+          `${r.done} updated${r.failed.length ? `, ${r.failed.length} skipped: ${r.failed[0].error}` : ""}`,
+          !!r.failed.length,
+        );
+        STATE.sel.clear();
+        switchView(current);
+      };
+      DO.bulkPrint = () => {
+        if (!STATE.sel.size) return toast("Select orders first", true);
+        [...STATE.sel].forEach((id) =>
+          window.open(`/api/orders/${id}/invoice`, "_blank"),
+        );
+      };
+      DO.bulkBook = () => {
+        if (!STATE.sel.size) return toast("Select orders first", true);
+        bookModal([...STATE.sel]);
+      };
+
+      DO.openOrder = async (el) => openOrder(el.dataset.id);
+      async function openOrder(id) {
+        const o = await GET(`/api/orders/${id}`);
+        const w = canDo("orders.write");
+        const editable = [
+          "pending",
+          "on_hold",
+          "confirmed",
+          "processing",
+        ].includes(o.status);
+        const nextBtns = o.next.filter(
+          (s) =>
+            ![
+              "return_requested",
+              "returned_restocked",
+              "returned_damaged",
+              "return_rejected",
+              "shipped",
+            ].includes(s) &&
+            !(
+              s === "rejected" ||
+              (o.status === "on_hold" && s === "confirmed")
+            ),
+        );
+        openModal({
+          title: `Order ${o.no}`,
+          wide: true,
+          body: `<div class="row" style="gap:8px;flex-wrap:wrap">${stPill(o.status)} ${riskPill(o)} ${pill(o.payment, payC(o.payment))} <span class="small muted">${esc(o.channel)} · ${when(o.createdAt)}</span></div>
+            <div class="f2 mt"><div class="box"><h5>CUSTOMER</h5><b>${esc(o.customer)}</b><div>${esc(o.phone)}</div><div class="small">${esc(o.address)}</div><div class="small muted">${esc(o.district || "")} · zone: ${esc(o.zone || "—")}</div>${o.conversationId ? `<button type="button" class="btn sm bd mt" data-do="openChat" data-id="${o.conversationId}">Open chat</button>` : ""}</div>
+              <div class="box"><h5>ITEMS</h5>${o.items.map((i) => `<div class="kv"><span>${esc(i.name)}${i.variant ? ` (${esc(i.variant)})` : ""} × ${i.qty}</span><b>${tkf(i.price * i.qty)}</b></div>`).join("")}
+                <div class="kv"><span>Subtotal</span><b>${tkf(o.subtotal)}</b></div><div class="kv"><span>Delivery</span><b>${tkf(o.deliveryFee)}</b></div>${o.discount ? `<div class="kv"><span>Discount</span><b>−${tkf(o.discount)}</b></div>` : ""}<div class="kv"><span><b style="color:var(--ink)">Total</b></span><b>${tkf(o.total)}</b></div></div></div>
+            ${o.signals?.length ? `<div class="box mt"><h5>RISK SIGNALS</h5>${o.signals.map((s) => `<div class="kv"><span class="small">${esc(s.reason)}</span><b class="${s.points > 0 ? "" : "c-green"}">${s.points > 0 ? "+" : ""}${s.points}</b></div>`).join("")}</div>` : ""}
+            ${o.courier ? `<div class="box mt"><h5>COURIER</h5><div class="kv"><span>${esc(o.courier)}</span><b>${esc(o.tracking || "")}</b></div>${o.courierStatus ? `<div class="small muted">Courier status: ${esc(o.courierStatus)}</div>` : ""}${o.consignmentId && w ? `<button type="button" class="btn sm bd mt" data-do="syncShip" data-id="${o.id}">Sync status now</button>` : ""}</div>` : ""}
+            ${o.returnInfo ? `<div class="box mt"><h5>RETURN</h5><div class="small">${esc(o.returnInfo.reason || "")} · ${when(o.returnInfo.requestedAt)}</div></div>` : ""}
+            <div class="box mt"><h5>NOTES</h5><textarea id="oNotes" rows="2" ${w ? "" : "disabled"}>${esc(o.notes || "")}</textarea>${w ? `<button type="button" class="btn sm bd mt" data-do="saveNotes" data-id="${o.id}">Save notes</button>` : ""}</div>
+            ${
+              w
+                ? `<div class="box mt"><h5>ACTIONS</h5><div class="row" style="flex-wrap:wrap;gap:6px">
+              ${o.status === "on_hold" ? `<button type="button" class="btn sm" data-do="fraudDecide" data-id="${o.id}" data-d="approve">Approve</button><button type="button" class="btn sm danger" data-do="fraudDecide" data-id="${o.id}" data-d="reject">Reject</button>` : ""}
+              ${nextBtns.map((s) => `<button type="button" class="btn sm ${["cancelled", "failed_delivery", "returned_to_sender"].includes(s) ? "danger" : ""}" data-do="moveOrder" data-id="${o.id}" data-to="${s}">→ ${STATUS_LABEL[s]}</button>`).join("")}
+              ${["confirmed", "processing", "packed"].includes(o.status) && canDo("courier.write") ? `<button type="button" class="btn sm dark" data-do="bookOne" data-id="${o.id}">Book courier</button>` : ""}
+              ${["shipped", "out_for_delivery", "failed_delivery", "delivered"].includes(o.status) ? `<button type="button" class="btn sm bd" data-do="returnOrder" data-id="${o.id}">Return</button>` : ""}
+              ${o.status === "return_requested" ? `<button type="button" class="btn sm" data-do="resolveReturn" data-id="${o.id}">Resolve return</button>` : ""}
+              ${editable ? `<button type="button" class="btn sm bd" data-do="editOrder" data-id="${o.id}">Edit order</button>` : ""}
+              <button type="button" class="btn sm bd" data-do="payOrder" data-id="${o.id}">Payment</button>
+              <a class="btn sm bd" target="_blank" href="/api/orders/${o.id}/invoice">Invoice (A4)</a><a class="btn sm bd" target="_blank" href="/api/orders/${o.id}/invoice?size=label">Label 3×4</a></div></div>`
+                : ""
+            }
+            <div class="box mt"><h5>HISTORY</h5>${(o.events || [])
+              .slice()
+              .reverse()
+              .map(
+                (e) =>
+                  `<div class="kv small"><span>${e.to && e.from !== e.to ? `${esc(STATUS_LABEL[e.from] || e.from || "Created")} → <b>${esc(STATUS_LABEL[e.to] || e.to)}</b>` : "<b>Update</b>"}${e.note ? ` · ${esc(e.note)}` : ""}</span><span class="muted">${esc(e.by || "")} · ${when(e.at)}</span></div>`,
+              )
+              .join("")}</div>`,
+          buttons: [],
+        });
+      }
+      const refreshAfter = async (id) => {
+        if ($("dlg").open) closeModal();
+        if (id) await openOrder(id);
+        switchViewQuiet();
+      };
+      const switchViewQuiet = () => {
+        if (["orders", "fraud", "courier", "overview"].includes(current))
+          switchView(current);
+      };
+      DO.moveOrder = async (el) => {
+        const to = el.dataset.to;
+        let note = "";
+        if (
+          ["cancelled", "failed_delivery", "returned_to_sender"].includes(to)
+        ) {
+          note = prompt(`Reason for "${STATUS_LABEL[to]}"?`) || "";
+          if (!note) return;
+        }
+        await POST(`/api/orders/${el.dataset.id}/transition`, { to, note });
+        toast(`Moved to ${STATUS_LABEL[to]}`);
+        refreshAfter(el.dataset.id);
+      };
+      DO.saveNotes = async (el) => {
+        await PUT(`/api/orders/${el.dataset.id}`, { notes: $("oNotes").value });
+        toast("Notes saved");
+      };
+      DO.syncShip = async (el) => {
+        const r = await POST(`/api/courier/sync/${el.dataset.id}`);
+        toast(
+          `Courier says: ${r.raw || "?"}${r.moved?.length ? " → " + r.moved.map((s) => STATUS_LABEL[s]).join(" → ") : ""}`,
+        );
+        refreshAfter(el.dataset.id);
+      };
+      DO.openChat = (el) => {
+        closeModal();
+        if (typeof IB !== "undefined") {
+          IB.id = el.dataset.id;
+          IB.tab = "all";
+        }
+        switchView("inbox");
+      };
+      DO.payOrder = async (el) => {
+        const o = await GET(`/api/orders/${el.dataset.id}`);
+        openModal({
+          title: `Payment · ${o.no}`,
+          body: `<div class="f3"><div><label>Method</label><select name="paymentMethod">${opts(["COD", "bKash", "Nagad", "Rocket", "Card"], o.paymentMethod)}</select></div><div><label>Status</label><select name="paymentStatus">${opts(
+            [
+              ["unpaid", "Unpaid"],
+              ["partial", "Partial advance"],
+              ["paid", "Paid / collected"],
+            ],
+            o.paymentStatus,
+          )}</select></div><div><label>Reference (TrxID)</label><input name="paymentRef" value="${esc(o.paymentRef || "")}"></div></div>`,
+          onSubmit: async (f) => {
+            await PUT(`/api/orders/${o.id}/payment`, f);
+            toast("Payment updated");
+            setTimeout(() => refreshAfter(o.id), 50);
+          },
+        });
+      };
+      DO.returnOrder = async (el) => {
+        const o = await GET(`/api/orders/${el.dataset.id}`);
+        openModal({
+          title: `Return · ${o.no}`,
+          body: `<p class="small muted">${o.status === "delivered" ? "Creates a return request. You decide restock/damaged when the parcel comes back." : "The parcel goes back to you and stock is restocked."}</p><div class="mt"><label>Reason</label><input name="reason" required placeholder="Customer refused / size issue / damaged"></div>`,
+          onSubmit: async (f) => {
+            await POST(`/api/orders/${o.id}/return`, f);
+            toast("Return recorded");
+            setTimeout(() => refreshAfter(o.id), 50);
+          },
+        });
+      };
+      DO.resolveReturn = async (el) => {
+        const o = await GET(`/api/orders/${el.dataset.id}`);
+        openModal({
+          title: `Resolve return · ${o.no}`,
+          body: `<div><label>Outcome</label><select name="resolution">${opts([
+            ["restocked", "Received: put back in stock"],
+            ["damaged", "Received damaged (no restock)"],
+            ["rejected", "Return rejected"],
+          ])}</select></div>
+            <h4 class="mt">Units back in stock (partial returns)</h4>${o.items.map((i, k) => `<div class="kv"><span>${esc(i.name)}${i.variant ? ` (${esc(i.variant)})` : ""} × ${i.qty}</span><input type="number" name="rq[]" min="0" max="${i.qty}" value="${i.qty}" style="width:80px"></div>`).join("")}<div class="mt"><label>Note</label><input name="note"></div>`,
+          onSubmit: async (f) => {
+            await POST(`/api/orders/${o.id}/return/resolve`, {
+              resolution: f.resolution,
+              note: f.note,
+              items: (f.rq || []).map((q, i) => ({
+                index: i,
+                qty: Number(q) || 0,
+              })),
+            });
+            toast("Return resolved");
+            setTimeout(() => refreshAfter(o.id), 50);
+          },
+        });
+      };
+
+      // New / edit order form with live quote
+      async function orderForm(o) {
+        const [products, pl] = await Promise.all([
+          GET("/api/products"),
+          places(),
+        ]);
+        const row = (i = {}) =>
+          `<div class="f2 mt orow" style="grid-template-columns:3fr 1fr">${variantSelect(products, "pv[]", i.productId ? `${i.productId}|${i.variantId || ""}` : "")}<input type="number" name="qty[]" min="1" value="${i.qty || 1}"></div>`;
+        STATE.orderRow = () => row();
+        openModal({
+          title: o ? `Edit ${o.no}` : "New order",
+          wide: true,
+          body: `<div class="f3"><div><label>Customer name</label><input name="customerName" required value="${esc(o?.customer || "")}"></div><div><label>Phone</label><input name="phone" required placeholder="01XXXXXXXXX" value="${esc(o?.phone || "")}"></div><div><label>District</label>${districtInput("district", o?.district, pl.districts)}</div></div>
+            <div class="mt"><label>Address (house, road, area/thana)</label><input name="address" required value="${esc(o?.address || "")}"></div>
+            <h4 class="mt">Products</h4><div id="orows">${(o?.items || []).map(row).join("") || row()}</div><button type="button" class="btn sm bd mt" data-do="addOrderRow">+ Product</button>
+            <div class="f3 mt">${o ? "" : `<div><label>Payment</label><select name="paymentMethod">${opts(["COD", "bKash", "Nagad", "Rocket", "Card"])}</select></div>`}<div><label>Discount (৳)</label><input type="number" name="discount" min="0" value="${o?.discount || ""}"></div><div><label>Delivery fee override (৳, blank = zone)</label><input type="number" name="deliveryFee" min="0"></div></div>
+            ${
+              o
+                ? ""
+                : `<div class="f2 mt"><div><label>Status</label><select name="status">${opts(
+                    [
+                      ["confirmed", "Confirmed (called the customer)"],
+                      ["pending", "Pending"],
+                    ],
+                  )}</select></div><div><label>Payment reference</label><input name="paymentRef" placeholder="bKash TrxID (if paid)"></div></div>`
+            }
+            <div class="mt"><label>Notes</label><input name="notes" value="${esc(o?.notes || "")}"></div>
+            <div class="box mt" id="quoteBox"><button type="button" class="btn sm bd" data-do="quote">Calculate total</button></div>`,
+          buttons: [["save", o ? "Save changes" : "Create order"]],
+          onSubmit: async (f) => {
+            const items = (f.pv || [])
+              .map((v, i) => ({
+                productId: v.split("|")[0],
+                variantId: v.split("|")[1],
+                qty: Number(f.qty[i]) || 1,
+              }))
+              .filter((x) => x.productId);
+            const body = {
+              customerName: f.customerName,
+              phone: f.phone,
+              address: f.address,
+              district: f.district,
+              items,
+              discount: f.discount || 0,
+              notes: f.notes,
+            };
+            if (f.deliveryFee !== null && f.deliveryFee !== undefined)
+              body.deliveryFee = f.deliveryFee;
+            if (o) {
+              await PUT(`/api/orders/${o.id}`, body);
+              toast("Order updated");
+              setTimeout(() => refreshAfter(o.id), 50);
+            } else {
+              const r = await POST("/api/orders", {
+                ...body,
+                paymentMethod: f.paymentMethod,
+                status: f.status,
+                paymentRef: f.paymentRef,
+                paymentStatus:
+                  f.paymentRef && f.paymentMethod !== "COD"
+                    ? "paid"
+                    : undefined,
+              });
+              toast(
+                `Order ${r.order.no} created${r.order.status === "on_hold" ? " — ON HOLD by Fraud Shield" : ""}`,
+                r.order.status === "on_hold",
+              );
+              setTimeout(() => {
+                switchViewQuiet();
+              }, 50);
+            }
+          },
+        });
+      }
+      DO.newOrder = () => orderForm(null);
+      DO.editOrder = async (el) =>
+        orderForm(await GET(`/api/orders/${el.dataset.id}`));
+      DO.addOrderRow = () =>
+        $("orows").insertAdjacentHTML("beforeend", STATE.orderRow());
+      DO.quote = async () => {
+        const f = formData($("dlgForm"));
+        const items = (f.pv || [])
+          .map((v, i) => ({
+            productId: v.split("|")[0],
+            variantId: v.split("|")[1],
+            qty: Number(f.qty[i]) || 1,
+          }))
+          .filter((x) => x.productId);
+        const q = await POST("/api/orders/quote", { ...f, items });
+        $("quoteBox").innerHTML =
+          `${q.errors.map((e) => warn(esc(e))).join("")}<div class="kv"><span>Subtotal</span><b>${tkf(q.subtotal)}</b></div><div class="kv"><span>Delivery · ${esc(q.zone.zone)}${q.zone.sure ? "" : " (address not recognised: default zone)"}</span><b>${tkf(q.deliveryFee)}</b></div>${q.discount ? `<div class="kv"><span>Discount</span><b>−${tkf(q.discount)}</b></div>` : ""}<div class="kv"><span><b style="color:var(--ink)">Total</b></span><b>${tkf(q.total)}</b></div>
+          ${q.risk ? `<div class="kv"><span>Fraud check</span>${riskPill({ risk: q.risk.score, riskBand: q.risk.band })}</div>${q.risk.signals.map((s) => `<div class="small muted">• ${esc(s.reason)} (${s.points > 0 ? "+" : ""}${s.points})</div>`).join("")}` : ""}<button type="button" class="btn sm bd mt" data-do="quote">Recalculate</button>`;
+      };
+
+      /* ---------- inventory ---------- */
+      STATE.inv = { q: "", stock: "", status: "" };
+      MKT.inventory = async (box) => {
+        const tab = tabOf("inventory", "products");
+        const [s, rows] = await Promise.all([
+          GET("/api/inventory/summary"),
+          tab === "products"
+            ? GET(`/api/products?${qs(STATE.inv)}`)
+            : GET("/api/inventory/movements"),
+        ]);
+        const w = canDo("inventory.write");
+        box.innerHTML =
+          kpiCards([
+            ["ACTIVE PRODUCTS", fmt(s.products), `${fmt(s.variants)} variants`],
+            [
+              "STOCK UNITS (ON HAND)",
+              fmt(s.onHand),
+              "physically in your store",
+              "c-blue",
+            ],
+            [
+              "AVAILABLE TO SELL",
+              fmt(s.available),
+              `${fmt(s.reserved)} reserved by open orders`,
+              "c-green",
+            ],
+            [
+              "LOW / OUT OF STOCK",
+              `${fmt(s.low)} / ${fmt(s.out)}`,
+              "products",
+              s.out ? "c-purple" : "",
+            ],
+            [
+              "STOCK VALUE (COST)",
+              tkf(s.stockValue),
+              `retail ${tkf(s.retailValue)}`,
+            ],
+          ]) +
+          tabsBar("inventory", [
+            ["products", "Products"],
+            ["movements", "Stock movements"],
+          ]) +
+          (tab === "products"
+            ? `<div class="card"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px"><div class="row" style="gap:6px"><input id="iQ" class="chip" placeholder="Search name, SKU, category…" value="${esc(STATE.inv.q)}"><select class="chip" data-chg="invF" data-k="stock">${opts(
+                [
+                  ["", "All stock"],
+                  ["low", "Low stock"],
+                  ["out", "Out of stock"],
+                ],
+                STATE.inv.stock,
+              )}</select><select class="chip" data-chg="invF" data-k="status">${opts(
+                [
+                  ["", "Active"],
+                  ["archived", "Archived"],
+                  ["all", "All"],
+                ],
+                STATE.inv.status,
+              )}</select></div>
+              <div class="row" style="gap:6px"><a class="btn sm bd" href="/api/products/export.csv">Export CSV</a>${w ? `<button class="btn sm" data-do="newProduct">+ Add product</button>` : ""}</div></div>
+              ${tbl(
+                [
+                  [
+                    "PRODUCT",
+                    (p) =>
+                      `<b>${esc(p.name)}</b>${p.nameBn ? `<div class="small">${esc(p.nameBn)}</div>` : ""}<div class="small muted">${esc(p.sku)} · ${esc(p.category || "")}</div>`,
+                  ],
+                  [
+                    "VARIANTS (available / on hand)",
+                    (p) =>
+                      (p.variants || [])
+                        .map(
+                          (v) =>
+                            `<span class="pill p-${v.available <= 0 ? "red" : v.available <= (p.lowStockAt ?? 5) ? "yellow" : "grey"}" style="margin:2px">${esc(v.name)}: ${v.available}/${v.onHand}${v.reserved ? ` (${v.reserved} res.)` : ""}</span>`,
+                        )
+                        .join(""),
+                  ],
+                  [
+                    "PRICE",
+                    (p) =>
+                      tkf(p.price) +
+                      ((p.variants || []).some((v) => v.price != null)
+                        ? "<div class='small muted'>varies</div>"
+                        : ""),
+                  ],
+                  [
+                    "AVAILABLE",
+                    (p) =>
+                      `<b class="${p.out ? "" : "c-green"}">${fmt(p.available)}</b>`,
+                  ],
+                  [
+                    "STATUS",
+                    (p) =>
+                      p.status === "archived"
+                        ? pill("Archived", "grey")
+                        : p.out
+                          ? pill("Out of stock", "red")
+                          : p.low
+                            ? pill("Low", "yellow")
+                            : pill("In stock", "green"),
+                  ],
+                  [
+                    "",
+                    (p) =>
+                      `<div class="row nowrap" style="gap:4px">${w ? `<button class="btn sm bd" data-do="adjustStock" data-id="${p.id}">Adjust</button><button class="btn sm bd" data-do="editProduct" data-id="${p.id}">Edit</button>` : ""}<button class="btn sm bd" data-do="stockHistory" data-id="${p.id}">History</button>${w && p.status !== "archived" ? `<button class="btn sm danger" data-do="archiveProduct" data-id="${p.id}">Archive</button>` : ""}</div>`,
+                  ],
+                ],
+                rows,
+                "No products yet. Add your first product.",
+              )}</div>`
+            : `<div class="card">${tbl(
+                [
+                  ["WHEN", (m) => when(m.createdAt)],
+                  ["ITEM", (m) => esc(m.label)],
+                  [
+                    "ON HAND",
+                    (m) =>
+                      m.onHandDelta
+                        ? `<b class="${m.onHandDelta > 0 ? "c-green" : ""}">${m.onHandDelta > 0 ? "+" : ""}${m.onHandDelta}</b>`
+                        : "—",
+                  ],
+                  [
+                    "RESERVED",
+                    (m) =>
+                      m.reservedDelta
+                        ? `${m.reservedDelta > 0 ? "+" : ""}${m.reservedDelta}`
+                        : "—",
+                  ],
+                  ["REASON", (m) => pill(human(m.reason || ""), "grey")],
+                  ["BY", (m) => esc(m.by || "")],
+                  ["NOTE", (m) => esc(m.note || "")],
+                ],
+                rows,
+                "No stock movements yet",
+              )}</div>`);
+        STATE.invRows = tab === "products" ? rows : STATE.invRows;
+        if ($("iQ")) {
+          let t;
+          $("iQ").oninput = (e) => {
+            clearTimeout(t);
+            t = setTimeout(() => {
+              STATE.inv.q = e.target.value;
+              switchView("inventory");
+            }, 450);
+          };
+        }
+      };
+      CHG.invF = (el) => {
+        STATE.inv[el.dataset.k] = el.value;
+        switchView("inventory");
+      };
+      const vRow = (v = {}, isNew = !v._id) =>
+        `<div class="vrow f3 mt" style="grid-template-columns:1.2fr 1fr 1fr 1fr 1fr .9fr auto"><input type="hidden" name="vid[]" value="${esc(v._id || "")}"><input name="vname[]" placeholder="Name (e.g. M / Red)" value="${esc(v.name && v.name !== "Default" ? v.name : "")}"><input name="vsize[]" placeholder="Size" value="${esc(v.size || "")}"><input name="vcolor[]" placeholder="Colour" value="${esc(v.color || "")}"><input name="vsku[]" placeholder="SKU (auto)" value="${esc(v.sku || "")}"><input type="number" name="vprice[]" placeholder="Price (same)" value="${v.price ?? ""}"><input type="number" name="vstock[]" placeholder="${isNew ? "Opening stock" : "Use Adjust"}" ${isNew ? "" : "disabled"} value="${isNew ? "" : v.onHand}"><button type="button" class="btn sm bd" data-do="rmVar">×</button></div>`;
+      async function productForm(p) {
+        openModal({
+          title: p ? `Edit ${p.name}` : "Add product",
+          wide: true,
+          body: `<div class="f3"><div><label>Name (English)</label><input name="name" required value="${esc(p?.name || "")}"></div><div><label>Name (বাংলা)</label><input name="nameBn" value="${esc(p?.nameBn || "")}"></div><div><label>SKU</label><input name="sku" value="${esc(p?.sku || "")}" placeholder="auto"></div></div>
+            <div class="f3 mt"><div><label>Price (৳)</label><input type="number" name="price" required min="0" value="${p?.price ?? ""}"></div><div><label>Compare-at price (৳)</label><input type="number" name="comparePrice" value="${p?.comparePrice ?? ""}"></div><div><label>Cost price (৳)</label><input type="number" name="costPrice" value="${p?.costPrice ?? ""}"></div></div>
+            <div class="f3 mt"><div><label>Category</label><input name="category" value="${esc(p?.category || "General")}"></div><div><label>Low-stock alert at</label><input type="number" name="lowStockAt" value="${p?.lowStockAt ?? 5}"></div><div><label>Weight (kg)</label><input type="number" step="0.01" name="weight" value="${p?.weight ?? ""}"></div></div>
+            <div class="mt"><label>Image URL</label><input name="imageUrl" value="${esc(p?.imageUrl || "")}"></div><div class="mt"><label>Description</label><textarea name="description" rows="2">${esc(p?.description || "")}</textarea></div>
+            <h4 class="mt">Variants (size / colour)</h4><p class="small muted">One row per sellable variant. Leave one row with an empty name for a product without sizes. Stock of existing variants changes only through <b>Adjust</b> (with a reason).</p>
+            <div id="vrows">${(p?.variants || [{}]).map((v) => vRow(v, !p)).join("")}</div><button type="button" class="btn sm bd mt" data-do="addVar">+ Variant</button>`,
+          onSubmit: async (f) => {
+            const variants = (f.vid || [])
+              .map((id, i) => ({
+                _id: id || undefined,
+                name: f.vname[i],
+                size: f.vsize[i],
+                color: f.vcolor[i],
+                sku: f.vsku[i],
+                price: f.vprice[i],
+                onHand: f.vstock?.[i],
+              }))
+              .filter(
+                (v, i, a) =>
+                  v._id || v.name || v.size || v.color || a.length === 1,
+              );
+            const body = { ...f, variants };
+            for (const k of [
+              "vid",
+              "vname",
+              "vsize",
+              "vcolor",
+              "vsku",
+              "vprice",
+              "vstock",
+            ])
+              delete body[k];
+            if (p) await PUT(`/api/products/${p.id}`, body);
+            else await POST("/api/products", body);
+            toast(p ? "Product saved" : "Product added");
+            setTimeout(
+              () => current === "inventory" && switchView("inventory"),
+              50,
+            );
+          },
+        });
+      }
+      DO.newProduct = () => productForm(null);
+      DO.editProduct = (el) =>
+        productForm((STATE.invRows || []).find((p) => p.id === el.dataset.id));
+      DO.addVar = () =>
+        $("vrows").insertAdjacentHTML("beforeend", vRow({}, true));
+      DO.rmVar = (el) => {
+        if (document.querySelectorAll(".vrow").length > 1)
+          el.closest(".vrow").remove();
+      };
+      DO.archiveProduct = async (el) => {
+        if (
+          !confirm(
+            "Archive this product? It disappears from the AI catalogue; past orders keep it.",
+          )
+        )
+          return;
+        const r = await DEL(`/api/products/${el.dataset.id}`);
+        toast(r.archived ? "Archived" : "Deleted");
+        switchView("inventory");
+      };
+      DO.adjustStock = (el) => {
+        const p = (STATE.invRows || []).find((x) => x.id === el.dataset.id);
+        openModal({
+          title: `Adjust stock · ${p.name}`,
+          body: `<div class="f3"><div><label>Variant</label><select name="variantId">${opts(p.variants.map((v) => [v._id, `${v.name} (on hand ${v.onHand}, available ${v.available})`]))}</select></div><div><label>Change (+ add / − remove)</label><input type="number" name="delta" required placeholder="+10 or -2"></div><div><label>Reason</label><select name="reason">${opts(
+            [
+              ["restock", "Restock / new purchase"],
+              ["count_correction", "Stock count correction"],
+              ["damage", "Damaged / lost"],
+              ["return", "Customer return"],
+              ["other", "Other"],
+            ],
+          )}</select></div></div><div class="mt"><label>Note</label><input name="note" placeholder="Supplier invoice no, who counted…"></div>`,
+          onSubmit: async (f) => {
+            await POST(`/api/products/${p.id}/adjust`, f);
+            toast("Stock updated");
+            setTimeout(() => switchView("inventory"), 50);
+          },
+        });
+      };
+      DO.stockHistory = async (el) => {
+        const rows = await GET(`/api/products/${el.dataset.id}/movements`);
+        openModal({
+          title: "Stock history",
+          wide: true,
+          buttons: [],
+          body: tbl(
+            [
+              ["WHEN", (m) => when(m.createdAt)],
+              ["VARIANT", (m) => esc(m.label)],
+              [
+                "ON HAND",
+                (m) =>
+                  m.onHandDelta
+                    ? (m.onHandDelta > 0 ? "+" : "") + m.onHandDelta
+                    : "—",
+              ],
+              [
+                "RESERVED",
+                (m) =>
+                  m.reservedDelta
+                    ? (m.reservedDelta > 0 ? "+" : "") + m.reservedDelta
+                    : "—",
+              ],
+              ["REASON", (m) => esc(human(m.reason || ""))],
+              ["BY", (m) => esc(m.by || "")],
+              ["NOTE", (m) => esc(m.note || "")],
+            ],
+            rows,
+            "No movements",
+          ),
+        });
+      };
+
+      /* ---------- fraud shield ---------- */
+      MKT.fraud = async (box) => {
+        const tab = tabOf("fraud", "queue");
+        const s = await GET("/api/fraud/summary");
+        const w = canDo("fraud.write");
+        let body = "";
+        if (tab === "queue") {
+          const rows = await GET("/api/fraud/queue");
+          body = `<div class="card"><h3>Orders on hold</h3><p class="sub">Held automatically when the risk score reaches ${s.settings.threshold} or the customer is blocked. Approve after you call the customer.</p>
+            ${tbl(
+              [
+                [
+                  "ORDER",
+                  (o) =>
+                    `<a href="#" data-do="openOrder" data-id="${o.id}"><b>${esc(o.no)}</b></a><div class="small muted">${when(o.createdAt)}</div>`,
+                ],
+                [
+                  "CUSTOMER",
+                  (o) =>
+                    `${esc(o.customer)}<div class="small muted">${esc(o.phone)}</div>`,
+                ],
+                ["TOTAL", (o) => tkf(o.total)],
+                [
+                  "RISK",
+                  (o) =>
+                    `${riskPill(o)}<div class="small">${(o.signals || [])
+                      .filter((x) => x.points > 0)
+                      .map((x) => `• ${esc(x.reason)}`)
+                      .join("<br>")}</div>`,
+                ],
+                [
+                  "",
+                  (o) =>
+                    w
+                      ? `<div class="row nowrap" style="gap:4px"><button class="btn sm" data-do="fraudDecide" data-id="${o.id}" data-d="approve">Approve</button><button class="btn sm danger" data-do="fraudDecide" data-id="${o.id}" data-d="reject">Reject</button></div>`
+                      : "",
+                ],
+              ],
+              rows,
+              "Nothing to review 🎉",
+            )}</div>`;
+        } else if (tab === "check") {
+          body = `<div class="card" style="max-width:720px"><h3>Check a customer before you confirm</h3><form class="stack" id="fcForm"><div class="f3"><div><label>Phone</label><input name="phone" required placeholder="01XXXXXXXXX"></div><div><label>District</label><input name="district"></div><div><label>Order total (৳)</label><input type="number" name="total"></div></div><div><label>Address</label><input name="address"></div><button class="btn">Check</button></form><div id="fcOut" class="mt"></div></div>`;
+        } else if (tab === "returners") {
+          const rows = await GET("/api/fraud/returners");
+          body = `<div class="card"><h3>Customers with returns (6 months)</h3>${tbl(
+            [
+              [
+                "CUSTOMER",
+                (r) =>
+                  `${esc(r.name || "")}<div class="small muted">${esc(r.phone)}</div>`,
+              ],
+              ["ORDERS", (r) => r.orders],
+              ["DELIVERED", (r) => r.delivered],
+              ["RETURNED", (r) => `<b>${r.returned}</b>`],
+              ["LOST DELIVERY FEES", (r) => tkf(r.lostFees)],
+              [
+                "",
+                (r) =>
+                  r.blocked
+                    ? pill("Blocked", "red")
+                    : w && r.rawPhone
+                      ? `<button class="btn sm danger" data-do="blockPhone" data-v="${esc(r.rawPhone)}">Block</button>`
+                      : "",
+              ],
+            ],
+            rows,
+            "No returns yet",
+          )}</div>`;
+        } else if (tab === "blocklist") {
+          const rows = await GET("/api/fraud/blacklist");
+          body = `<div class="split"><div class="card"><h3>Block a customer</h3><form class="stack" id="blForm"><div><label>Type</label><select name="type">${opts(
+            [
+              ["phone", "Phone number"],
+              ["address", "Address"],
+              ["psid", "Messenger PSID"],
+            ],
+          )}</select></div><div><label>Value</label><input name="value" required></div><div><label>Reason</label><input name="reason" required placeholder="Refused 3 parcels"></div><button class="btn full" ${w ? "" : "disabled"}>Block</button></form></div>
+            <div class="card"><h3>Block list</h3>${tbl(
+              [
+                ["TYPE", (b) => pill(b.type || "phone", "grey")],
+                ["VALUE", (b) => esc(b.value)],
+                ["REASON", (b) => esc(b.reason)],
+                ["BY", (b) => esc(b.by || "")],
+                [
+                  "",
+                  (b) =>
+                    w
+                      ? `<button class="btn sm bd" data-do="unblock" data-id="${b.id || b._id}">Remove</button>`
+                      : "",
+                ],
+              ],
+              rows,
+              "Nobody is blocked",
+            )}</div></div>`;
+        } else {
+          const f = s.settings;
+          body = `<div class="card" style="max-width:640px"><h3>Fraud Shield settings</h3><form class="stack" id="fsForm"><div class="f2"><div><label>Fraud scoring</label><select name="enabled" data-bool>${opts(
+            [
+              ["true", "On"],
+              ["false", "Off"],
+            ],
+            String(f.enabled),
+          )}</select></div><div><label>Blocked customers</label><select name="refuseBlocked" data-bool>${opts(
+            [
+              ["true", "Refuse the order"],
+              ["false", "Create it on hold"],
+            ],
+            String(f.refuseBlocked),
+          )}</select></div></div>
+            <div class="f2"><div><label>Hold orders at risk score ≥</label><input type="number" name="threshold" min="40" max="100" value="${f.threshold}"></div><div><label>Look-back window (days)</label><input type="number" name="lookbackDays" min="7" max="365" value="${f.lookbackDays}"></div></div>
+            <p class="small muted">Signals: returns (+25 each, max 50), delivery success below 60% (+30), 3+ phones at one address (+20), 3+ orders in 24h (+15), unusual quantity or first-order size (+15), fake name/phone (+20), address/district mismatch (+10), blocked (100), delivered history (−15 each, max −30). Bands: low &lt;40, medium 40–${f.threshold - 1}, high ≥${f.threshold}.</p>
+            <button class="btn" ${w ? "" : "disabled"}>Save</button></form></div>`;
+        }
+        box.innerHTML =
+          kpiCards([
+            [
+              "ON HOLD",
+              fmt(s.onHold),
+              "waiting for review",
+              s.onHold ? "c-purple" : "",
+            ],
+            ["HIGH RISK (30D)", fmt(s.high30), `${fmt(s.medium30)} medium`],
+            [
+              "REJECTED (30D)",
+              fmt(s.rejected30),
+              `${tkf(s.savedAmount30)} not shipped`,
+              "c-green",
+            ],
+            [
+              "RETURN RATE (30D)",
+              s.returnRate30 == null ? "—" : s.returnRate30 + "%",
+              "returned ÷ shipped",
+            ],
+            ["BLOCKED", fmt(s.blocked), "phones, addresses, PSIDs"],
+          ]) +
+          tabsBar("fraud", [
+            ["queue", `Review queue (${s.onHold})`],
+            ["check", "Check customer"],
+            ["returners", "Returners"],
+            ["blocklist", "Block list"],
+            ["settings", "Settings"],
+          ]) +
+          body;
+        if ($("fcForm"))
+          $("fcForm").onsubmit = async (e) => {
+            e.preventDefault();
+            const r = await POST("/api/fraud/check", formData(e.target)).catch(
+              (x) => toast(x.message, true),
+            );
+            if (!r) return;
+            $("fcOut").innerHTML =
+              `<div class="box"><div class="kv"><span>Score</span>${riskPill({ risk: r.score, riskBand: r.band })}</div>${r.signals.map((x) => `<div class="kv small"><span>${esc(x.reason)}</span><b>${x.points > 0 ? "+" : ""}${x.points}</b></div>`).join("") || "<p class='small muted'>No risk signals.</p>"}<div class="small muted mt">History: ${
+                Object.entries(r.history)
+                  .map(([k, v]) => `${STATUS_LABEL[k] || k} ${v}`)
+                  .join(" · ") || "first order"
+              }</div></div>`;
+          };
+        if ($("blForm"))
+          $("blForm").onsubmit = async (e) => {
+            e.preventDefault();
+            try {
+              await POST("/api/fraud/blacklist", formData(e.target));
+              toast("Blocked");
+              switchView("fraud");
+            } catch (x) {
+              toast(x.message, true);
+            }
+          };
+        if ($("fsForm"))
+          $("fsForm").onsubmit = async (e) => {
+            e.preventDefault();
+            try {
+              await PUT("/api/fraud/settings", formData(e.target));
+              toast("Saved");
+              switchView("fraud");
+            } catch (x) {
+              toast(x.message, true);
+            }
+          };
+      };
+      DO.fraudDecide = async (el) => {
+        const approve = el.dataset.d === "approve";
+        const note = approve
+          ? (prompt("Note (optional): e.g. called and confirmed") ?? null)
+          : prompt("Why reject? (required)");
+        if (note === null || (!approve && !note)) return;
+        const block = !approve && confirm("Also block this phone number?");
+        await POST(`/api/fraud/orders/${el.dataset.id}/decide`, {
+          decision: el.dataset.d,
+          note,
+          block,
+        });
+        toast(approve ? "Approved → Confirmed" : "Rejected; stock released");
+        if ($("dlg").open) closeModal();
+        switchViewQuiet();
+      };
+      DO.blockPhone = async (el) => {
+        const reason = prompt("Reason for blocking?", "Too many returns");
+        if (!reason) return;
+        await POST("/api/fraud/blacklist", {
+          type: "phone",
+          value: el.dataset.v,
+          reason,
+        });
+        toast("Blocked");
+        switchView("fraud");
+      };
+      DO.unblock = async (el) => {
+        if (!confirm("Remove from block list?")) return;
+        await DEL(`/api/fraud/blacklist/${el.dataset.id}`);
+        switchView("fraud");
+      };
+
+      /* ---------- courier hub ---------- */
+      MKT.courier = async (box) => {
+        const tab = tabOf("courier", "ready");
+        const [acc, ship] = await Promise.all([
+          GET("/api/courier/accounts"),
+          GET("/api/courier/shipments"),
+        ]);
+        STATE.courierAcc = acc.accounts;
+        const w = canDo("courier.write");
+        let body = "";
+        if (!acc.accounts.length && tab !== "accounts")
+          body = `<div class="card">${empty("No courier connected", "Connect Steadfast, Pathao or your own rider in the Accounts tab to start booking.")}<div class="row" style="justify-content:center"><button class="btn" data-do="tab" data-v="courier" data-k="accounts">Connect a courier</button></div></div>`;
+        else if (tab === "ready")
+          body = `<div class="card"><div class="head"><div><h3>Ready to ship</h3><p class="sub">Confirmed, processing and packed orders. Booking moves them to Packed → Shipped and saves the consignment.</p></div>${w ? `<button class="btn" data-do="bookSel">Book selected</button>` : ""}</div>
+            ${tbl(
+              [
+                [
+                  "<input type='checkbox' data-chg='selAll' style='width:auto'>",
+                  (o) =>
+                    `<input type="checkbox" data-chg="selOne" data-id="${o.id}" style="width:auto">`,
+                ],
+                [
+                  "ORDER",
+                  (o) =>
+                    `<a href="#" data-do="openOrder" data-id="${o.id}"><b>${esc(o.no)}</b></a>`,
+                ],
+                [
+                  "CUSTOMER",
+                  (o) =>
+                    `${esc(o.customer)}<div class="small muted">${esc(o.phone)}</div>`,
+                ],
+                [
+                  "ADDRESS",
+                  (o) =>
+                    `<span class="small">${esc(o.address)}</span><div class="small muted">${esc(o.district || "")}</div>`,
+                ],
+                ["COD", (o) => tkf(/COD unpaid/.test(o.payment) ? o.total : 0)],
+                ["STATUS", (o) => stPill(o.status)],
+              ],
+              ship.ready,
+              "Nothing waiting to ship",
+            )}</div>`;
+        else if (tab === "shipments")
+          body = `<div class="card"><h3>Shipments</h3><p class="sub">Courier statuses sync every 30 minutes and move orders along Shipped → Out for delivery → Delivered / Returned.</p>
+            ${tbl(
+              [
+                [
+                  "ORDER",
+                  (o) =>
+                    `<a href="#" data-do="openOrder" data-id="${o.id}"><b>${esc(o.no)}</b></a>`,
+                ],
+                [
+                  "CUSTOMER",
+                  (o) =>
+                    `${esc(o.customer)}<div class="small muted">${esc(o.phone)}</div>`,
+                ],
+                [
+                  "COURIER",
+                  (o) =>
+                    `${esc(o.courier)}<div class="small">${esc(o.tracking || "")}</div>`,
+                ],
+                ["COURIER STATUS", (o) => esc(o.courierStatus || "—")],
+                ["COD", (o) => tkf(o.total)],
+                ["STATUS", (o) => stPill(o.status)],
+                [
+                  "",
+                  (o) =>
+                    w && o.consignmentId
+                      ? `<button class="btn sm bd" data-do="syncShip" data-id="${o.id}">Sync</button>`
+                      : "",
+                ],
+              ],
+              ship.shipments,
+              "No shipments yet",
+            )}</div>`;
+        else if (tab === "cod") {
+          const rows = await GET("/api/courier/cod");
+          body = `<div class="card"><h3>Cash on delivery by courier</h3>${tbl(
+            [
+              ["COURIER", (r) => `<b>${esc(r.label)}</b>`],
+              ["SHIPMENTS", (r) => fmt(r.shipments)],
+              ["COD IN TRANSIT", (r) => tkf(r.inTransit)],
+              [
+                "COD DELIVERED",
+                (r) => `<b class="c-green">${tkf(r.collected)}</b>`,
+              ],
+              ["DELIVERED / RETURNED", (r) => `${r.delivered} / ${r.returned}`],
+              [
+                "SUCCESS",
+                (r) => (r.successRate == null ? "—" : r.successRate + "%"),
+              ],
+              ["CHARGES", (r) => tkf(r.charges)],
+            ],
+            rows,
+            "No COD shipments yet",
+          )}<p class="small muted">Match “COD delivered” with the courier's payment statement before marking payouts received.</p></div>`;
+        } else
+          body = `<div class="split"><div class="card"><h3>Connect a courier</h3><form class="stack" id="caForm"><div><label>Courier</label><select name="provider" data-chg="caProv">${opts(acc.providers.map((p) => [p.id, p.label]))}</select></div><div id="caFields"></div><div><label>Label</label><input name="label" placeholder="e.g. Steadfast main"></div><label class="row small" style="gap:6px"><input type="checkbox" name="isDefault" style="width:auto"> Default courier</label><button class="btn full" ${canDo("courier.write") ? "" : "disabled"}>Connect</button></form></div>
+            <div class="card"><h3>Connected</h3>${tbl(
+              [
+                [
+                  "COURIER",
+                  (a) =>
+                    `<b>${esc(a.providerLabel)}</b>${a.isDefault ? " " + pill("Default", "green") : ""}${a.sandbox ? " " + pill("Sandbox", "yellow") : ""}<div class="small muted">${esc(a.label)}${a.storeId ? ` · store ${esc(a.storeId)}` : ""}</div>${a.lastError ? `<div class="small" style="color:#c0362c">${esc(a.lastError)}</div>` : ""}`,
+                ],
+                [
+                  "",
+                  (a) =>
+                    w
+                      ? `<div class="row nowrap" style="gap:4px"><button class="btn sm bd" data-do="caTest" data-id="${a.id}">Test</button>${a.isDefault ? "" : `<button class="btn sm bd" data-do="caDefault" data-id="${a.id}">Make default</button>`}<button class="btn sm danger" data-do="caDel" data-id="${a.id}">Remove</button></div>`
+                      : "",
+                ],
+              ],
+              acc.accounts,
+              "Nothing connected",
+            )}</div></div>`;
+        box.innerHTML =
+          tabsBar("courier", [
+            ["ready", `Ready to ship (${ship.ready.length})`],
+            ["shipments", "Shipments"],
+            ["cod", "COD"],
+            ["accounts", "Accounts"],
+          ]) + body;
+        STATE.sel = new Set();
+        if ($("caForm")) {
+          CHG.caProv($("caForm").provider);
+          $("caForm").onsubmit = async (e) => {
+            e.preventDefault();
+            const f = formData(e.target);
+            const credentials = {};
+            for (const k of [
+              "apiKey",
+              "secretKey",
+              "clientId",
+              "clientSecret",
+              "username",
+              "password",
+            ])
+              if (f[k]) credentials[k] = f[k];
+            try {
+              await POST("/api/courier/accounts", {
+                provider: f.provider,
+                label: f.label,
+                storeId: f.storeId,
+                sandbox: f.sandbox,
+                isDefault: f.isDefault,
+                credentials,
+              });
+              toast("Courier connected. Press Test to check it.");
+              switchView("courier");
+            } catch (x) {
+              toast(x.message, true);
+            }
+          };
+        }
+      };
+      CHG.caProv = (el) => {
+        const v = el.value;
+        $("caFields").innerHTML =
+          v === "steadfast"
+            ? `<div class="f2"><div><label>API key</label><input name="apiKey" required></div><div><label>Secret key</label><input name="secretKey" required type="password"></div></div><p class="small muted">Steadfast portal → API. Keys are stored encrypted.</p>`
+            : v === "pathao"
+              ? `<div class="f2"><div><label>Client ID</label><input name="clientId" required></div><div><label>Client secret</label><input name="clientSecret" required type="password"></div></div><div class="f2 mt"><div><label>Merchant email</label><input name="username" required></div><div><label>Password</label><input name="password" type="password" required></div></div><div class="f2 mt"><div><label>Store ID</label><input name="storeId" required></div><label class="row small" style="gap:6px;align-self:end"><input type="checkbox" name="sandbox" style="width:auto"> Sandbox (test)</label></div>`
+              : `<p class="small muted">Your own rider / local delivery. You type the tracking reference when booking.</p>`;
+      };
+      DO.caTest = async (el) => {
+        const r = await POST(`/api/courier/accounts/${el.dataset.id}/test`);
+        toast(r.message);
+        switchView("courier");
+      };
+      DO.caDefault = async (el) => {
+        await PUT(`/api/courier/accounts/${el.dataset.id}`, {
+          isDefault: true,
+        });
+        switchView("courier");
+      };
+      DO.caDel = async (el) => {
+        if (!confirm("Remove this courier account?")) return;
+        await DEL(`/api/courier/accounts/${el.dataset.id}`);
+        switchView("courier");
+      };
+      DO.bookSel = () => {
+        if (!STATE.sel.size) return toast("Select orders first", true);
+        bookModal([...STATE.sel]);
+      };
+      DO.bookOne = (el) => {
+        closeModal();
+        bookModal([el.dataset.id]);
+      };
+      async function bookModal(ids) {
+        const accs =
+          STATE.courierAcc || (await GET("/api/courier/accounts")).accounts;
+        if (!accs.length) {
+          toast("Connect a courier first (Courier Hub → Accounts)", true);
+          STATE.tabs.courier = "accounts";
+          return switchView("courier");
+        }
+        const def = accs.find((a) => a.isDefault) || accs[0];
+        openModal({
+          title: `Book ${ids.length} order(s)`,
+          body: `<div><label>Courier</label><select name="accountId" data-chg="bookAcc">${opts(
+            accs.map((a) => [
+              a.id,
+              `${a.providerLabel}${a.label ? " · " + a.label : ""}`,
+            ]),
+            def.id,
+          )}</select></div><div id="bookExtra" class="mt"></div>`,
+          buttons: [["book", "Book now"]],
+          onSubmit: async (f) => {
+            const r = await POST("/api/courier/book", {
+              orderIds: ids,
+              accountId: f.accountId,
+              tracking: f.tracking,
+              pathao: { cityId: f.cityId, zoneId: f.zoneId },
+            });
+            const bad = r.results.filter((x) => !x.ok);
+            toast(
+              `${r.results.length - bad.length} booked${bad.length ? `; ${bad.length} failed: ${bad[0].error}` : ""}`,
+              !!bad.length,
+            );
+            STATE.sel.clear();
+            setTimeout(switchViewQuiet, 50);
+          },
+        });
+        CHG.bookAcc($("dlgForm").accountId);
+      }
+      CHG.bookAcc = async (el) => {
+        const a = (STATE.courierAcc || []).find((x) => x.id === el.value);
+        if (!a) return;
+        if (a.provider === "local")
+          $("bookExtra").innerHTML =
+            `<label>Tracking / rider reference</label><input name="tracking" placeholder="optional">`;
+        else if (a.provider === "pathao") {
+          $("bookExtra").innerHTML =
+            `<p class="small muted">Optional: pick city/zone if Pathao can't read the address.</p><div class="f2"><select name="cityId" data-chg="pCity"><option value="">City (auto)</option></select><select name="zoneId"><option value="">Zone (auto)</option></select></div>`;
+          const cities = await GET(
+            `/api/courier/pathao/cities?accountId=${a.id}`,
+          ).catch((e) => {
+            toast(e.message, true);
+            return [];
+          });
+          $("dlgForm").cityId.innerHTML =
+            `<option value="">City (auto)</option>` +
+            opts(cities.map((c) => [c.id, c.name]));
+        } else
+          $("bookExtra").innerHTML =
+            `<p class="small muted">Steadfast reads the address. COD = order total for unpaid COD orders.</p>`;
+      };
+      CHG.pCity = async (el) => {
+        const zones = el.value
+          ? await GET(
+              `/api/courier/pathao/zones?accountId=${$("dlgForm").accountId.value}&cityId=${el.value}`,
+            )
+          : [];
+        $("dlgForm").zoneId.innerHTML =
+          `<option value="">Zone (auto)</option>` +
+          opts(zones.map((z) => [z.id, z.name]));
+      };
+
+      /* ---------- FB comments ---------- */
+      STATE.cm = { q: "", intent: "", sentiment: "", page: 1 };
+      const CM_TAB = {
+        all: "",
+        human: "needs_human",
+        pending: "pending_approval",
+        scheduled: "scheduled",
+        replied: "replied",
+        spam: "spam,hidden",
+      };
+      const intentC = (i) =>
+        ({
+          order_intent: "green",
+          price: "blue",
+          availability: "blue",
+          size_colour: "blue",
+          delivery: "purple",
+          complaint: "red",
+          spam: "grey",
+          recommendation: "purple",
+        })[i] || "grey";
+      const cmStatC = (s) =>
+        ({
+          replied: "green",
+          scheduled: "blue",
+          pending_approval: "yellow",
+          needs_human: "red",
+          spam: "grey",
+          hidden: "grey",
+          failed: "red",
+          ignored: "grey",
+          deleted: "grey",
+        })[s] || "grey";
+      MKT.comments = async (box) => {
+        const tab = tabOf("comments", "all");
+        const k = await GET("/api/comments/kpis?period=7d");
+        const w = canDo("comments.write");
+        let body = "";
+        if (tab === "pages") {
+          const pages = await GET("/api/comments/pages");
+          body = pages.length
+            ? pages
+                .map(
+                  (
+                    p,
+                  ) => `<div class="card"><div class="head"><div><h3>${esc(p.name)}</h3><p class="sub">Last webhook: ${p.lastWebhookAt ? when(p.lastWebhookAt) : "never (subscribe the Page in Inbox settings)"} · ${pill(p.status || "active", p.status === "active" ? "green" : "red")}</p></div></div>
+              <form class="stack pcForm" data-id="${esc(p.pageId)}"><div class="f3"><div><label>Auto-reply to comments</label><select name="autoReply" data-bool>${opts(
+                [
+                  ["true", "On"],
+                  ["false", "Off"],
+                ],
+                String(p.config.autoReply),
+              )}</select></div><div><label>Reply delay (seconds, 0–600)</label><input type="number" name="delaySec" min="0" max="600" value="${p.config.delaySec}"></div><div><label>Manual approval</label><select name="manualApproval" data-bool>${opts(
+                [
+                  ["false", "Off: send automatically"],
+                  ["true", "On: wait for approval"],
+                ],
+                String(p.config.manualApproval),
+              )}</select></div></div>
+              <div class="f3"><div><label>Private-reply DM for buying comments</label><select name="privateReply" data-bool>${opts(
+                [
+                  ["true", "On"],
+                  ["false", "Off"],
+                ],
+                String(p.config.privateReply),
+              )}</select></div><div><label>Reply language</label><select name="language">${opts(
+                [
+                  ["auto", "Same as comment"],
+                  ["bn", "বাংলা"],
+                  ["en", "English"],
+                ],
+                p.config.language,
+              )}</select></div><div><label>Hide spam on Facebook</label><select name="hideSpam" data-bool>${opts(
+                [
+                  ["false", "No"],
+                  ["true", "Yes"],
+                ],
+                String(p.config.hideSpam),
+              )}</select></div></div>
+              <div><label>Blocked keywords (comma or one per line: treated as spam)</label><textarea name="blockedKeywords" rows="2">${esc((p.config.blockedKeywords || []).join("\n"))}</textarea></div>${w ? `<button class="btn">Save ${esc(p.name)}</button>` : ""}</form></div>`,
+                )
+                .join("")
+            : `<div class="card">${empty("No Facebook Page connected", "Connect a Page in Meta Accounts first.")}</div>`;
+        } else if (tab === "posts") {
+          const [posts, products] = await Promise.all([
+            GET("/api/comments/posts"),
+            GET("/api/products"),
+          ]);
+          body = `<div class="card"><h3>Post → product mapping</h3><p class="sub">Tell the engine which products a post shows, so “price koto?” under that post gets the right price. Without a mapping it guesses from the comment text.</p>
+            <form class="row" id="ppAdd" style="gap:6px"><input name="postId" class="chip" placeholder="Post ID (pageid_postid)" required style="min-width:260px"><button class="btn sm">Add post</button></form>
+            ${tbl(
+              [
+                [
+                  "POST",
+                  (p) =>
+                    `<span class="small">${esc(p.postId)}</span>${p.postId.includes("_") && !p.postId.startsWith("sim") ? ` <a class="small" target="_blank" href="https://facebook.com/${esc(p.postId)}">open</a>` : ""}<div class="small muted">${p.comments} comment(s)</div>`,
+                ],
+                [
+                  "PRODUCTS",
+                  (p) =>
+                    `<select multiple data-chg="ppMap" data-id="${esc(p.postId)}" style="min-width:260px;height:70px" ${w ? "" : "disabled"}>${products.map((x) => `<option value="${x.id}" ${p.productIds.includes(x.id) ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select>`,
+                ],
+              ],
+              posts,
+              "No posts with comments yet",
+            )}</div>`;
+        } else {
+          const r = await GET(
+            `/api/comments?${qs({ status: CM_TAB[tab], intent: STATE.cm.intent, sentiment: STATE.cm.sentiment, q: STATE.cm.q, page: STATE.cm.page })}`,
+          );
+          STATE.cmRows = r.rows;
+          body = `<div class="card"><div class="row" style="gap:6px;flex-wrap:wrap"><input id="cmQ" class="chip" placeholder="Search text or name…" value="${esc(STATE.cm.q)}"><select class="chip" data-chg="cmF" data-k="intent">${opts(
+            [
+              ["", "Any category"],
+              ["order_intent", "Order intent"],
+              ["price", "Price"],
+              ["availability", "Availability"],
+              ["size_colour", "Size/colour"],
+              ["delivery", "Delivery"],
+              ["recommendation", "Recommendation"],
+              ["complaint", "Complaint"],
+              ["general", "General"],
+              ["spam", "Spam"],
+            ],
+            STATE.cm.intent,
+          )}</select><select class="chip" data-chg="cmF" data-k="sentiment">${opts(
+            [
+              ["", "Any sentiment"],
+              ["positive", "Positive"],
+              ["neutral", "Neutral"],
+              ["negative", "Negative"],
+            ],
+            STATE.cm.sentiment,
+          )}</select>
+              ${w && tab === "pending" && r.rows.length ? `<button class="btn sm" data-do="cmBulk" data-a="approve">Approve all shown</button>` : ""}</div>
+            ${
+              r.rows.length
+                ? r.rows
+                    .map(
+                      (
+                        c,
+                      ) => `<div class="item mt" style="border:1px solid var(--line);border-radius:12px;padding:12px"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><div><b>${esc(c.from)}</b> <span class="small muted">${when(c.createdAt)}${c.simulated ? " · simulator" : ""}</span></div><div class="row" style="gap:4px">${pill(human(c.intent), intentC(c.intent))}${pill(c.sentiment, c.sentiment === "negative" ? "red" : c.sentiment === "positive" ? "green" : "grey")}${pill(human(c.status), cmStatC(c.status))}</div></div>
+                <p style="margin:6px 0">“${esc(c.message)}”</p>${c.products?.length ? `<div class="small muted">Products: ${c.products.map(esc).join(", ")}</div>` : ""}${c.reason ? `<div class="small muted">${esc(c.reason)}</div>` : ""}
+                ${c.publicReply?.text ? `<div class="mini small mt" style="background:#f6f7f3;border-radius:8px;padding:8px">↳ <b>${c.publicReply.status === "sent" ? "Replied" : c.publicReply.status === "scheduled" ? `Will reply ${c.dueAt ? when(c.dueAt) : ""}` : human(c.publicReply.status || "draft")}</b> (${esc(c.publicReply.source || c.publicReply.by || "")}): ${esc(c.publicReply.text)}${c.publicReply.error ? `<div style="color:#c0362c">${esc(c.publicReply.error)}</div>` : ""}</div>` : ""}
+                ${c.privateReply ? `<div class="small mt">${c.privateReply.status === "sent" ? "✉️ DM sent → handed over to Messenger" : `DM ${esc(c.privateReply.status)}${c.privateReply.error ? ": " + esc(c.privateReply.error) : ""}`}</div>` : ""}
+                <div class="row mt" style="gap:4px;flex-wrap:wrap">${w && ["pending_approval", "scheduled", "needs_human", "failed"].includes(c.status) && c.publicReply?.text ? `<button class="btn sm" data-do="cmApprove" data-id="${c.id}">${c.status === "scheduled" ? "Send now" : "Approve & send"}</button>` : ""}
+                  ${w && !["replied", "deleted", "hidden"].includes(c.status) ? `<button class="btn sm bd" data-do="cmReply" data-id="${c.id}">Reply…</button>` : ""}
+                  ${w && ["pending_approval", "scheduled", "needs_human"].includes(c.status) ? `<button class="btn sm bd" data-do="cmReject" data-id="${c.id}">Don't reply</button>` : ""}
+                  ${w && c.privateReply?.status !== "sent" && !["spam", "deleted"].includes(c.status) ? `<button class="btn sm bd" data-do="cmDm" data-id="${c.id}">Send DM</button>` : ""}
+                  ${c.privateReply?.conversationId ? `<button class="btn sm bd" data-do="openChat" data-id="${c.privateReply.conversationId}">AI chat thread</button>` : ""}
+                  ${w && !["deleted"].includes(c.status) ? `<button class="btn sm bd" data-do="cmHide" data-id="${c.id}" data-h="${c.status === "hidden" ? "0" : "1"}">${c.status === "hidden" ? "Unhide" : "Hide"}</button><button class="btn sm danger" data-do="cmDel" data-id="${c.id}">Delete</button>` : ""}</div></div>`,
+                    )
+                    .join("")
+                : empty(
+                    "No comments here",
+                    "New comments on your Page posts appear here within seconds.",
+                  )
+            }
+            ${r.total > 50 ? `<div class="row mt" style="justify-content:flex-end;gap:6px"><button class="btn sm bd" data-do="cmPage" data-p="${r.page - 1}" ${r.page <= 1 ? "disabled" : ""}>‹ Prev</button><button class="btn sm bd" data-do="cmPage" data-p="${r.page + 1}" ${r.page * 50 >= r.total ? "disabled" : ""}>Next ›</button></div>` : ""}</div>`;
+        }
+        box.innerHTML =
+          `<div class="row" style="justify-content:flex-end;margin-bottom:8px">${ME?.sandbox ? `<button class="btn sm" data-do="cmSim">${icon("agent")}Simulate comment (sandbox)</button>` : ""}</div>` +
+          kpiCards([
+            ["COMMENTS (7D)", fmt(k.total), "on your Pages"],
+            [
+              "AI AUTO-REPLIED",
+              fmt(k.autoReplied),
+              "public replies sent",
+              "c-green",
+            ],
+            ["DMS DISPATCHED", fmt(k.dms), "handed to Messenger", "c-blue"],
+            ["SPAM FILTERED", fmt(k.spam), "links, repeats, blocked words"],
+            [
+              "NEEDS HUMAN",
+              fmt(k.needsHuman),
+              `${fmt(k.pending)} waiting approval`,
+              k.needsHuman ? "c-purple" : "",
+            ],
+          ]) +
+          tabsBar("comments", [
+            ["all", "All"],
+            ["human", `Needs human (${k.needsHuman})`],
+            ["pending", `Approval (${k.pending})`],
+            ["scheduled", "Scheduled"],
+            ["replied", "Replied"],
+            ["spam", "Spam"],
+            ["pages", "Pages"],
+            ["posts", "Post → product"],
+          ]) +
+          body;
+        if ($("cmQ")) {
+          let t;
+          $("cmQ").oninput = (e) => {
+            clearTimeout(t);
+            t = setTimeout(() => {
+              STATE.cm.q = e.target.value;
+              STATE.cm.page = 1;
+              switchView("comments");
+            }, 450);
+          };
+        }
+        document.querySelectorAll(".pcForm").forEach(
+          (fm) =>
+            (fm.onsubmit = async (e) => {
+              e.preventDefault();
+              try {
+                await PUT(`/api/comments/pages/${fm.dataset.id}`, formData(fm));
+                toast("Page settings saved");
+              } catch (x) {
+                toast(x.message, true);
+              }
+            }),
+        );
+        if ($("ppAdd"))
+          $("ppAdd").onsubmit = async (e) => {
+            e.preventDefault();
+            const pid = formData(e.target).postId.trim();
+            const first = (await GET("/api/products"))[0];
+            if (!first) return toast("Add a product first", true);
+            await PUT(`/api/comments/posts/${encodeURIComponent(pid)}`, {
+              productIds: [first.id],
+            });
+            toast("Post added. Now pick its products.");
+            switchView("comments");
+          };
+      };
+      CHG.cmF = (el) => {
+        STATE.cm[el.dataset.k] = el.value;
+        STATE.cm.page = 1;
+        switchView("comments");
+      };
+      CHG.ppMap = async (el) => {
+        await PUT(`/api/comments/posts/${encodeURIComponent(el.dataset.id)}`, {
+          productIds: [...el.selectedOptions].map((o) => o.value),
+        });
+        toast("Mapping saved");
+      };
+      DO.cmPage = (el) => {
+        STATE.cm.page = Number(el.dataset.p);
+        switchView("comments");
+      };
+      const cmById = (id) => (STATE.cmRows || []).find((c) => c.id === id);
+      DO.cmApprove = (el) => {
+        const c = cmById(el.dataset.id);
+        openModal({
+          title: "Approve reply",
+          body: `<p class="small muted">Comment: “${esc(c.message)}”</p><label>Reply</label><textarea name="text" rows="3">${esc(c.publicReply?.text || "")}</textarea><p class="small muted">Prices and offers must match your catalogue (checked before sending).</p>`,
+          buttons: [["send", "Send reply"]],
+          onSubmit: async (f) => {
+            await POST(`/api/comments/${c.id}/approve`, f);
+            toast("Reply posted");
+            setTimeout(() => switchView("comments"), 50);
+          },
+        });
+      };
+      DO.cmReply = (el) => {
+        const c = cmById(el.dataset.id);
+        openModal({
+          title: `Reply to ${c.from}`,
+          body: `<p class="small muted">“${esc(c.message)}”</p><textarea name="text" rows="3" required></textarea>`,
+          buttons: [["send", "Post reply"]],
+          onSubmit: async (f) => {
+            await POST(`/api/comments/${c.id}/reply`, f);
+            toast("Reply posted");
+            setTimeout(() => switchView("comments"), 50);
+          },
+        });
+      };
+      DO.cmReject = async (el) => {
+        await POST(`/api/comments/${el.dataset.id}/reject`);
+        switchView("comments");
+      };
+      DO.cmDm = async (el) => {
+        const r = await POST(`/api/comments/${el.dataset.id}/dm`);
+        toast("DM sent. The conversation is in the inbox.");
+        switchView("comments");
+        return r;
+      };
+      DO.cmHide = async (el) => {
+        await POST(`/api/comments/${el.dataset.id}/hide`, {
+          hidden: el.dataset.h === "1",
+        });
+        switchView("comments");
+      };
+      DO.cmDel = async (el) => {
+        if (!confirm("Delete this comment from Facebook?")) return;
+        await DEL(`/api/comments/${el.dataset.id}`);
+        switchView("comments");
+      };
+      DO.cmBulk = async (el) => {
+        const r = await POST("/api/comments/bulk", {
+          ids: (STATE.cmRows || []).map((c) => c.id),
+          action: el.dataset.a,
+        });
+        toast(
+          `${r.done} done${r.errors.length ? `, ${r.errors.length} failed` : ""}`,
+          !!r.errors.length,
+        );
+        switchView("comments");
+      };
+      DO.cmSim = () =>
+        openModal({
+          title: "Simulate a comment (sandbox)",
+          body: `<p class="small muted">Runs the full engine without Facebook: spam filter → category → product link → DM → public reply.</p><div class="f2"><div><label>Name</label><input name="name" value="Test customer"></div><div><label>Post ID (optional, for mapping)</label><input name="postId" placeholder="sim_post"></div></div><div class="mt"><label>Comment</label><textarea name="message" rows="2" required>L size ache? dam koto?</textarea></div>`,
+          buttons: [["go", "Simulate"]],
+          onSubmit: async (f) => {
+            const r = await POST("/api/comments/simulate", f);
+            toast(
+              `Classified: ${human(r.comment.intent)} → ${human(r.comment.status)}`,
+            );
+            setTimeout(() => switchView("comments"), 50);
+          },
+        });
+
+      /* ---------- workspace, zones, team, audit ---------- */
+      MKT.workspace = async (box) => {
+        const tab = tabOf("workspace", "profile");
+        const ws = await GET("/api/workspace");
+        const w = canDo("settings.write");
+        let body = "";
+        if (tab === "profile")
+          body = `<div class="card" style="max-width:720px"><h3>Workspace profile</h3><p class="sub">Shown on invoices and used by the AI.</p><form class="stack" id="wsForm"><div class="f2"><div><label>Business name</label><input name="name" value="${esc(ws.name || "")}" required></div><div><label>Business phone</label><input name="businessPhone" value="${esc(ws.businessPhone || "")}"></div></div>
+            <div class="f3"><div><label>Logo URL</label><input name="logoUrl" value="${esc(ws.logoUrl || "")}"></div><div><label>Default language</label><select name="defaultLanguage">${opts(
+              [
+                ["bn", "বাংলা"],
+                ["en", "English"],
+              ],
+              ws.defaultLanguage,
+            )}</select></div><div><label>Order number prefix</label><input name="orderPrefix" value="${esc(ws.orderPrefix)}"></div></div>
+            <div><label>Return / exchange policy (printed on invoices)</label><textarea name="returnPolicy" rows="3">${esc(ws.returnPolicy || "")}</textarea></div>${w ? `<button class="btn">Save</button>` : ""}</form></div>`;
+        else if (tab === "zones")
+          body = `<div class="card"><h3>Delivery zones</h3><p class="sub">The delivery fee for every order (manual, AI agent and comments) comes from these rules. The address is matched by area first (e.g. “North Badda” → Inside Dhaka), then by district. Unmatched addresses use the default zone.</p>
+            <form id="zForm"><div id="zRows">${ws.zones.map((z, i) => zRow(z, i)).join("")}</div>${w ? `<div class="row mt" style="gap:6px"><button type="button" class="btn sm bd" data-do="addZone">+ Zone</button><button class="btn sm">Save zones</button>${ws.customZones ? `<button type="button" class="btn sm bd" data-do="resetZones">Reset to defaults</button>` : ""}</div>` : ""}</form>
+            <div class="box mt"><h5>TEST AN ADDRESS</h5><div class="row" style="gap:6px"><input id="zTest" class="chip" placeholder="e.g. House 5, Mirpur 10" style="min-width:280px"><button class="btn sm bd" data-do="testZone">Test</button><span id="zOut" class="small"></span></div></div></div>`;
+        else if (tab === "team") {
+          const t = await GET("/api/team").catch(() => null);
+          body = !t
+            ? `<div class="card">${empty("Only Owners and Managers can see the team", "")}</div>`
+            : `<div class="split"><div class="card"><h3>Invite a teammate</h3><form class="stack" id="invForm"><div><label>Email</label><input name="email" type="email" required></div><div><label>Role</label><select name="role">${opts(
+                t.roles
+                  .filter((r) => ME.role === "owner" || r.id !== "owner")
+                  .map((r) => [r.id, r.label]),
+                "agent",
+              )}</select></div><button class="btn full" ${canDo("users.write") ? "" : "disabled"}>Create invite link</button></form><div id="invOut" class="mt"></div>
+              <p class="small muted mt">Owner: everything · Manager: everything except team & billing · Agent: inbox, comments, orders, leads · Fulfilment: orders, courier, inventory · Lead executive: leads · Viewer: read-only with masked phone numbers.</p></div>
+              <div class="card"><h3>Members</h3>${tbl(
+                [
+                  [
+                    "PERSON",
+                    (m) =>
+                      `<b>${esc(m.name || "(invited)")}</b>${m.isYou ? " " + pill("You", "blue") : ""}<div class="small muted">${esc(m.email)}</div>`,
+                  ],
+                  [
+                    "ROLE",
+                    (m) =>
+                      canDo("users.write") && !m.isYou
+                        ? `<select data-chg="memRole" data-id="${m.id}">${opts(
+                            t.roles.map((r) => [r.id, r.label]),
+                            m.role,
+                          )}</select>`
+                        : esc(m.roleLabel),
+                  ],
+                  [
+                    "STATUS",
+                    (m) =>
+                      pill(
+                        m.status,
+                        m.status === "active"
+                          ? "green"
+                          : m.status === "invited"
+                            ? "yellow"
+                            : "red",
+                      ),
+                  ],
+                  [
+                    "LAST LOGIN",
+                    (m) => (m.lastLoginAt ? when(m.lastLoginAt) : "—"),
+                  ],
+                  [
+                    "",
+                    (m) =>
+                      canDo("users.write") && !m.isYou
+                        ? `<div class="row nowrap" style="gap:4px">${m.status === "active" ? `<button class="btn sm bd" data-do="memStatus" data-id="${m.id}" data-s="suspended">Suspend</button>` : m.status === "suspended" ? `<button class="btn sm bd" data-do="memStatus" data-id="${m.id}" data-s="active">Activate</button>` : ""}<button class="btn sm danger" data-do="memDel" data-id="${m.id}">Remove</button></div>`
+                        : "",
+                  ],
+                ],
+                t.members,
+              )}</div></div>`;
+        } else if (tab === "audit") {
+          const rows = await GET("/api/audit?limit=300").catch(() => null);
+          body = `<div class="card"><h3>Audit log</h3><p class="sub">Logins, order status changes, stock adjustments, team and settings changes.</p>${
+            rows
+              ? tbl(
+                  [
+                    ["WHEN", (a) => when(a.createdAt)],
+                    ["WHO", (a) => esc(a.userName)],
+                    [
+                      "ACTION",
+                      (a) =>
+                        pill(
+                          a.action,
+                          /fail|forbidden|lockout|delete|remove|block/.test(
+                            a.action,
+                          )
+                            ? "red"
+                            : "grey",
+                        ),
+                    ],
+                    ["TARGET", (a) => esc(a.target || "")],
+                    [
+                      "DETAILS",
+                      (a) =>
+                        `<span class="small muted">${esc(JSON.stringify(a.meta || {})).slice(0, 160)}</span>`,
+                    ],
+                    [
+                      "IP",
+                      (a) => `<span class="small">${esc(a.ip || "")}</span>`,
+                    ],
+                  ],
+                  rows,
+                  "Nothing logged yet",
+                )
+              : empty("Only Owners and Managers can see the audit log", "")
+          }</div>`;
+        } else
+          body = `<div class="card" style="max-width:520px"><h3>Change password</h3><form class="stack" id="pwForm"><div><label>Current password</label><input type="password" name="current" required></div><div><label>New password (8+ characters)</label><input type="password" name="next" minlength="8" required></div><button class="btn">Change password</button><p class="small muted">Other devices are signed out.</p></form></div>`;
+        box.innerHTML =
+          tabsBar("workspace", [
+            ["profile", "Profile"],
+            ["zones", "Delivery zones"],
+            ["team", "Team & roles"],
+            ["audit", "Audit log"],
+            ["security", "My password"],
+          ]) + body;
+        const bind = (id, fn) => {
+          if ($(id))
+            $(id).onsubmit = async (e) => {
+              e.preventDefault();
+              try {
+                await fn(formData(e.target), e.target);
+              } catch (x) {
+                toast(x.message, true);
+              }
+            };
+        };
+        bind("wsForm", async (f) => {
+          await PUT("/api/workspace", f);
+          toast("Saved");
+          ME = await GET("/api/auth/me");
+          applyMe();
+        });
+        bind("zForm", async () => {
+          const zones = [...document.querySelectorAll(".zrow")].map((r) => ({
+            name: r.querySelector("[data-f=name]").value,
+            fee: Number(r.querySelector("[data-f=fee]").value),
+            freeOver: Number(r.querySelector("[data-f=freeOver]").value) || 0,
+            districts: r.querySelector("[data-f=districts]").value,
+            areas: r.querySelector("[data-f=areas]").value,
+            isDefault: r.querySelector("[data-f=isDefault]").checked,
+          }));
+          await PUT("/api/workspace", { zones });
+          toast("Delivery zones saved");
+          switchView("workspace");
+        });
+        bind("invForm", async (f) => {
+          const r = await POST("/api/team/invite", f);
+          $("invOut").innerHTML =
+            `<div class="ok-box small">Send this link to ${esc(f.email)} (valid ${r.expiresInDays} days):<input readonly value="${esc(r.link)}" onclick="this.select()" class="mt"></div>`;
+          navigator.clipboard
+            ?.writeText(r.link)
+            .then(() => toast("Invite link copied"))
+            .catch(() => {});
+          setTimeout(() => {
+            if (current === "workspace" && $("invOut")) {
+              const keep = $("invOut").innerHTML;
+              switchView("workspace").then(() => {
+                if ($("invOut")) $("invOut").innerHTML = keep;
+              });
+            }
+          }, 600);
+        });
+        bind("pwForm", async (f, form) => {
+          await POST("/api/auth/password", f);
+          form.reset();
+          toast("Password changed");
+        });
+      };
+      const zRow = (
+        z = {},
+        i = 0,
+      ) => `<div class="zrow box mt"><div class="f3" style="grid-template-columns:1.4fr .7fr .9fr auto"><div><label>Zone name</label><input data-f="name" value="${esc(z.name || "")}"></div><div><label>Fee (৳)</label><input type="number" data-f="fee" value="${z.fee ?? ""}"></div><div><label>Free delivery over (৳, 0 = never)</label><input type="number" data-f="freeOver" value="${z.freeOver || 0}"></div><label class="row small" style="gap:6px;align-self:end"><input type="radio" name="zdef" data-f="isDefault" ${z.isDefault ? "checked" : ""} style="width:auto"> Default</label></div>
+          <div class="f2 mt"><div><label>Districts (comma separated)</label><input data-f="districts" value="${esc((z.districts || []).join(", "))}" placeholder="Dhaka"></div><div><label>Areas / thanas (comma separated)</label><input data-f="areas" value="${esc((z.areas || []).filter((a) => /^[a-z]/i.test(a)).join(", "))}" placeholder="savar, ashulia"></div></div>${i > 0 || !z.name ? `<button type="button" class="btn sm bd mt" data-do="rmZone">Remove zone</button>` : ""}</div>`;
+      DO.addZone = () =>
+        $("zRows").insertAdjacentHTML("beforeend", zRow({}, 1));
+      DO.rmZone = (el) => el.closest(".zrow").remove();
+      DO.resetZones = async () => {
+        if (
+          !confirm(
+            "Go back to the default zones (Inside Dhaka 80 / Suburbs 100 / Outside 130)?",
+          )
+        )
+          return;
+        await PUT("/api/workspace", { resetZones: true });
+        switchView("workspace");
+      };
+      DO.testZone = async () => {
+        const r = await POST("/api/zones/test", { address: $("zTest").value });
+        $("zOut").innerHTML =
+          `→ <b>${esc(r.zone)}</b> ৳${fmt(r.fee)} · district ${esc(r.district || "?")} · matched by ${esc(r.matchedBy)}`;
+      };
+      CHG.memRole = async (el) => {
+        await PUT(`/api/team/${el.dataset.id}`, { role: el.value });
+        toast("Role updated");
+      };
+      DO.memStatus = async (el) => {
+        await PUT(`/api/team/${el.dataset.id}`, { status: el.dataset.s });
+        switchView("workspace");
+      };
+      DO.memDel = async (el) => {
+        if (!confirm("Remove this member? They lose access immediately."))
+          return;
+        await DEL(`/api/team/${el.dataset.id}`);
+        switchView("workspace");
+      };
+
+      /* ---------- sales analytics ---------- */
+      STATE.anaPeriod = "30d";
+      MKT.analytics = async (box) => {
+        const a = await GET(`/api/analytics?period=${STATE.anaPeriod}`);
+        const sum = a.daily.reduce(
+          (s, d) => ({
+            revenue: s.revenue + d.revenue,
+            orders: s.orders + d.orders,
+            ai: s.ai + d.ai,
+          }),
+          { revenue: 0, orders: 0, ai: 0 },
+        );
+        box.innerHTML =
+          `<div class="row" style="gap:6px;margin-bottom:10px">${[
+            ["7d", "7 days"],
+            ["30d", "30 days"],
+            ["month", "This month"],
+          ]
+            .map(
+              ([k, l]) =>
+                `<button class="chip ${STATE.anaPeriod === k ? "on" : ""}" data-do="anaP" data-p="${k}">${l}</button>`,
+            )
+            .join("")}</div>` +
+          kpiCards([
+            [
+              "REVENUE",
+              tkf(sum.revenue),
+              "excl. cancelled/rejected",
+              "c-green",
+            ],
+            ["ORDERS", fmt(sum.orders), `${fmt(sum.ai)} by the AI agent`],
+            [
+              "AI SHARE",
+              sum.orders ? Math.round((sum.ai / sum.orders) * 100) + "%" : "—",
+              "orders created by AI",
+            ],
+            [
+              "HANDOVER RATE",
+              a.ai.handoverRate == null ? "—" : a.ai.handoverRate + "%",
+              "chats handed to a human",
+            ],
+            [
+              "ORDERS / 100 CHATS",
+              a.ai.ordersPer100 == null ? "—" : a.ai.ordersPer100,
+              `${fmt(a.ai.conversations)} conversations`,
+            ],
+          ]) +
+          `<div class="card"><h3>Revenue & orders</h3>${lineChart(a.daily, ["revenue"])}${lineChart(a.daily, ["orders", "ai"], 140)}</div>
+          <div class="split" style="grid-template-columns:1fr 1fr;margin-top:14px"><div class="card"><h3>By channel</h3>${tbl(
+            [
+              ["CHANNEL", (r) => esc(r.channel)],
+              ["ORDERS", (r) => fmt(r.orders)],
+              ["REVENUE", (r) => tkf(r.revenue)],
+            ],
+            a.channels,
+          )}</div><div class="card"><h3>By status</h3>${tbl(
+            [
+              ["STATUS", (r) => stPill(r.status)],
+              ["ORDERS", (r) => fmt(r.count)],
+            ],
+            a.statuses,
+          )}</div></div>
+          <div class="split" style="grid-template-columns:1fr 1fr;margin-top:14px"><div class="card"><h3>Return rate by district</h3>${tbl(
+            [
+              ["DISTRICT", (r) => esc(r.district)],
+              ["SHIPPED", (r) => r.shipped],
+              ["RETURNED", (r) => r.returned],
+              ["RATE", (r) => `<b>${r.rate}%</b>`],
+            ],
+            a.districts,
+            "No shipments yet",
+          )}</div><div class="card"><h3>Products</h3>${tbl(
+            [
+              ["PRODUCT", (r) => esc(r.product)],
+              ["UNITS", (r) => fmt(r.units)],
+              ["REVENUE", (r) => tkf(r.revenue)],
+              ["RETURNED", (r) => r.returned],
+            ],
+            a.products,
+          )}</div></div>`;
+      };
+      DO.anaP = (el) => {
+        STATE.anaPeriod = el.dataset.p;
+        switchView("analytics");
+      };
+
+      /* ---------- AI agent page ---------- */
+      MKT.agent = async (box) => {
+        const a = await GET("/api/agent");
+        const w = canDo("agent.write");
+        const yn = (k) =>
+          `<select name="${k}" data-bool>${opts(
+            [
+              ["true", "On"],
+              ["false", "Off"],
+            ],
+            String(!!a[k]),
+          )}</select>`;
+        box.innerHTML = `<div class="card" style="max-width:860px"><h3>AI sales agent</h3><p class="sub">Answers Messenger/Instagram chats from your catalogue, collects order details and places COD orders only after the customer confirms. Prices, stock, delivery fees and fraud checks are always calculated by the system, never by the AI.</p>
+          <form class="stack" id="agForm"><div class="f3"><div><label>AI agent</label>${yn("enabled")}</div><div><label>Auto-confirm AI orders</label>${yn("autoConfirm")}</div><div><label>Hand to human below confidence (%)</label><input type="number" name="escalateBelow" min="0" max="100" value="${a.escalateBelow ?? 60}"></div></div>
+          <div class="f2"><div><label>Tone</label><select name="tone">${opts(["friendly", "professional", "playful", "formal"], a.tone)}</select></div><div><label>Delivery time text</label><input name="deliveryTime" value="${esc(a.deliveryTime || "")}"></div></div>
+          <div><label>Business knowledge the AI may use (policies, exchange rules, size chart, hours, location, FAQ)</label><textarea name="knowledge" rows="8">${esc(a.knowledge || "")}</textarea></div>
+          <div><label>Payment note</label><input name="paymentNote" value="${esc(a.paymentNote || "")}" placeholder="bKash advance for orders above ৳5,000"></div>
+          <div><label>Message when handing to a human</label><input name="handoffMessage" value="${esc(a.handoffMessage || "")}"></div>
+          <div><label>Comment DM fallback ({name} = first name)</label><textarea name="commentPrivateReply" rows="2">${esc(a.commentPrivateReply || "")}</textarea></div>
+          <div class="row" style="gap:6px">${w ? `<button class="btn">Save</button>` : ""}<button type="button" class="btn bd" data-do="goZones">Delivery zones →</button><button type="button" class="btn bd" data-view="comments">Comment settings →</button></div></form></div>`;
+        if ($("agForm"))
+          $("agForm").onsubmit = async (e) => {
+            e.preventDefault();
+            try {
+              await PUT("/api/agent", formData(e.target));
+              toast("Saved");
+            } catch (x) {
+              toast(x.message, true);
+            }
+          };
+      };
+
       /* ================= start ================= */
       (async () => {
         const q = new URLSearchParams(location.search);
+        if (q.get("invite"))
+          sessionStorage.setItem("mf_invite", q.get("invite"));
+        const inv = sessionStorage.getItem("mf_invite");
+        if (inv) {
+          STATE.inviteInfo = await fetch(
+            `/api/auth/invite/${encodeURIComponent(inv)}`,
+          )
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null);
+          if (!STATE.inviteInfo) {
+            sessionStorage.removeItem("mf_invite");
+            toast("This invitation is invalid or has expired", true);
+          }
+        }
+        try {
+          ME = await GET("/api/auth/me");
+        } catch {
+          if (q.toString()) history.replaceState({}, "", "/");
+          return showAuth(
+            STATE.inviteInfo
+              ? STATE.inviteInfo.hasAccount
+                ? "login"
+                : "signup"
+              : undefined,
+          );
+        }
+        if (STATE.inviteInfo) {
+          try {
+            await POST("/api/auth/accept-invite", { token: inv });
+            toast(`You joined ${STATE.inviteInfo.orgName}`);
+            ME = await GET("/api/auth/me");
+          } catch (e) {
+            toast(e.message, true);
+          }
+          sessionStorage.removeItem("mf_invite");
+        }
+        applyMe();
         if (q.get("connected"))
           toast(
             `Facebook connected: ${q.get("pages") || 0} Page(s), ${q.get("ig") || 0} Instagram, ${q.get("ads") || 0} ad account(s)`,
