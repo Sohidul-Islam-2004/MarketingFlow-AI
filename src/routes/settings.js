@@ -10,9 +10,9 @@ router.get("/", handle(async (req, res) => {
   const o = await Organization.findById(req.org).lean();
   res.json({
     profile: { name: o.name, phone: o.phone, logoUrl: o.logoUrl, returnPolicy: o.returnPolicy, orderPrefix: o.orderPrefix },
-    ai: { ...o.ai, ready: aiReady() },
+    ai: { enabled: true, autoConfirm: true, tone: "friendly", handoffBelow: 60, knowledge: "", deliveryTime: "", handoffMessage: "", ...(o.ai || {}), ready: aiReady() },
     comments: { autoReply: true, sendDm: true, delaySec: 30, needApproval: false, hideSpam: false, blockedWords: [], ...(o.comments || {}) },
-    fraud: { holdAtScore: 60, refuseBlocked: false, ...(o.fraud || {}) },
+    fraud: { holdAtScore: 60, refuseBlocked: true, ...(o.fraud || {}) },
     zones: o.zones?.length ? o.zones : DEFAULT_ZONES,
     usingDefaultZones: !o.zones?.length,
     districts: DISTRICT_NAMES,

@@ -33,6 +33,18 @@ async function sendText(org, conv, text, quickReplies = []) {
   return graph(`/${page.accountId}/messages`, { token: decrypt(page.accessToken), method: "POST", body: { recipient: { id: conv.psid }, messaging_type: "RESPONSE", message } });
 }
 
+// Shows "seen" + the typing dots to the customer while the AI thinks. Never throws.
+function showTyping(org, conv) {
+  if (isSimulator(conv) || conv.channel !== "Messenger") return;
+  pageOf(org, conv.pageId)
+    .then(async (page) => {
+      const send = (sender_action) => graph(`/${page.accountId}/messages`, { token: decrypt(page.accessToken), method: "POST", body: { recipient: { id: conv.psid }, sender_action } });
+      await send("mark_seen");
+      await send("typing_on");
+    })
+    .catch(() => {});
+}
+
 // Bot/agent message: saved in the chat even if sending fails (the error is shown in the inbox)
 async function reply(org, conv, from, text, quickReplies = []) {
   const msg = addMessage(conv, from, text);
@@ -54,4 +66,4 @@ function oneAtATime(key, task) {
   return run;
 }
 
-module.exports = { isSimulator, canReply, addMessage, pageOf, sendText, reply, oneAtATime };
+module.exports = { isSimulator, canReply, addMessage, pageOf, sendText, reply, showTyping, oneAtATime };

@@ -1,7 +1,8 @@
 // Customer Inbox: chats on the left, the conversation in the middle, the order the AI is collecting on the right.
-// Refreshes every 5 seconds while the page is open.
+// Refreshes every 5 seconds while the page is open (the server answers "nothing new" when nothing changed).
+// On a phone you see one part at a time: chat list -> chat -> order.
 import { get, post, put, del } from "../api.js";
-import { esc, taka, dateTime, onAction, openModal, toast, orderPill, $ } from "../ui.js";
+import { esc, taka, dateTime, onAction, openModal, toast, orderPill, $, confirmBox, debounce, icon, loading } from "../ui.js";
 import { itemRow, readItems, districtList } from "../shared.js";
 import { updateCounts } from "../app.js";
 
@@ -13,19 +14,21 @@ export async function render(root, params) {
   root.innerHTML = `
     <div class="page-head"><div><h1>Customer Inbox</h1><p>Messenger and Instagram chats. The AI answers and takes orders; you can take over any time.</p></div>
       <button class="btn light" data-action="simulate">Test the AI (simulator)</button></div>
-    <div class="inbox">
-      <div class="chats"><div class="filters"><div class="tabs" id="tabs" style="margin:0"></div><input id="search" placeholder="Search name, message, phone…" value="${esc(state.q)}"></div><div class="chat-list" id="chatList"></div></div>
+    <div class="inbox ${state.openId ? "show-chat" : ""}" id="inbox">
+      <div class="chats"><div class="filters"><div class="tabs" id="tabs" style="margin:0"></div><input id="search" placeholder="Search name, message, phone…" value="${esc(state.q)}"></div><div class="chat-list" id="chatList">${loading()}</div></div>
       <div class="thread" id="thread"></div>
       <div class="side-panel" id="sidePanel"></div>
     </div>`;
 
   onAction(root, {
     tab: (el) => { state.tab = el.dataset.tab; drawList(); },
-    openChat: (el) => { state.openId = el.dataset.id; drawList(); drawChat(); },
+    openChat: (el) => { state.openId = el.dataset.id; state.chat = null; $("#inbox").classList.add("show-chat"); $("#thread").innerHTML = loading(); return refreshAll(); },
+    back: () => { state.openId = null; state.chat = null; $("#inbox").classList.remove("show-chat", "show-order"); return refreshAll(); },
+    toggleOrder: () => $("#inbox").classList.toggle("show-order"),
     send: () => sendReply(),
     aiToggle: async () => { await post(`/api/inbox/${state.openId}/ai`, { on: state.chat.aiPaused }); refreshAll(); },
     closeChat: async () => { await post(`/api/inbox/${state.openId}/status`, { status: state.chat.status === "closed" ? "open" : "closed" }); refreshAll(); },
-    deleteChat: async () => { if (!confirm("Delete this chat?")) return; await del(`/api/inbox/${state.openId}`); state.openId = null; refreshAll(); },
+    deleteChat: async () => { if (!(await confirmBox("Delete this test chat?", "Delete"))) return; await del(`/api/inbox/${state.openId}`); state.openId = null; state.chat = null; $("#inbox").classList.remove("show-chat", "show-order"); refreshAll(); },
     suggest: async (el) => {
       el.disabled = true;
       try { const s = await post(`/api/inbox/${state.openId}/suggest`); $("#replyBox").value = s.reply || ""; toast(s.summary || "Suggestion ready"); }
@@ -33,18 +36,22 @@ export async function render(root, params) {
     },
     editDraft: () => editDraft(),
     placeOrder: async () => {
-      if (!confirm("Create the order from this chat?")) return;
+      if (!(await confirmBox("Create the order from this chat? The customer gets a confirmation message.", "Create order", false))) return;
       const order = await post(`/api/inbox/${state.openId}/place-order`, { tellCustomer: true });
       toast(`Order ${order.orderNo} created`);
       refreshAll();
     },
     simulate: () => startSimulator(),
   });
-  $("#search").addEventListener("change", (e) => { state.q = e.target.value; drawList(); });
+  $("#search").addEventListener("input", debounce((e) => { state.q = e.target.value; drawList(); }));
   root.addEventListener("keydown", (e) => { if (e.target.id === "replyBox" && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply().catch((err) => toast(err.message, true)); } });
 
   await refreshAll();
-  const timer = setInterval(() => (root.isConnected ? refreshAll(true) : clearInterval(timer)), 5000);
+  if (params.simulate) startSimulator();
+  const timer = setInterval(() => {
+    if (!root.isConnected) return clearInterval(timer);
+    if (!document.hidden) refreshAll(true); // no need to ask while the tab is in the background
+  }, 5000);
 }
 
 async function refreshAll(quiet = false) {
@@ -73,16 +80,20 @@ async function drawChat(quiet = false) {
     $("#sidePanel").innerHTML = "";
     return;
   }
-  const c = await get(`/api/inbox/${state.openId}`);
-  const changed = !state.chat || state.chat._id !== c._id || state.chat.messages.length !== c.messages.length || state.chat.updatedAt !== c.updatedAt;
+  const id = state.openId;
+  const same = state.chat?._id === id;
+  const c = await get(`/api/inbox/${id}${quiet && same ? `?since=${encodeURIComponent(state.chat.updatedAt)}` : ""}`);
+  if (c.unchanged || id !== state.openId) return; // nothing new (keeps what you are typing)
   state.chat = c;
-  if (quiet && !changed) return; // don't redraw (keeps what you are typing)
-  const typing = $("#replyBox")?.value || "";
+  const typing = same ? $("#replyBox")?.value || "" : "";
+  const atBottom = !same || !$("#messages") || $("#messages").scrollHeight - $("#messages").scrollTop - $("#messages").clientHeight < 80;
+  const oldScroll = $("#messages")?.scrollTop;
 
   $("#thread").innerHTML = `
-    <div class="thread-head"><div><b>${esc(c.customerName)}</b> <span class="small muted">${esc(c.channel)}</span>
-      ${c.status === "needs_human" ? `<div class="small" style="color:var(--red)">Needs you: ${esc(c.handoffReason || "")}</div>` : ""}</div>
+    <div class="thread-head"><div class="row" style="flex-wrap:nowrap"><button class="btn sm light back" data-action="back" title="Back to all chats">${icon("back")}</button><div><b>${esc(c.customerName)}</b> <span class="small muted">${esc(c.channel)}</span>
+      ${c.status === "needs_human" ? `<div class="small" style="color:var(--red)">Needs you: ${esc(c.handoffReason || "")}</div>` : ""}</div></div>
       <div class="row">
+        <button class="btn sm light order-btn" data-action="toggleOrder">🧾 Order${c.draft?.items?.length && c.draft.status !== "placed" ? " •" : ""}</button>
         <button class="btn sm ${c.aiPaused ? "" : "light"}" data-action="aiToggle">${c.aiPaused ? "🤖 Turn AI on" : "✋ Take over (AI off)"}</button>
         <button class="btn sm light" data-action="closeChat">${c.status === "closed" ? "Reopen" : "Close chat"}</button>
         ${c.simulator ? `<button class="btn sm danger" data-action="deleteChat">Delete</button>` : ""}</div></div>
@@ -94,7 +105,7 @@ async function drawChat(quiet = false) {
            <button class="btn light" data-action="suggest" title="AI writes a reply for you">✨</button><button class="btn" data-action="send" ${c.canReply ? "" : "disabled"}>Send</button>`}
     </div>`;
   $("#replyBox").value = typing;
-  $("#messages").scrollTop = 1e9;
+  $("#messages").scrollTop = atBottom ? 1e9 : oldScroll; // stay where you were reading unless you were at the end
   drawSidePanel(c);
 }
 
@@ -102,6 +113,7 @@ function drawSidePanel(c) {
   const d = c.draft || { items: [] };
   const placed = d.status === "placed";
   $("#sidePanel").innerHTML = `
+    <button class="btn sm light order-btn" data-action="toggleOrder">✕ Close</button>
     <div class="box"><h4>Order in this chat ${placed ? "· ✅ placed" : d.status === "awaiting_confirm" ? "· waiting for Confirm" : ""}</h4>
       ${placed ? `<p>Order <b>${esc(d.orderNo)}</b> was created.</p>` : `
         ${(d.items || []).map((i) => `<div class="line"><span>${esc(i.name)}${i.variantName ? ` (${esc(i.variantName)})` : ""} × ${i.qty}</span><b>${taka(i.price * i.qty)}</b></div>`).join("") || `<p class="small muted">No products yet.</p>`}
@@ -121,14 +133,19 @@ async function sendReply() {
   try {
     if (state.chat.simulator) {
       box.placeholder = "AI is typing…";
+      $("#messages").insertAdjacentHTML("beforeend", `<div class="bubble customer">${esc(text)}</div><div class="bubble ai typing"><i></i><i></i><i></i></div>`);
+      $("#messages").scrollTop = 1e9;
       await post("/api/inbox/simulate", { conversationId: state.openId, text });
     } else {
       await post(`/api/inbox/${state.openId}/reply`, { text });
     }
   } catch (e) {
     box.value = text;
+    state.chat = null;
+    refreshAll(true); // removes the "typing" dots
     throw e;
   }
+  state.chat = null; // force a full redraw
   await refreshAll();
   updateCounts();
 }
@@ -165,7 +182,9 @@ function startSimulator() {
     onSubmit: async (f) => {
       const r = await post("/api/inbox/simulate", f);
       state.openId = r.conversationId;
+      state.chat = null;
       state.tab = "open";
+      $("#inbox").classList.add("show-chat");
       await refreshAll();
     },
   });

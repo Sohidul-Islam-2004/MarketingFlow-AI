@@ -39,5 +39,6 @@ const conversationSchema = new Schema(
 );
 conversationSchema.index({ organizationId: 1, psid: 1 }, { unique: true });
 conversationSchema.index({ organizationId: 1, updatedAt: -1 });
+conversationSchema.index({ organizationId: 1, status: 1 });
 
 module.exports = mongoose.model("Conversation", conversationSchema);

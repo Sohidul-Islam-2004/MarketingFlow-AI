@@ -3,7 +3,7 @@ const router = require("express").Router();
 const { User, Organization, Session } = require("../models");
 const { handle, fail } = require("../lib/errors");
 const { hashPassword, checkPassword } = require("../lib/crypto");
-const { startSession, endSession, currentUser, requireLogin } = require("../middleware/auth");
+const { startSession, endSession, currentUser, requireLogin, forgetSessions } = require("../middleware/auth");
 const { DEFAULT_TENANT } = require("../config");
 
 const validEmail = (e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
@@ -74,6 +74,7 @@ router.post("/password", requireLogin, handle(async (req, res) => {
   user.passwordHash = await hashPassword(req.body.next);
   await user.save();
   await Session.deleteMany({ userId: user._id }); // log out everywhere...
+  forgetSessions();
   await startSession(req, res, user); // ...except here
   res.json({ ok: true });
 }));

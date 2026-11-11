@@ -1,6 +1,6 @@
 // Settings: business profile, AI agent, comment replies, delivery zones, Fraud Shield, password.
 import { get, put, post } from "../api.js";
-import { esc, onAction, toast, options, readForm } from "../ui.js";
+import { esc, onAction, toast, options, readForm, confirmBox } from "../ui.js";
 
 let tab = "ai";
 const TABS = [["ai", "AI agent"], ["comments", "Comments"], ["zones", "Delivery fees"], ["fraud", "Fraud Shield"], ["profile", "Business"], ["password", "Password"]];
@@ -19,7 +19,7 @@ export async function render(root) {
     },
     addZone: (el) => el.closest("form").querySelector("#zones").insertAdjacentHTML("beforeend", zoneRow({ name: "", fee: 0 })),
     removeZone: (el) => el.closest(".zone").remove(),
-    resetZones: async () => { if (!confirm("Go back to Inside Dhaka ৳80 / Suburbs ৳100 / Outside ৳130?")) return; await put("/api/settings/zones", { reset: true }); toast("Default zones restored"); draw(root); },
+    resetZones: async () => { if (!(await confirmBox("Go back to Inside Dhaka ৳80 / Suburbs ৳100 / Outside ৳130?", "Reset zones"))) return; await put("/api/settings/zones", { reset: true }); toast("Default zones restored"); draw(root); },
     testZone: async (el) => {
       const r = await post("/api/settings/zones/test", { address: el.closest("form").querySelector("#testAddress").value });
       el.closest("form").querySelector("#testResult").textContent = `→ ${r.zone} · ৳${r.fee} · district: ${r.district || "unknown"} (matched by ${r.matched})`;

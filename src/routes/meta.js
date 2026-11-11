@@ -15,7 +15,16 @@ const SCOPES = [
 ].join(",");
 const WEBHOOK_FIELDS = ["messages", "messaging_postbacks", "message_echoes", "feed"];
 
-const pendingLogins = new Map(); // state -> { org, at }
+
+// The "state" Facebook sends back tells us which workspace started the login. It is signed with
+// the app secret, so it can't be faked and it still works if the server restarted in between.
+const sign = (text) => crypto.createHmac("sha256", META.APP_SECRET).update(text).digest("hex").slice(0, 32);
+const makeState = (org) => { const body = `${org}.${Date.now()}`; return `${body}.${sign(body)}`; };
+function readState(state) {
+  const [org, at, sig] = String(state || "").split(".");
+  if (!org || !sig || sig !== sign(`${org}.${at}`)) return null;
+  return Date.now() - Number(at) < 15 * 60e3 ? org : null; // valid for 15 minutes
+}
 
 const publicView = (a) => ({ _id: a._id, platform: a.platform, accountId: a.accountId, accountName: a.accountName, pictureUrl: a.pictureUrl, pageId: a.pageId, status: a.status, statusNote: a.statusNote, webhooksOn: a.webhooksOn, lastWebhookAt: a.lastWebhookAt });
 
@@ -35,9 +44,7 @@ async function startConnect(req, res) {
   const who = await currentUser(req);
   if (!who) return res.redirect("/");
   if (!META.APP_ID || !META.APP_SECRET) return res.status(400).send("Set FB_APP_ID and FB_APP_SECRET in .env first.");
-  const state = crypto.randomBytes(24).toString("hex");
-  pendingLogins.set(state, { org: who.org, at: Date.now() });
-  for (const [k, v] of pendingLogins) if (Date.now() - v.at > 15 * 60e3) pendingLogins.delete(k);
+  const state = makeState(who.org);
   const url = new URL(`https://www.facebook.com/${META.GRAPH_VERSION}/dialog/oauth`);
   url.searchParams.set("client_id", META.APP_ID);
   url.searchParams.set("redirect_uri", META.REDIRECT_URI);
@@ -54,17 +61,23 @@ async function finishConnect(req, res) {
   try {
     const { code, state, error_description: denied } = req.query;
     if (denied) return back("error=" + encodeURIComponent(denied));
-    const login = pendingLogins.get(state);
-    if (!login) return back("error=" + encodeURIComponent("Login expired. Please try again."));
-    pendingLogins.delete(state);
+    const org = readState(state);
+    const who = await currentUser(req);
+    if (!org || !who || who.org !== org) return back("error=" + encodeURIComponent("Login expired. Please press Connect Facebook again."));
+    const login = { org };
 
     const short = await graph("/oauth/access_token", { params: { client_id: META.APP_ID, client_secret: META.APP_SECRET, redirect_uri: META.REDIRECT_URI, code } });
     const long = await graph("/oauth/access_token", { params: { grant_type: "fb_exchange_token", client_id: META.APP_ID, client_secret: META.APP_SECRET, fb_exchange_token: short.access_token } });
     // Page tokens made from a long-lived user token don't expire
     const pages = await graphAll("/me/accounts", { token: long.access_token, params: { fields: "id,name,access_token,picture{url},instagram_business_account{id,username,profile_picture_url}", limit: 100 } });
 
+    if (!pages.length) return back("error=" + encodeURIComponent("No Facebook Page was selected. Press Connect Facebook again and tick your Page in the Facebook window."));
+
     let nPages = 0, nInstagram = 0;
+    const taken = [];
     for (const p of pages) {
+      // A Page can belong to one workspace only, otherwise its messages would go to the wrong shop
+      if (await SocialAccount.exists({ platform: "Facebook", accountId: p.id, organizationId: { $ne: login.org } })) { taken.push(p.name); continue; }
       const page = await SocialAccount.findOneAndUpdate(
         { organizationId: login.org, platform: "Facebook", accountId: p.id },
         { $set: { accountName: p.name, accessToken: encrypt(p.access_token), pictureUrl: p.picture?.data?.url || null, status: "active", statusNote: null } },
@@ -83,7 +96,7 @@ async function finishConnect(req, res) {
         nInstagram++;
       }
     }
-    back(`connected=1&pages=${nPages}&instagram=${nInstagram}`);
+    back(`connected=1&pages=${nPages}&instagram=${nInstagram}${taken.length ? "&taken=" + encodeURIComponent(taken.join(", ")) : ""}`);
   } catch (e) {
     console.error("Facebook connect:", e.message);
     back("error=" + encodeURIComponent(e.message));
@@ -115,8 +128,14 @@ router.post("/check", handle(async (req, res) => {
 }));
 
 router.delete("/:id", handle(async (req, res) => {
-  const r = await SocialAccount.deleteOne({ _id: req.params.id, organizationId: req.org });
-  if (!r.deletedCount) throw fail(404, "Account not found");
+  const account = await SocialAccount.findOne({ _id: req.params.id, organizationId: req.org }).select("+accessToken");
+  if (!account) throw fail(404, "Account not found");
+  if (account.platform === "Facebook") {
+    // Tell Meta to stop sending this Page's messages, and remove the Instagram account that came with it
+    await graph(`/${account.accountId}/subscribed_apps`, { token: decrypt(account.accessToken), method: "DELETE" }).catch(() => {});
+    await SocialAccount.deleteMany({ organizationId: req.org, platform: "Instagram", pageId: account.accountId });
+  }
+  await account.deleteOne();
   res.json({ ok: true });
 }));
 

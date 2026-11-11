@@ -1,6 +1,6 @@
 // The post editor pop-up, used by Content Studio and the Calendar.
 import { get, post, put, del, uploadFiles } from "./api.js";
-import { esc, onAction, openModal, toast, toLocalInput } from "./ui.js";
+import { esc, onAction, openModal, toast, toLocalInput, confirmBox } from "./ui.js";
 
 const LOCKED = ["Publishing", "Published", "Partly published"];
 
@@ -41,7 +41,7 @@ export async function openPostEditor(item, { date = null, onDone = () => {} } = 
       </div>`,
     onSubmit: async (f, button) => {
       if (button === "delete") {
-        if (!confirm("Delete this post?")) return true;
+        if (!(await confirmBox("Delete this post?", "Delete"))) return true;
         await del(`/api/content/${p._id}`);
         toast("Post deleted");
         return onDone();

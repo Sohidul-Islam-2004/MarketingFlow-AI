@@ -1,7 +1,7 @@
 // App start: login screen, side menu, and switching pages.
 // Each page lives in js/pages/<name>.js and exports render(root, params).
 import { get, post } from "./api.js";
-import { $, esc, icon, toast, openModal, dateTime } from "./ui.js";
+import { $, esc, icon, toast, openModal, dateTime, loading } from "./ui.js";
 
 const MENU = [
   ["SHOP", [["overview", "Overview"], ["inbox", "Customer Inbox"], ["comments", "FB Comments"], ["orders", "Orders"], ["inventory", "Inventory"], ["fraud", "Fraud Shield"]]],
@@ -9,6 +9,7 @@ const MENU = [
   ["SETTINGS", [["accounts", "Meta Accounts"], ["settings", "Settings"]]],
 ];
 const PAGES = MENU.flatMap(([, items]) => items.map(([id]) => id));
+const LABELS = Object.fromEntries(MENU.flatMap(([, items]) => items));
 
 /* ---------- login / sign up ---------- */
 function showLogin(mode = "login") {
@@ -22,20 +23,27 @@ function showLogin(mode = "login") {
     <form id="authForm" class="stack">
       ${signup ? `<div><label>Your name</label><input name="name" required></div>` : ""}
       <div><label>Email</label><input name="email" type="email" required autocomplete="email"></div>
-      <div><label>Password</label><input name="password" type="password" required ${signup ? 'minlength="8" autocomplete="new-password"' : 'autocomplete="current-password"'}></div>
+      <div><label>Password ${signup ? "(at least 8 characters)" : ""}</label>
+        <div class="with-btn"><input name="password" type="password" required ${signup ? 'minlength="8" autocomplete="new-password"' : 'autocomplete="current-password"'}><button type="button" id="showPass">Show</button></div></div>
       ${signup ? `<div><label>Business name</label><input name="business" placeholder="e.g. Rahim Fashion"></div>` : ""}
+      <p class="note small hidden" id="authError"></p>
       <button class="btn full">${signup ? "Create account" : "Log in"}</button>
-      <p class="small" id="authError" style="color:var(--red)"></p>
+      <p class="small muted center">${signup ? "Already have an account?" : "New here?"} <a href="#" data-mode="${signup ? "login" : "signup"}">${signup ? "Log in" : "Create an account"}</a></p>
     </form></div>`;
-  box.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => showLogin(b.dataset.mode)));
+  $("#showPass").onclick = (e) => { const input = box.querySelector("[name=password]"); input.type = input.type === "password" ? "text" : "password"; e.target.textContent = input.type === "password" ? "Show" : "Hide"; };
+  box.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = (e) => { e.preventDefault(); showLogin(b.dataset.mode); }));
   $("#authForm").onsubmit = async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.target));
+    const button = e.target.querySelector("button.full");
+    button.classList.add("busy");
     try {
       await post(`/api/auth/${signup ? "signup" : "login"}`, data);
       location.reload();
     } catch (err) {
       $("#authError").textContent = err.message;
+      $("#authError").classList.remove("hidden");
+      button.classList.remove("busy");
     }
   };
 }
@@ -56,6 +64,11 @@ async function refreshCounts() {
     const o = await get("/api/overview?period=today");
     menuCounts = { inbox: o.todo.needsHuman, comments: o.todo.newComments, fraud: o.todo.onHold };
     drawMenu(currentPage(), menuCounts);
+    // the same total on the phone top bar and in the browser tab
+    const waiting = o.todo.needsHuman + o.todo.newComments + o.todo.onHold;
+    $("#topCount").textContent = waiting;
+    $("#topCount").classList.toggle("hidden", !waiting);
+    document.title = `${waiting ? `(${waiting}) ` : ""}MarketingFlow AI`;
     const n = await get("/api/notifications");
     $("#bell").innerHTML = icon("bell") + (n.unread ? `<span class="badge">${n.unread}</span>` : "");
   } catch {}
@@ -88,15 +101,26 @@ async function showPage() {
   const page = currentPage();
   const id = ++renderId;
   drawMenu(page, menuCounts);
+  closeMenu();
+  $("#topTitle").textContent = LABELS[page];
   const root = document.createElement("div"); // a fresh element each time, so old click handlers disappear
+  root.innerHTML = loading();
   $("#page").replaceChildren(root);
+  window.scrollTo(0, 0);
   try {
     const module = await import(`./pages/${page}.js`);
     if (id === renderId) await module.render(root, currentParams());
   } catch (e) {
-    root.innerHTML = `<div class="card"><b>Couldn't load this page</b><p class="muted">${esc(e.message)}</p></div>`;
+    if (id !== renderId) return;
+    root.innerHTML = `<div class="card"><b>Couldn't load this page</b><p class="muted">${esc(e.message)}</p><button class="btn light mt" id="retry">Try again</button></div>`;
+    $("#retry").onclick = showPage;
   }
 }
+
+/* ---------- phone: slide-in menu ---------- */
+const closeMenu = () => document.body.classList.remove("menu-open");
+$("#menuBtn").onclick = () => document.body.classList.toggle("menu-open");
+$("#shade").onclick = closeMenu;
 window.addEventListener("hashchange", showPage);
 
 /* ---------- start ---------- */
@@ -115,7 +139,7 @@ window.addEventListener("hashchange", showPage);
   $("#bell").onclick = () => showNotifications().catch((e) => toast(e.message, true));
   await showPage();
   refreshCounts();
-  setInterval(refreshCounts, 60000);
+  setInterval(() => document.hidden || refreshCounts(), 60000); // not while the tab is in the background
 })();
 
 // Pages call this after changes that affect the red counters

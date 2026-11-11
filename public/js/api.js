@@ -6,7 +6,7 @@ export async function api(url, { method = "GET", body } = {}) {
     credentials: "same-origin",
     headers: body !== undefined ? { "Content-Type": "application/json" } : {},
     body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  }).catch(() => { throw new Error("Can't reach the server. Check your internet and try again."); });
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && data.code === "LOGIN_REQUIRED") window.dispatchEvent(new Event("logged-out"));
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);

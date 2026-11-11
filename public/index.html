@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MarketingFlow AI</title>
+    <meta name="theme-color" content="#0d1b2a" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23b8f03a'/%3E%3Cpath d='M24 8 17.5 25l-3.2-7.3L7 14.5z' fill='none' stroke='%230d1b2a' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;600&display=swap" />
     <link rel="stylesheet" href="/css/app.css" />
   </head>
@@ -13,7 +15,14 @@
 
     <!-- The dashboard -->
     <div id="app" class="hidden">
-      <aside>
+      <!-- Phone only: top bar with the menu button -->
+      <header class="topbar">
+        <button id="menuBtn" aria-label="Menu">☰</button>
+        <b id="topTitle">MarketingFlow AI</b>
+        <span class="count hidden" id="topCount"></span>
+      </header>
+      <div class="shade" id="shade"></div>
+      <aside id="side">
         <div class="brand">
           <div class="logo" id="logo"></div>
           <span>MarketingFlow AI</span>
@@ -36,6 +45,11 @@
         <div class="dlg-body" id="modalBody"></div>
         <div class="dlg-foot" id="modalFoot"></div>
       </form>
+    </dialog>
+    <!-- Small "Are you sure?" pop-up (js/ui.js -> confirmBox) -->
+    <dialog id="confirm">
+      <div class="dlg-body"><p id="confirmText"></p></div>
+      <div class="dlg-foot"><button class="btn light" id="confirmNo">Cancel</button><button class="btn" id="confirmYes">OK</button></div>
     </dialog>
     <div class="toasts" id="toasts"></div>
 

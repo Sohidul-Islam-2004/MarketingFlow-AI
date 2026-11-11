@@ -90,13 +90,9 @@ Every change is saved in StockMovement ("History" on the Inventory page).
 
 ## Meta app checklist
 1. **Facebook Login → Valid OAuth Redirect URIs:** add `https://YOUR-DOMAIN/auth/facebook/callback`. It must be the same as `FB_REDIRECT_URI`.
-2. **Webhooks → Page:**
-   - Callback URL: `https://YOUR-DOMAIN/webhooks/meta`
-   - Verify token: the value of `META_WEBHOOK_VERIFY_TOKEN`
-   - Fields: `messages`, `messaging_postbacks`, `message_echoes`, `feed`
-3. **Webhooks → Instagram:** use the same callback URL, field `messages`.
-4. **App mode Live:** Meta does not send real messages in Development mode.
-5. **Connect Facebook:** in the app, open Meta Accounts and press Connect Facebook. Webhooks are switched on for each Page automatically. "Messages & comments" must show **On**.
+2. **Webhooks:** nothing to do by hand. When the server starts it registers `PUBLIC_BASE_URL/webhooks/meta` with Meta (`src/services/webhookSetup.js`). The terminal must show `✅ Webhook registered`. This needs `PUBLIC_BASE_URL` (https) and `META_WEBHOOK_VERIFY_TOKEN` in `.env`.
+3. **App mode Live:** Meta does not send real messages in Development mode.
+4. **Connect Facebook:** in the app, open Meta Accounts and press Connect Facebook. Webhooks are switched on for each Page automatically. "Messages & comments" must show **On**.
 
 ## What v2 removed (to keep the code small)
 - Removed modules: Brands, Strategy, Creative Studio, Meta Ads, Ads Optimizer, Budget, A/B tests, Reports, Competitors, Leads/CRM, Subscription plans, Courier API booking, teams and roles, approval workflow, n8n routes.

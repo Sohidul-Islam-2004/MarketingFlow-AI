@@ -19,6 +19,7 @@ const messenger = require("./messenger");
 const CONFIRM_WORDS = /^(confirm(ed)?|yes|yeah|yep|ok(ay)?|done|sure|হ্যাঁ|হ্যা|হা|জি|জ্বি|ঠিক আছে|কনফার্ম|ওকে|ji|hae|ha)$/i;
 const CHANGE_WORDS = /^(change|edit|বদল|পরিবর্তন)/i;
 const HUMAN_WORDS = /(human|real person|agent|manush|মানুষ|complain|অভিযোগ|refund|রিফান্ড|ফেরত দিতে|damaged|broken|নষ্ট|ভাঙা|fraud|প্রতারণা|scam)/i;
+const ATTACHMENT_ONLY = /^\[(image|audio|video|file|fallback|template|sticker|share|story_mention|reel|ig_reel)(, \w+)*\]$/i;
 const BUTTONS = ["✅ Confirm", "✏️ Change"];
 
 async function aiSettings(org) {
@@ -214,10 +215,13 @@ async function handleCustomerMessage(org, conv, text) {
     conv.draft = { ...d, status: "collecting" }; conv.markModified("draft");
     return messenger.reply(org, conv, "ai", "অবশ্যই! কী পরিবর্তন করতে চান? পণ্য, সাইজ, পরিমাণ, নাম, ফোন নাকি ঠিকানা?");
   }
+  // The AI can't see photos or hear voice messages: a person has to look
+  if (ATTACHMENT_ONLY.test(String(text || "").trim())) return handToHuman(org, conv, `Customer sent ${text} (the AI can't open it)`, settings.ai.handoffMessage);
   if (await isBlocked(org, d.phone)) return handToHuman(org, conv, "Customer is on the block list", settings.ai.handoffMessage);
   if (HUMAN_WORDS.test(text)) return handToHuman(org, conv, `Customer said: "${text.slice(0, 80)}"`, settings.ai.handoffMessage);
   if (!aiReady()) return handToHuman(org, conv, "AI is not set up (AI_API_KEY missing)", settings.ai.handoffMessage);
 
+  messenger.showTyping(org, conv);
   let result;
   try { result = await askAgent(org, settings, conv, text); }
   catch (e) { return handToHuman(org, conv, `AI error: ${e.message}`, settings.ai.handoffMessage); }

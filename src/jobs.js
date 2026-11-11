@@ -12,7 +12,7 @@ async function run(name, job) {
 }
 
 // Chats with no activity for 3 days are closed (a new message opens them again)
-const closeOldChats = () => Conversation.updateMany({ status: "open", updatedAt: { $lt: new Date(Date.now() - 72 * 3600e3) } }, { status: "closed" });
+const closeOldChats = () => Conversation.updateMany({ status: "open", updatedAt: { $lt: new Date(Date.now() - 72 * 3600e3) } }, { status: "closed" }, { timestamps: false });
 
 function startJobs() {
   setInterval(() => run("publish", publishDuePosts), 30 * 1000);

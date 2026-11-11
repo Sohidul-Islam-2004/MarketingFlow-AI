@@ -1,5 +1,5 @@
 // Meta webhooks: Messenger + Instagram messages and Page comments arrive here.
-// Set the callback URL in the Meta App Dashboard to https://YOUR-DOMAIN/webhooks/meta
+// The callback URL is registered automatically when the server starts (services/webhookSetup.js).
 const router = require("express").Router();
 const crypto = require("crypto");
 const { SocialAccount, Conversation, ProcessedEvent } = require("../models");
@@ -19,9 +19,9 @@ router.get("/", (req, res) => {
 router.post("/", (req, res) => {
   // Only accept events signed with our app secret
   if (META.APP_SECRET) {
-    const got = String(req.headers["x-hub-signature-256"] || "");
-    const expected = "sha256=" + crypto.createHmac("sha256", META.APP_SECRET).update(req.rawBody || "").digest("hex");
-    if (got.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(got), Buffer.from(expected))) return res.sendStatus(401);
+    const got = Buffer.from(String(req.headers["x-hub-signature-256"] || ""));
+    const expected = Buffer.from("sha256=" + crypto.createHmac("sha256", META.APP_SECRET).update(req.rawBody || "").digest("hex"));
+    if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) return res.sendStatus(401);
   }
   res.sendStatus(200); // answer Meta quickly, then work
   handleEvents(req.body).catch((e) => console.error("Webhook:", e));

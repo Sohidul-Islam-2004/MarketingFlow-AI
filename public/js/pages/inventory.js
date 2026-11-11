@@ -1,6 +1,6 @@
 // Inventory: products, sizes/colours (variants) and stock.
 import { get, post, put, del } from "../api.js";
-import { esc, taka, num, table, onAction, openModal, toast, options, dateTime, pill } from "../ui.js";
+import { esc, taka, num, table, onAction, openModal, toast, options, dateTime, pill, confirmBox, liveSearch, empty } from "../ui.js";
 
 let filters = { q: "", low: "", archived: "" };
 let products = [];
@@ -13,15 +13,17 @@ export async function render(root, params) {
     adjust: (el) => adjustForm(find(el), () => draw(root)),
     history: (el) => showHistory(find(el)),
     archive: async (el) => { await post(`/api/products/${el.dataset.id}/archive`, { archived: filters.archived !== "1" }); toast(filters.archived === "1" ? "Product is back in the shop" : "Product archived"); draw(root); },
-    remove: async (el) => { if (!confirm("Delete this product for good?")) return; await del(`/api/products/${el.dataset.id}`); toast("Deleted"); draw(root); },
+    remove: async (el) => { if (!(await confirmBox("Delete this product for good?", "Delete"))) return; await del(`/api/products/${el.dataset.id}`); toast("Deleted"); draw(root); },
   });
   root.addEventListener("change", (e) => {
     const key = e.target.dataset.filter;
-    if (!key) return;
+    if (!key || key === "q") return; // the search box is handled by liveSearch
     filters[key] = e.target.type === "checkbox" ? (e.target.checked ? "1" : "") : e.target.value;
     draw(root);
   });
+  liveSearch(root, filters, () => draw(root));
   await draw(root);
+  if (params.add) productForm(null, () => draw(root));
 }
 
 const find = (el) => products.find((p) => p._id === el.dataset.id);
@@ -43,7 +45,7 @@ async function draw(root) {
         <label class="check small"><input type="checkbox" data-filter="low" ${filters.low ? "checked" : ""}> Low stock only</label>
         <label class="check small"><input type="checkbox" data-filter="archived" ${filters.archived ? "checked" : ""}> Show archived</label>
       </div>
-      ${table([
+      ${!products.length && !filters.q && !filters.low && !filters.archived ? empty("No products yet", "Add what you sell. The AI can only talk about products that are here.", `<button class="btn" data-action="add">+ Add your first product</button>`) : table([
         ["Product", (p) => `<b>${esc(p.name)}</b>${p.nameBn ? `<div class="small">${esc(p.nameBn)}</div>` : ""}<div class="small muted">${esc(p.category)}${p.sku ? " · " + esc(p.sku) : ""}</div>`],
         ["Price", (p) => taka(p.price)],
         ["Sizes / colours (available / in shop)", (p) => p.variants.map((v) => pill(`${v.name}: ${v.available}/${v.onHand}`, v.available <= 0 ? "red" : v.available <= p.lowStockAt ? "yellow" : "grey")).join(" ")],
@@ -54,7 +56,7 @@ async function draw(root) {
           <button class="btn sm light" data-action="history" data-id="${p._id}">History</button>
           <button class="btn sm light" data-action="archive" data-id="${p._id}">${filters.archived ? "Restore" : "Archive"}</button>
           ${filters.archived ? `<button class="btn sm danger" data-action="remove" data-id="${p._id}">Delete</button>` : ""}</div>`],
-      ], products, { emptyText: filters.q || filters.low ? "No products match" : "No products yet. Add your first product." })}
+      ], products, { emptyText: "No products match" })}
     </div>`;
 }
 

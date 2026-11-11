@@ -34,8 +34,10 @@ router.get("/", handle(async (req, res) => {
 
 router.get("/:id", handle(async (req, res) => {
   const c = await findConversation(req);
+  if (c.unread) await Conversation.updateOne({ _id: c._id }, { unread: 0 }, { timestamps: false });
+  // The page asks every few seconds: answer "nothing new" when the chat didn't change
+  if (req.query.since && req.query.since === c.updatedAt.toISOString()) return res.json({ unchanged: true });
   c.unread = 0;
-  await c.save();
   const draft = c.draft || { items: [] };
   const orders = await Order.find({ organizationId: req.org, $or: [{ conversationId: c._id }, ...(draft.phone ? [{ phone: draft.phone }] : [])] }).sort({ createdAt: -1 }).limit(5).lean();
   res.json({

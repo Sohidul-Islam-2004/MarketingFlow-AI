@@ -1,6 +1,6 @@
 // FB Comments: what the comment engine did, and the comments that need you.
 import { get, post } from "../api.js";
-import { esc, dateTime, onAction, openModal, toast, pill } from "../ui.js";
+import { esc, dateTime, onAction, openModal, toast, pill, confirmBox } from "../ui.js";
 import { updateCounts } from "../app.js";
 
 const TABS = [["needs_you", "Needs you"], ["waiting", "Replying soon"], ["replied", "Replied"], ["spam", "Spam"], ["all", "All"]];
@@ -22,7 +22,7 @@ export async function render(root) {
     },
     dm: async (el) => { await post(`/api/comments/${el.dataset.id}/dm`); toast("Message sent. The chat is in the inbox."); draw(root); },
     skip: async (el) => { await post(`/api/comments/${el.dataset.id}/skip`); draw(root); updateCounts(); },
-    hide: async (el) => { if (!confirm("Hide this comment on Facebook?")) return; await post(`/api/comments/${el.dataset.id}/hide`); draw(root); updateCounts(); },
+    hide: async (el) => { if (!(await confirmBox("Hide this comment on Facebook?", "Hide"))) return; await post(`/api/comments/${el.dataset.id}/hide`); draw(root); updateCounts(); },
     simulate: () => openModal({
       title: "Test a comment", buttons: [["go", "Run"]],
       body: `<p class="small muted">Runs the comment engine without Facebook. Try "dam koto?", "L size ache?", "fake page".</p><div class="f2 mt"><div><label>Name</label><input name="name" value="Test customer"></div><div><label>Comment</label><input name="message" required></div></div>`,

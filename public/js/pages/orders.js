@@ -1,6 +1,6 @@
 // Orders: list with filters, order details pop-up, new order form.
 import { get, post, put } from "../api.js";
-import { esc, taka, table, orderPill, dateTime, onAction, openModal, closeModal, toast, options, ORDER_STATUS, readForm, $ } from "../ui.js";
+import { esc, taka, table, orderPill, dateTime, onAction, openModal, closeModal, toast, options, ORDER_STATUS, readForm, $, liveSearch } from "../ui.js";
 import { itemRow, readItems, districtList } from "../shared.js";
 import { updateCounts } from "../app.js";
 
@@ -17,11 +17,12 @@ export async function render(root, params) {
     newOrder: () => orderForm(() => draw(root)),
   });
   root.addEventListener("change", (e) => {
-    if (!e.target.dataset.filter) return;
+    if (!e.target.dataset.filter || e.target.dataset.filter === "q") return; // the search box is handled by liveSearch
     filters[e.target.dataset.filter] = e.target.value;
     filters.page = 1;
     draw(root);
   });
+  liveSearch(root, filters, () => draw(root));
   await draw(root);
   if (params.open) openOrder(params.open, () => draw(root));
 }

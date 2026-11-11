@@ -25,20 +25,29 @@ async function startSession(req, res, user) {
 
 async function endSession(req, res) {
   const token = readCookie(req, COOKIE);
+  remembered.clear();
   if (token) await Session.deleteOne({ _id: sha256(token) });
   writeCookie(req, res, "", 0);
 }
 
 // Returns { user, org } for the logged-in person, or null
+const remembered = new Map(); // session id -> { who, until }
 async function currentUser(req) {
   const token = readCookie(req, COOKIE);
   if (!token) return null;
-  const session = await Session.findById(sha256(token)).lean();
+  const id = sha256(token);
+  const hit = remembered.get(id);
+  if (hit && hit.until > Date.now()) return hit.who;
+  const session = await Session.findById(id).lean();
   if (!session || session.expiresAt < new Date()) return null;
   const user = await User.findById(session.userId).lean();
   if (!user) return null;
-  return { user: { id: user._id, name: user.name, email: user.email }, org: user.organizationId };
+  const who = { user: { id: user._id, name: user.name, email: user.email }, org: user.organizationId };
+  if (remembered.size > 5000) remembered.clear();
+  remembered.set(id, { who, until: Date.now() + 60000 });
+  return who;
 }
+const forgetSessions = () => remembered.clear(); // call after a password change
 
 async function requireLogin(req, res, next) {
   try {
@@ -52,4 +61,4 @@ async function requireLogin(req, res, next) {
   }
 }
 
-module.exports = { requireLogin, currentUser, startSession, endSession };
+module.exports = { requireLogin, currentUser, startSession, endSession, forgetSessions };

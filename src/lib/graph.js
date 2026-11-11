@@ -10,12 +10,12 @@ async function graph(path, { token, params = {}, method = "GET", body, base = GR
   for (const [k, v] of Object.entries({ ...params, access_token: token })) {
     if (v != null) url.searchParams.set(k, typeof v === "object" ? JSON.stringify(v) : String(v));
   }
-  const options = { method };
+  const options = { method, signal: AbortSignal.timeout(60000) }; // give up after 60s instead of hanging
   if (body && method !== "GET") {
     options.headers = { "Content-Type": "application/json" };
     options.body = JSON.stringify(body);
   }
-  const res = await fetch(url, options);
+  const res = await fetch(url, options).catch((e) => { throw fail(502, e.name === "TimeoutError" ? "Facebook took too long to answer" : "Could not reach Facebook"); });
   const json = await res.json().catch(() => ({}));
   if (!res.ok || json.error) {
     const e = json.error || {};

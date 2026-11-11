@@ -14,7 +14,8 @@ export const ymd = (d) => { const x = new Date(d); return `${x.getFullYear()}-${
 export const toLocalInput = (d) => (d ? `${ymd(d)}T${String(new Date(d).getHours()).padStart(2, "0")}:${String(new Date(d).getMinutes()).padStart(2, "0")}` : "");
 
 export const pill = (text, color = "grey") => `<span class="pill p-${color}">${esc(text)}</span>`;
-export const empty = (title, hint = "") => `<div class="empty"><b>${esc(title)}</b>${esc(hint)}</div>`;
+// empty("No orders yet", "They appear here…", `<button …>`)  (the 3rd part is ready-made HTML, e.g. a button)
+export const empty = (title, hint = "", actionHtml = "") => `<div class="empty"><b>${esc(title)}</b>${esc(hint)}${actionHtml ? `<div class="mt">${actionHtml}</div>` : ""}</div>`;
 
 export const ORDER_STATUS = { pending: ["Pending", "yellow"], on_hold: ["On hold", "red"], confirmed: ["Confirmed", "blue"], packed: ["Packed", "purple"], shipped: ["Shipped", "purple"], delivered: ["Delivered", "green"], returned: ["Returned", "grey"], cancelled: ["Cancelled", "grey"] };
 export const orderPill = (status) => pill(...(ORDER_STATUS[status] || [status, "grey"]));
@@ -27,7 +28,7 @@ export const options = (list, selected) =>
 export function table(columns, rows, { emptyText = "Nothing here yet", rowAttrs } = {}) {
   if (!rows.length) return empty(emptyText);
   const head = columns.map(([h]) => `<th>${h}</th>`).join("");
-  const body = rows.map((r) => `<tr ${rowAttrs ? rowAttrs(r) : ""}>${columns.map(([, cell]) => `<td>${cell(r)}</td>`).join("")}</tr>`).join("");
+  const body = rows.map((r) => `<tr ${rowAttrs ? rowAttrs(r) : ""}>${columns.map(([h, cell]) => `<td data-label="${esc(h)}">${cell(r)}</td>`).join("")}</tr>`).join(""); // data-label: shown on phones
   return `<div class="table"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
 
@@ -46,8 +47,51 @@ export function onAction(root, handlers) {
     const el = event.target.closest("[data-action]");
     if (!el || !root.contains(el) || !handlers[el.dataset.action]) return;
     event.preventDefault();
-    try { await handlers[el.dataset.action](el, event); } catch (e) { toast(e.message, true); }
+    if (el.classList.contains("busy")) return; // still working on the last click
+    const isButton = el.tagName === "BUTTON";
+    if (isButton) el.classList.add("busy");
+    try { await handlers[el.dataset.action](el, event); } catch (e) { toast(e.message, true); } finally { el.classList.remove("busy"); }
   });
+}
+
+// "Are you sure?" pop-up. Use: if (!(await confirmBox("Delete this product?", "Delete"))) return;
+export function confirmBox(text, yesLabel = "Yes", danger = true) {
+  return new Promise((done) => {
+    const box = $("#confirm");
+    $("#confirmText").textContent = text;
+    $("#confirmYes").textContent = yesLabel;
+    $("#confirmYes").className = "btn" + (danger ? " danger solid" : "");
+    const finish = (answer) => { box.close(); box.oncancel = null; done(answer); };
+    $("#confirmYes").onclick = () => finish(true);
+    $("#confirmNo").onclick = () => finish(false);
+    box.oncancel = () => done(false); // Esc key
+    box.showModal();
+  });
+}
+
+// Shown while a page or list is loading
+export const loading = (text = "Loading…") => `<div class="loading"><span class="spin"></span>${esc(text)}</div>`;
+
+// Search-as-you-type for pages that redraw themselves: boxes with data-filter="q" update filters.q,
+// the page is redrawn a moment after the last key, and the cursor stays in the box.
+export function liveSearch(root, filters, draw) {
+  const redraw = debounce(async () => {
+    await draw();
+    const box = root.querySelector('[data-filter="q"]');
+    if (box && document.activeElement !== box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+  });
+  root.addEventListener("input", (e) => {
+    if (e.target.dataset.filter !== "q") return;
+    filters.q = e.target.value;
+    if ("page" in filters) filters.page = 1;
+    redraw();
+  });
+}
+
+// Runs fn only after the person stops typing for a moment (for search boxes)
+export function debounce(fn, ms = 350) {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
 }
 
 // Reads form fields into an object: checkboxes -> true/false, number inputs -> numbers, name="x[]" -> arrays
@@ -82,6 +126,8 @@ export function openModal({ title, body, buttons = [["save", "Save"]], wide = fa
   $("#modalCancel").onclick = closeModal;
   submitHandler = onSubmit;
   if (!$("#modal").open) $("#modal").showModal();
+  // On a computer: put the cursor in the first box. On a phone that would pop the keyboard open, so skip it.
+  if (matchMedia("(pointer: fine)").matches) bodyEl.querySelector("input:not([type=hidden]):not([type=checkbox]):not([type=file]):not([type=date])")?.focus();
   return bodyEl;
 }
 export function closeModal() {
@@ -95,13 +141,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!submitHandler) return closeModal();
     const buttons = $$("#modalFoot button");
     buttons.forEach((b) => (b.disabled = true));
+    event.submitter?.classList.add("busy");
     try {
       const keepOpen = await submitHandler(readForm($("#modalForm")), event.submitter?.value);
       if (keepOpen !== true) closeModal();
     } catch (e) {
       toast(e.message, true);
     } finally {
-      buttons.forEach((b) => (b.disabled = false));
+      buttons.forEach((b) => { b.disabled = false; b.classList.remove("busy"); });
     }
   });
 });
@@ -120,6 +167,8 @@ const ICONS = {
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
   send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/>',
+  check: '<path d="m5 12 5 5 9-10"/>',
+  back: '<path d="M15 5l-7 7 7 7"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
 };
 export const icon = (name) => `<svg class="i" viewBox="0 0 24 24">${ICONS[name] || ""}</svg>`;

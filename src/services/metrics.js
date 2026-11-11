@@ -1,5 +1,5 @@
 // Numbers for the Overview page. Days are counted in Bangladesh time.
-const { Order, Conversation, Product, Comment } = require("../models");
+const { Order, Conversation, Product, Comment, SocialAccount, Organization } = require("../models");
 const { DAY, dhakaToday, dhakaMidnight } = require("../lib/utils");
 
 const NOT_COUNTED = ["cancelled"];
@@ -15,8 +15,22 @@ function periodRange(period) {
 const change = (now, before) => (before > 0 ? Math.round(((now - before) / before) * 100) : null);
 
 async function orderTotals(org, from, to) {
-  const rows = await Order.find({ organizationId: org, createdAt: { $gte: from, $lt: to }, status: { $nin: NOT_COUNTED } }).select("total source").lean();
-  return { count: rows.length, revenue: rows.reduce((s, o) => s + o.total, 0), ai: rows.filter((o) => o.source !== "manual").length };
+  const groups = await Order.aggregate([
+    { $match: { organizationId: org, createdAt: { $gte: from, $lt: to }, status: { $nin: NOT_COUNTED } } },
+    { $group: { _id: "$source", n: { $sum: 1 }, revenue: { $sum: "$total" } } },
+  ]);
+  const sum = (field, rows = groups) => rows.reduce((s, g) => s + g[field], 0);
+  return { count: sum("n"), revenue: sum("revenue"), ai: sum("n", groups.filter((g) => g._id !== "manual")) };
+}
+
+// First steps for a new shop. The Overview page shows them until all are done.
+async function setupSteps(org, productCount) {
+  const [page, shop, chat] = await Promise.all([
+    SocialAccount.exists({ organizationId: org, platform: "Facebook" }),
+    Organization.findById(org).select("ai.knowledge").lean(),
+    Conversation.exists({ organizationId: org }),
+  ]);
+  return { page: !!page, products: productCount > 0, knowledge: !!shop?.ai?.knowledge?.trim(), chat: !!chat };
 }
 
 async function overview(org, period = "today") {
@@ -35,6 +49,7 @@ async function overview(org, period = "today") {
   const lowStock = products.filter((p) => p.variants.reduce((s, v) => s + v.available, 0) <= (p.lowStockAt ?? 5));
   return {
     period,
+    setup: await setupSteps(org, products.length),
     sales: { revenue: now.revenue, revenueChange: change(now.revenue, before.revenue), orders: now.count, ordersChange: change(now.count, before.count), aiOrders: now.ai },
     todo: { onHold, toPack, needsHuman, newComments, lowStock: lowStock.length },
     openChats,

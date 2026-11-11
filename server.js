@@ -12,6 +12,7 @@ const config = require("./src/config");
 const { connectDB } = require("./src/db");
 const { requireLogin } = require("./src/middleware/auth");
 const { startJobs } = require("./src/jobs");
+const { registerWebhooks } = require("./src/services/webhookSetup");
 const meta = require("./src/routes/meta");
 
 const app = express();
@@ -47,7 +48,10 @@ app.use("/api", (req, res) => res.status(404).json({ error: `Unknown API: ${req.
 
 connectDB()
   .then(() => {
-    app.listen(config.PORT, () => console.log(`🚀 Running on http://localhost:${config.PORT}`));
+    app.listen(config.PORT, () => {
+      console.log(`🚀 Running on http://localhost:${config.PORT}`);
+      registerWebhooks(); // tells Meta where to send messages/comments (no manual dashboard step)
+    });
     if (config.JOBS_ON) startJobs();
   })
   .catch((e) => {
