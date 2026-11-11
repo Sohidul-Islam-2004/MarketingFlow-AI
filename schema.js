@@ -32,15 +32,30 @@ const marketingSettingsSchema = new Schema(
     maxBudgetDeltaPct: { type: Number, default: 20 }, // guardrail: max % budget change per step
     maxDailyBudget: { type: Number, default: 0 }, // guardrail: 0 = no cap (account currency, major units)
     guardrailAllowlist: { type: [String], default: [] }, // Meta campaign ids allowed for guardrailed automation
-    salesTeam: { type: [{ name: String, email: String, active: { type: Boolean, default: true } }], default: [] },
+    salesTeam: {
+      type: [
+        {
+          name: String,
+          email: String,
+          active: { type: Boolean, default: true },
+        },
+      ],
+      default: [],
+    },
     rrIndex: { type: Number, default: 0 }, // round-robin pointer for lead assignment
     leadCategories: {
       type: [String],
-      default: ["Product inquiry", "Service inquiry", "Wholesale / B2B", "Support", "Other"],
+      default: [
+        "Product inquiry",
+        "Service inquiry",
+        "Wholesale / B2B",
+        "Support",
+        "Other",
+      ],
     },
     timezone: { type: String, default: "Asia/Dhaka" },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const organizationSchema = new Schema(
@@ -59,7 +74,19 @@ const organizationSchema = new Schema(
     defaultLanguage: { type: String, default: "bn" },
     orderPrefix: { type: String, default: "ORD-" },
     // Delivery zones (FR-ORD-006). Empty = built-in defaults (Inside Dhaka 80 / Suburbs 100 / Outside 130)
-    zones: { type: [{ name: String, fee: Number, districts: [String], areas: [String], isDefault: Boolean, freeOver: Number }], default: [] },
+    zones: {
+      type: [
+        {
+          name: String,
+          fee: Number,
+          districts: [String],
+          areas: [String],
+          isDefault: Boolean,
+          freeOver: Number,
+        },
+      ],
+      default: [],
+    },
     // Fraud Shield settings (FR-FRD-007)
     fraud: {
       enabled: { type: Boolean, default: true },
@@ -68,19 +95,23 @@ const organizationSchema = new Schema(
       lookbackDays: { type: Number, default: 30 },
     },
   },
-  baseOpts()
+  baseOpts(),
 );
 
 // Atomic counters (used for order numbers)
 const counterSchema = new Schema(
   { _id: { type: String }, seq: { type: Number, default: 0 } },
-  { versionKey: false }
+  { versionKey: false },
 );
 
 /* ============ 2. CRM & LEADS ============ */
 const leadNoteSchema = new Schema(
-  { text: String, by: { type: String, default: "system" }, at: { type: Date, default: Date.now } },
-  { _id: true }
+  {
+    text: String,
+    by: { type: String, default: "system" },
+    at: { type: Date, default: Date.now },
+  },
+  { _id: true },
 );
 
 const leadSchema = new Schema(
@@ -116,7 +147,7 @@ const leadSchema = new Schema(
     orderId: { type: String, default: null },
     duplicateCount: { type: Number, default: 0 },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 leadSchema.index({ organizationId: 1, aiStatus: 1 });
 leadSchema.index({ organizationId: 1, stage: 1, updatedAt: -1 });
@@ -134,7 +165,7 @@ const taskSchema = new Schema(
     priority: { type: String, default: "High" },
     status: { type: String, default: "Pending" },
   },
-  baseOpts()
+  baseOpts(),
 );
 taskSchema.index({ organizationId: 1, status: 1 });
 
@@ -168,7 +199,7 @@ const brandSchema = new Schema(
     },
     logoUrl: { type: String, default: null },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 
 // 3.2 Content items (drafts, approvals, versions, scheduling, publishing results)
@@ -177,7 +208,7 @@ const contentVariantSchema = new Schema(
     platform: { type: String, required: true },
     caption: { type: String, required: true },
   },
-  { _id: true }
+  { _id: true },
 );
 
 const publishTargetSchema = new Schema(
@@ -196,7 +227,7 @@ const publishTargetSchema = new Schema(
     metrics: { type: Mixed, default: {} }, // reach, impressions, likes, comments, shares, saves, clicks, views
     metricsAt: { type: Date, default: null },
   },
-  { _id: true }
+  { _id: true },
 );
 
 const contentVersionSchema = new Schema(
@@ -210,7 +241,7 @@ const contentVersionSchema = new Schema(
     note: { type: String, default: "" },
     at: { type: Date, default: Date.now },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const contentItemSchema = new Schema(
@@ -242,12 +273,19 @@ const contentItemSchema = new Schema(
     lockUntil: { type: Date, default: null },
     lastError: { type: String, default: null },
     approvals: {
-      type: [{ action: String, by: String, comment: String, at: { type: Date, default: Date.now } }],
+      type: [
+        {
+          action: String,
+          by: String,
+          comment: String,
+          at: { type: Date, default: Date.now },
+        },
+      ],
       default: [],
     },
     versions: { type: [contentVersionSchema], default: [] },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 contentItemSchema.index({ organizationId: 1, status: 1 });
 contentItemSchema.index({ organizationId: 1, scheduledAt: 1 });
@@ -266,7 +304,7 @@ const planItemSchema = new Schema(
     cta: String,
     contentItemId: { type: String, default: null },
   },
-  { _id: true }
+  { _id: true },
 );
 
 const contentPlanSchema = new Schema(
@@ -283,7 +321,7 @@ const contentPlanSchema = new Schema(
     startDate: { type: Date, default: null },
     endDate: { type: Date, default: null },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 contentPlanSchema.index({ organizationId: 1, kind: 1, createdAt: -1 });
 
@@ -308,7 +346,7 @@ const mediaAssetSchema = new Schema(
     status: { type: String, default: "approved" }, // pending | approved | rejected
     reviewNote: { type: String, default: null },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 mediaAssetSchema.index({ organizationId: 1, createdAt: -1 });
 
@@ -321,7 +359,7 @@ const creativeTemplateSchema = new Schema(
     format: { type: String, default: "1:1" },
     layout: { type: Mixed, default: {} }, // colours, alignment, sizes, text defaults (rendered in the browser)
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 
 // 3.5 Meta Ads: synced structure + daily insights + breakdowns
@@ -347,7 +385,7 @@ const adEntitySchema = new Schema(
     targeting: { type: Mixed, default: null },
     syncedAt: Date,
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 adEntitySchema.index({ organizationId: 1, metaId: 1 }, { unique: true });
 adEntitySchema.index({ organizationId: 1, adAccountId: 1, level: 1 });
@@ -371,9 +409,12 @@ const adInsightSchema = new Schema(
     purchases: { type: Number, default: 0 },
     purchaseValue: { type: Number, default: 0 },
   },
-  { versionKey: false, toJSON: jsonOptions }
+  { versionKey: false, toJSON: jsonOptions },
 );
-adInsightSchema.index({ organizationId: 1, adId: 1, date: 1 }, { unique: true });
+adInsightSchema.index(
+  { organizationId: 1, adId: 1, date: 1 },
+  { unique: true },
+);
 adInsightSchema.index({ organizationId: 1, adAccountId: 1, date: 1 });
 adInsightSchema.index({ organizationId: 1, campaignId: 1, date: 1 });
 
@@ -389,7 +430,7 @@ const adBreakdownSchema = new Schema(
     range: String,
     syncedAt: Date,
   },
-  { versionKey: false, toJSON: jsonOptions }
+  { versionKey: false, toJSON: jsonOptions },
 );
 adBreakdownSchema.index({ organizationId: 1, adAccountId: 1, kind: 1 });
 
@@ -408,7 +449,10 @@ const campaignDraftSchema = new Schema(
     endTime: Date,
     targeting: {
       countries: { type: [String], default: ["BD"] },
-      cities: { type: [{ key: String, name: String, radius: Number }], default: [] },
+      cities: {
+        type: [{ key: String, name: String, radius: Number }],
+        default: [],
+      },
       ageMin: { type: Number, default: 18 },
       ageMax: { type: Number, default: 65 },
       genders: { type: [Number], default: [] }, // [] all, 1 male, 2 female
@@ -433,11 +477,26 @@ const campaignDraftSchema = new Schema(
       description: String,
       cta: { type: String, default: "LEARN_MORE" },
       link: String,
-      utm: { source: String, medium: String, campaign: String, content: String },
+      utm: {
+        source: String,
+        medium: String,
+        campaign: String,
+        content: String,
+      },
     },
     // draft | pending_approval | approved | rejected | created | active | error
     status: { type: String, default: "draft" },
-    reviews: { type: [{ action: String, by: String, comment: String, at: { type: Date, default: Date.now } }], default: [] },
+    reviews: {
+      type: [
+        {
+          action: String,
+          by: String,
+          comment: String,
+          at: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
     meta: {
       campaignId: String,
       adsetId: String,
@@ -447,7 +506,7 @@ const campaignDraftSchema = new Schema(
     },
     lastError: { type: String, default: null },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 
 // Every live change to Meta (status / budget) goes through a change request (audit + approval)
@@ -472,7 +531,7 @@ const changeRequestSchema = new Schema(
     error: String,
     draftId: String,
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 changeRequestSchema.index({ organizationId: 1, status: 1, createdAt: -1 });
 
@@ -495,7 +554,7 @@ const recommendationSchema = new Schema(
     status: { type: String, default: "open" }, // open | dismissed | actioned
     key: String, // dedup key for rule-based items
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 recommendationSchema.index({ organizationId: 1, status: 1, createdAt: -1 });
 recommendationSchema.index({ organizationId: 1, key: 1 });
@@ -512,7 +571,7 @@ const budgetPlanSchema = new Schema(
     alertAt: { type: [Number], default: [50, 80, 100] }, // % thresholds
     alertsSent: { type: [String], default: [] },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 
 const experimentSchema = new Schema(
@@ -543,7 +602,7 @@ const experimentSchema = new Schema(
     confidence: { type: Number, default: null },
     aiNotes: { type: String, default: null },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 
 // 3.6 Organic analytics: daily account metrics + follower snapshots
@@ -556,9 +615,12 @@ const accountInsightSchema = new Schema(
     date: { type: String, required: true }, // YYYY-MM-DD
     metrics: { type: Mixed, default: {} },
   },
-  { versionKey: false, toJSON: jsonOptions }
+  { versionKey: false, toJSON: jsonOptions },
 );
-accountInsightSchema.index({ organizationId: 1, accountId: 1, date: 1 }, { unique: true });
+accountInsightSchema.index(
+  { organizationId: 1, accountId: 1, date: 1 },
+  { unique: true },
+);
 
 // 3.7 Competitor & market intelligence (public data only)
 const competitorSchema = new Schema(
@@ -571,13 +633,19 @@ const competitorSchema = new Schema(
     facebookUrl: { type: String, default: null },
     website: { type: String, default: null },
     notes: {
-      type: [{ type: { type: String, default: "note" }, text: String, at: { type: Date, default: Date.now } }],
+      type: [
+        {
+          type: { type: String, default: "note" },
+          text: String,
+          at: { type: Date, default: Date.now },
+        },
+      ],
       default: [],
     },
     latest: { type: Mixed, default: null }, // last snapshot summary
     lastSnapshotAt: Date,
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 
 const competitorSnapshotSchema = new Schema(
@@ -592,7 +660,7 @@ const competitorSnapshotSchema = new Schema(
     offers: { type: [String], default: [] },
     posts: { type: [Mixed], default: [] },
   },
-  baseOpts()
+  baseOpts(),
 );
 
 /* ============ 4. COMMERCE ============ */
@@ -615,21 +683,23 @@ const productSchema = new Schema(
     costPrice: { type: Number, default: null },
     weight: { type: Number, default: null }, // kg
     variants: {
-      type: [{
-        _id: { type: String, default: genId },
-        sku: String,
-        name: { type: String, default: "Default" }, // e.g. "M", "L / Red"
-        size: { type: String, default: "" },
-        color: { type: String, default: "" },
-        price: { type: Number, default: null }, // optional override
-        onHand: { type: Number, default: 0 },
-        reserved: { type: Number, default: 0 },
-        available: { type: Number, default: 0 }, // = onHand - reserved (kept in sync atomically)
-      }],
+      type: [
+        {
+          _id: { type: String, default: genId },
+          sku: String,
+          name: { type: String, default: "Default" }, // e.g. "M", "L / Red"
+          size: { type: String, default: "" },
+          color: { type: String, default: "" },
+          price: { type: Number, default: null }, // optional override
+          onHand: { type: Number, default: 0 },
+          reserved: { type: Number, default: 0 },
+          available: { type: Number, default: 0 }, // = onHand - reserved (kept in sync atomically)
+        },
+      ],
       default: [],
     },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 productSchema.index({ organizationId: 1, sku: 1 }, { unique: true });
 
@@ -648,7 +718,7 @@ const stockMovementSchema = new Schema(
     by: { type: String, default: "system" },
     note: { type: String, default: "" },
   },
-  baseOpts()
+  baseOpts(),
 );
 stockMovementSchema.index({ organizationId: 1, productId: 1, createdAt: -1 });
 
@@ -662,7 +732,7 @@ const orderItemSchema = new Schema(
     qty: { type: Number, default: 1, min: 1 },
     price: { type: Number, default: 0 },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const orderSchema = new Schema(
@@ -705,10 +775,24 @@ const orderSchema = new Schema(
     createdByName: { type: String, default: null },
     sourceCommentId: { type: String, default: null },
     riskBand: { type: String, default: "low" },
-    riskSignals: { type: [{ code: String, points: Number, reason: String }], default: [] },
+    riskSignals: {
+      type: [{ code: String, points: Number, reason: String }],
+      default: [],
+    },
     paymentRef: { type: String, default: null },
     notes: { type: String, default: "" },
-    events: { type: [{ from: String, to: String, by: String, note: String, at: { type: Date, default: Date.now } }], default: [] },
+    events: {
+      type: [
+        {
+          from: String,
+          to: String,
+          by: String,
+          note: String,
+          at: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
     returnInfo: { type: Mixed, default: null }, // { items:[{line, qty}], reason, requestedAt, resolution }
     conversationId: { type: String, default: null },
     psid: { type: String, default: null },
@@ -722,7 +806,7 @@ const orderSchema = new Schema(
       leadId: { type: String, default: null },
     },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 orderSchema.index({ organizationId: 1, orderNo: 1 }, { unique: true });
 orderSchema.index({ organizationId: 1, createdAt: -1 });
@@ -734,7 +818,11 @@ orderSchema.index({ organizationId: 1, addressKey: 1, createdAt: -1 });
 /* ============ 5. MESSENGER INBOX ============ */
 const messageSchema = new Schema(
   {
-    from: { type: String, enum: ["customer", "ai", "agent", "system"], required: true },
+    from: {
+      type: String,
+      enum: ["customer", "ai", "agent", "system"],
+      required: true,
+    },
     text: { type: String, required: true },
     at: { type: Date, default: Date.now },
     by: { type: String, default: null }, // agent name
@@ -744,7 +832,7 @@ const messageSchema = new Schema(
     fromComment: { type: Boolean, default: undefined }, // customer text came from a public comment
     error: { type: String, default: undefined }, // delivery error from Meta
   },
-  { _id: true }
+  { _id: true },
 );
 
 const conversationSchema = new Schema(
@@ -766,12 +854,15 @@ const conversationSchema = new Schema(
     aiHandled: { type: Number, default: 0 }, // AI replies sent
     source: { type: Mixed, default: null }, // { type:'comment', commentId, postId, text }
     // { items:[{productId,name,variant,qty,price,stock}], name, phone, address, area:'inside'|'outside', status:'collecting'|'awaiting_confirm'|'placed' }
-    orderDraft: { type: Mixed, default: () => ({ items: [], status: "collecting" }) },
+    orderDraft: {
+      type: Mixed,
+      default: () => ({ items: [], status: "collecting" }),
+    },
     orderId: { type: String, default: null },
     orderNo: { type: String, default: null },
     leadId: { type: String, default: null },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 conversationSchema.index({ organizationId: 1, psid: 1 }, { unique: true });
 conversationSchema.index({ organizationId: 1, status: 1, updatedAt: -1 });
@@ -786,7 +877,7 @@ const blacklistSchema = new Schema(
     reason: { type: String, default: "Blocked manually" },
     by: { type: String, default: null },
   },
-  baseOpts()
+  baseOpts(),
 );
 blacklistSchema.index({ organizationId: 1, phone: 1 }, { unique: true });
 
@@ -802,15 +893,26 @@ const agentConfigSchema = new Schema(
     greeting: { type: String, default: "Hi! How can I help you today?" },
     deliveryInside: { type: Number, default: 80 }, // delivery fee inside Dhaka
     deliveryOutside: { type: Number, default: 130 },
-    deliveryTime: { type: String, default: "24-48 hours inside Dhaka, 3-5 days outside" },
+    deliveryTime: {
+      type: String,
+      default: "24-48 hours inside Dhaka, 3-5 days outside",
+    },
     paymentNote: { type: String, default: "" },
     knowledge: { type: String, default: "" }, // policies, FAQ, hours, location: the only facts the AI may use
-    handoffMessage: { type: String, default: "Thanks! I'm connecting you with our team. They'll reply shortly 🙏" },
+    handoffMessage: {
+      type: String,
+      default:
+        "Thanks! I'm connecting you with our team. They'll reply shortly 🙏",
+    },
     commentAutoReply: { type: Boolean, default: true }, // private-reply to new post comments
-    commentPrivateReply: { type: String, default: "Hi {name}! 👋 Thanks for your comment on our post. Tell me which product, size/colour and quantity you'd like and I'll get your order ready right here." },
+    commentPrivateReply: {
+      type: String,
+      default:
+        "Hi {name}! 👋 Thanks for your comment on our post. Tell me which product, size/colour and quantity you'd like and I'll get your order ready right here.",
+    },
     commentPublicReply: { type: String, default: "" }, // optional public reply, e.g. "Inbox করা হয়েছে ✅"
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 
 /* ============ 8. AUTOMATION (Idempotency) ============ */
@@ -822,7 +924,7 @@ const webhookEventSchema = new Schema(
     tenantId: { type: String, required: true },
     processingStatus: { type: String, default: "pending" },
   },
-  baseOpts({ timestamps: { createdAt: "receivedAt", updatedAt: false } })
+  baseOpts({ timestamps: { createdAt: "receivedAt", updatedAt: false } }),
 );
 webhookEventSchema.index({ tenantId: 1, processingStatus: 1 });
 
@@ -856,7 +958,7 @@ const socialAccountSchema = new Schema(
     // Per-Page automation (FR-PAGE-005): { autoReply, delaySec, manualApproval, privateReply, persona, language, blockedKeywords[], workingHours }
     pageConfig: { type: Mixed, default: null },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 socialAccountSchema.index({ organizationId: 1, platform: 1 });
 socialAccountSchema.index({ organizationId: 1, platform: 1, accountId: 1 });
@@ -873,7 +975,7 @@ const notificationSchema = new Schema(
     view: { type: String, default: null }, // dashboard view to open
     read: { type: Boolean, default: false },
   },
-  baseOpts()
+  baseOpts(),
 );
 notificationSchema.index({ organizationId: 1, read: 1, createdAt: -1 });
 
@@ -887,7 +989,7 @@ const aiUsageSchema = new Schema(
     completionTokens: { type: Number, default: 0 },
     ok: { type: Boolean, default: true },
   },
-  baseOpts()
+  baseOpts(),
 );
 aiUsageSchema.index({ organizationId: 1, createdAt: -1 });
 
@@ -895,7 +997,13 @@ aiUsageSchema.index({ organizationId: 1, createdAt: -1 });
 const userSchema = new Schema(
   {
     _id: { type: String, default: genId },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
     name: { type: String, required: true },
     passwordHash: { type: String, required: true, select: false }, // scrypt$salt$hash
     isSuperAdmin: { type: Boolean, default: false },
@@ -904,7 +1012,7 @@ const userSchema = new Schema(
     lockedUntil: { type: Date, default: null },
     lastOrgId: { type: String, default: null },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 
 const membershipSchema = new Schema(
@@ -921,7 +1029,7 @@ const membershipSchema = new Schema(
     inviteExpiresAt: { type: Date, default: null },
     invitedBy: { type: String, default: null },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 membershipSchema.index({ organizationId: 1, email: 1 }, { unique: true });
 
@@ -934,7 +1042,7 @@ const sessionSchema = new Schema(
     ip: String,
     ua: String,
   },
-  baseOpts()
+  baseOpts(),
 );
 sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
@@ -949,7 +1057,7 @@ const auditLogSchema = new Schema(
     meta: { type: Mixed, default: {} },
     ip: { type: String, default: null },
   },
-  baseOpts()
+  baseOpts(),
 );
 auditLogSchema.index({ organizationId: 1, createdAt: -1 });
 
@@ -975,7 +1083,7 @@ const commentSchema = new Schema(
     dueAt: { type: Date, default: null },
     reason: { type: String, default: null },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 commentSchema.index({ organizationId: 1, commentId: 1 }, { unique: true });
 commentSchema.index({ organizationId: 1, status: 1, createdAt: -1 });
@@ -991,7 +1099,7 @@ const postProductSchema = new Schema(
     productIds: { type: [String], default: [] },
     caption: { type: String, default: "" },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 postProductSchema.index({ organizationId: 1, postId: 1 }, { unique: true });
 
@@ -1009,7 +1117,7 @@ const courierAccountSchema = new Schema(
     active: { type: Boolean, default: true },
     lastError: { type: String, default: null },
   },
-  baseOpts(withUpdates)
+  baseOpts(withUpdates),
 );
 
 /* ============ MODELS ============ */
@@ -1032,7 +1140,10 @@ const BudgetPlan = model("BudgetPlan", budgetPlanSchema);
 const Experiment = model("Experiment", experimentSchema);
 const AccountInsight = model("AccountInsight", accountInsightSchema);
 const Competitor = model("Competitor", competitorSchema);
-const CompetitorSnapshot = model("CompetitorSnapshot", competitorSnapshotSchema);
+const CompetitorSnapshot = model(
+  "CompetitorSnapshot",
+  competitorSnapshotSchema,
+);
 const Product = model("Product", productSchema);
 const Order = model("Order", orderSchema);
 const Conversation = model("Conversation", conversationSchema);
@@ -1055,9 +1166,12 @@ async function nextOrderNo(orgId) {
   const c = await Counter.findOneAndUpdate(
     { _id: `order:${orgId}` },
     { $inc: { seq: 1 } },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    { upsert: true, new: true, setDefaultsOnInsert: true },
   );
-  const o = await Organization.findById(orgId).select("orderPrefix").lean().catch(() => null);
+  const o = await Organization.findById(orgId)
+    .select("orderPrefix")
+    .lean()
+    .catch(() => null);
   return `${o?.orderPrefix || "ORD-"}${100000 + c.seq}`;
 }
 
