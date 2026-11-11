@@ -1,26 +1,18 @@
 {
-  "dependencies": {
-    "@prisma/client": "^5.22.0",
-    "axios": "^1.21.0",
-    "cors": "^2.8.6",
-    "dotenv": "^18.0.9",
-    "express": "^5.3.0",
-    "mongoose": "^9.12.0",
-    "multer": "^2.5.0"
-  },
-  "name": "n8n",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "devDependencies": {
-    "nodemon": "^3.1.14",
-    "prisma": "^5.22.0"
-  },
+  "name": "marketingflow-ai",
+  "version": "2.0.0",
+  "private": true,
+  "description": "AI sales inbox, orders, inventory and Facebook/Instagram publishing for Bangladeshi F-commerce shops",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs"
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "mongoose": "^8.9.0",
+    "multer": "^1.4.5-lts.1"
+  }
 }

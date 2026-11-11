@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MarketingFlow AI</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;600&display=swap" />
+    <link rel="stylesheet" href="/css/app.css" />
+  </head>
+  <body>
+    <!-- Login / sign-up screen (js/app.js shows it when you are logged out) -->
+    <div id="auth" class="auth hidden"></div>
+
+    <!-- The dashboard -->
+    <div id="app" class="hidden">
+      <aside>
+        <div class="brand">
+          <div class="logo" id="logo"></div>
+          <span>MarketingFlow AI</span>
+          <button class="bell" id="bell" title="Notifications"></button>
+        </div>
+        <nav id="nav"></nav>
+        <div class="me">
+          <div class="avatar" id="meAvatar"></div>
+          <div><b id="meName"></b><small id="meBusiness"></small></div>
+          <button id="logout" title="Log out"></button>
+        </div>
+      </aside>
+      <main id="page"></main>
+    </div>
+
+    <!-- One shared pop-up window (js/ui.js -> openModal) -->
+    <dialog id="modal">
+      <form method="dialog" id="modalForm">
+        <div class="dlg-head"><h3 id="modalTitle"></h3><button type="button" id="modalClose">×</button></div>
+        <div class="dlg-body" id="modalBody"></div>
+        <div class="dlg-foot" id="modalFoot"></div>
+      </form>
+    </dialog>
+    <div class="toasts" id="toasts"></div>
+
+    <script type="module" src="/js/app.js"></script>
+  </body>
+</html>

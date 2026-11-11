@@ -1,0 +1,125 @@
+// Small UI helpers shared by every page.
+
+export const $ = (selector, root = document) => root.querySelector(selector);
+export const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+
+// Always use esc() when putting user text into HTML
+export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+export const num = (n) => Number(n || 0).toLocaleString("en-IN");
+export const taka = (n) => "৳" + num(n);
+export const dateTime = (d) => (d ? new Date(d).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
+export const dateOnly = (d) => (d ? new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "");
+export const ymd = (d) => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
+// <input type="datetime-local"> value <-> Date
+export const toLocalInput = (d) => (d ? `${ymd(d)}T${String(new Date(d).getHours()).padStart(2, "0")}:${String(new Date(d).getMinutes()).padStart(2, "0")}` : "");
+
+export const pill = (text, color = "grey") => `<span class="pill p-${color}">${esc(text)}</span>`;
+export const empty = (title, hint = "") => `<div class="empty"><b>${esc(title)}</b>${esc(hint)}</div>`;
+
+export const ORDER_STATUS = { pending: ["Pending", "yellow"], on_hold: ["On hold", "red"], confirmed: ["Confirmed", "blue"], packed: ["Packed", "purple"], shipped: ["Shipped", "purple"], delivered: ["Delivered", "green"], returned: ["Returned", "grey"], cancelled: ["Cancelled", "grey"] };
+export const orderPill = (status) => pill(...(ORDER_STATUS[status] || [status, "grey"]));
+
+// <select> options from ["a","b"] or [["value","Label"], ...]
+export const options = (list, selected) =>
+  list.map((o) => { const [v, l] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(v)}" ${String(v) === String(selected ?? "") ? "selected" : ""}>${esc(l)}</option>`; }).join("");
+
+// table([["Header", row => html], ...], rows, { rowAttrs: row => 'data-action="open" data-id=".."' })
+export function table(columns, rows, { emptyText = "Nothing here yet", rowAttrs } = {}) {
+  if (!rows.length) return empty(emptyText);
+  const head = columns.map(([h]) => `<th>${h}</th>`).join("");
+  const body = rows.map((r) => `<tr ${rowAttrs ? rowAttrs(r) : ""}>${columns.map(([, cell]) => `<td>${cell(r)}</td>`).join("")}</tr>`).join("");
+  return `<div class="table"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+export function toast(message, isError = false) {
+  const t = document.createElement("div");
+  t.className = "toast" + (isError ? " err" : "");
+  t.textContent = message;
+  $("#toasts").appendChild(t);
+  setTimeout(() => t.remove(), isError ? 7000 : 3500);
+}
+
+// Clicks on elements with data-action="name" call handlers.name(element, event).
+// Errors thrown by a handler are shown as a red toast.
+export function onAction(root, handlers) {
+  root.addEventListener("click", async (event) => {
+    const el = event.target.closest("[data-action]");
+    if (!el || !root.contains(el) || !handlers[el.dataset.action]) return;
+    event.preventDefault();
+    try { await handlers[el.dataset.action](el, event); } catch (e) { toast(e.message, true); }
+  });
+}
+
+// Reads form fields into an object: checkboxes -> true/false, number inputs -> numbers, name="x[]" -> arrays
+// (for checkboxes named "x[]": an array of the ticked values)
+export function readForm(form) {
+  const data = {};
+  for (const el of form.querySelectorAll("[name]")) {
+    let key = el.name;
+    const isList = key.endsWith("[]");
+    if (isList) key = key.slice(0, -2);
+    if (el.type === "checkbox" && isList) { if (el.checked) (data[key] = data[key] || []).push(el.value); continue; } // list of ticked values
+    let value = el.type === "checkbox" ? el.checked : el.type === "number" ? (el.value === "" ? "" : Number(el.value)) : el.value;
+    if (el.type === "radio" && !el.checked) continue;
+    if (isList) (data[key] = data[key] || []).push(value);
+    else data[key] = value;
+  }
+  return data;
+}
+
+/* ----- the shared pop-up ----- */
+let submitHandler = null;
+// openModal({ title, body (html), buttons: [["save","Save"], ["delete","Delete","danger"]], wide, onSubmit(data, buttonValue) })
+// onSubmit may return true to keep the pop-up open. Return value of openModal: the body element (to add listeners).
+export function openModal({ title, body, buttons = [["save", "Save"]], wide = false, onSubmit }) {
+  $("#modalTitle").textContent = title;
+  const bodyEl = document.createElement("div");
+  bodyEl.innerHTML = body;
+  $("#modalBody").replaceChildren(bodyEl);
+  $("#modalFoot").innerHTML = `<button type="button" class="btn light" id="modalCancel">Close</button>` +
+    buttons.map(([value, label, style]) => `<button class="btn ${style || ""}" value="${value}">${esc(label)}</button>`).join("");
+  $("#modal").classList.toggle("wide", wide);
+  $("#modalCancel").onclick = closeModal;
+  submitHandler = onSubmit;
+  if (!$("#modal").open) $("#modal").showModal();
+  return bodyEl;
+}
+export function closeModal() {
+  if ($("#modal").open) $("#modal").close();
+  submitHandler = null;
+}
+document.addEventListener("DOMContentLoaded", () => {
+  $("#modalClose").onclick = closeModal;
+  $("#modalForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!submitHandler) return closeModal();
+    const buttons = $$("#modalFoot button");
+    buttons.forEach((b) => (b.disabled = true));
+    try {
+      const keepOpen = await submitHandler(readForm($("#modalForm")), event.submitter?.value);
+      if (keepOpen !== true) closeModal();
+    } catch (e) {
+      toast(e.message, true);
+    } finally {
+      buttons.forEach((b) => (b.disabled = false));
+    }
+  });
+});
+
+/* ----- icons (simple line icons) ----- */
+const ICONS = {
+  overview: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/>',
+  comments: '<path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12z"/>',
+  orders: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+  inventory: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+  fraud: '<path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6z"/>',
+  content: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  accounts: '<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+  send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+};
+export const icon = (name) => `<svg class="i" viewBox="0 0 24 24">${ICONS[name] || ""}</svg>`;
