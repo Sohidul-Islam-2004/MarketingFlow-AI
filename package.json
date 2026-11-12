@@ -1,6 +1,6 @@
 {
   "name": "marketingflow-ai",
-  "version": "2.1.0",
+  "version": "2.3.0",
   "private": true,
   "description": "AI sales inbox, orders, inventory and Facebook/Instagram publishing for Bangladeshi F-commerce shops",
   "main": "server.js",

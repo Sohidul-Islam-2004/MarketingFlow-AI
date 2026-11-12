@@ -1,6 +1,6 @@
 # MarketingFlow AI v2
 
-An AI sales inbox, comment auto-replies, orders, stock and Facebook/Instagram posting for Bangladeshi online shops.
+An AI sales inbox, comment auto-replies, orders, stock and Facebook Page posting for Bangladeshi online shops. The AI learns each shop by reading its Facebook Page and website.
 Built with Node.js, Express, MongoDB and plain HTML/CSS/JS. There is no build step.
 
 ## Run it
@@ -32,15 +32,16 @@ src/
     ai.js                 askAI(): calls Groq / any OpenAI-compatible API, returns JSON
     places.js             64 districts, Dhaka areas, delivery-zone matching
     notify.js             bell notifications
+    web.js                safe reading of public web pages (text, links, product data)
   middleware/auth.js      login cookie -> req.user, req.org
   services/               the business rules
     orders.js             create order, prices, status flow
     stock.js              reserve / release / ship / return stock
-    fraud.js              risk score
-    agent.js              AI sales agent (Messenger / Instagram)
+    learn.js              AI Training: reads the Facebook Page + website, writes shop knowledge, finds products
+    agent.js              AI sales agent (Messenger)
     messenger.js          sending messages, 24-hour window
     comments.js           comment engine
-    publisher.js          publishing to Facebook / Instagram
+    publisher.js          publishing to the Facebook Page
     metrics.js            Overview numbers
   routes/                 the /api URLs (one file per page)
 public/
@@ -67,7 +68,7 @@ export async function render(root, params) {
 
 ## How the main flows work
 
-**Order statuses**: `pending → confirmed → packed → shipped → delivered`. Any order can go to `cancelled` before it ships; `shipped` / `delivered` can go to `returned`. Fraud Shield puts risky orders `on_hold`. The allowed moves are in `NEXT` in `src/services/orders.js`.
+**Order statuses**: `pending → confirmed → packed → shipped → delivered`. Any order can go to `cancelled` before it ships; `shipped` / `delivered` can go to `returned`.
 
 **Stock**: each size/colour has `onHand` (in the shop), `reserved` (held by open orders) and `available` (= onHand − reserved).
 - A new order reserves stock.
@@ -92,9 +93,21 @@ Every change is saved in StockMovement ("History" on the Inventory page).
 1. **Facebook Login → Valid OAuth Redirect URIs:** add `https://YOUR-DOMAIN/auth/facebook/callback`. It must be the same as `FB_REDIRECT_URI`.
 2. **Webhooks:** nothing to do by hand. When the server starts it registers `PUBLIC_BASE_URL/webhooks/meta` with Meta (`src/services/webhookSetup.js`). The terminal must show `✅ Webhook registered`. This needs `PUBLIC_BASE_URL` (https) and `META_WEBHOOK_VERIFY_TOKEN` in `.env`.
 3. **App mode Live:** Meta does not send real messages in Development mode.
-4. **Connect Facebook:** in the app, open Meta Accounts and press Connect Facebook. Webhooks are switched on for each Page automatically. "Messages & comments" must show **On**.
+4. **Connect Facebook:** in the app, open Facebook Page and press Connect Facebook. Webhooks are switched on for each Page automatically. "Messages & comments" must show **On**.
 
 ## What v2 removed (to keep the code small)
 - Removed modules: Brands, Strategy, Creative Studio, Meta Ads, Ads Optimizer, Budget, A/B tests, Reports, Competitors, Leads/CRM, Subscription plans, Courier API booking, teams and roles, approval workflow, n8n routes.
 - Courier booking is replaced by typing the courier and tracking number when you ship.
 - One login per business. Every account is the owner of its own shop.
+
+## AI Training (the AI learns the shop by itself)
+1. The seller connects the Facebook Page and writes the website address on the **AI Training** page.
+2. `src/services/learn.js` reads the Page (About, contact, last 50 posts) and the website (home, delivery/return/about pages, product pages). `src/lib/web.js` does the page reading and blocks private addresses.
+3. The AI writes the **shop knowledge** ("## Delivery" + facts) and a **product list** with prices. Product pages that carry schema.org data need no AI.
+4. The seller checks and edits everything, then saves. Knowledge goes to `organization.ai.knowledge`, ticked products go to Inventory.
+5. When a customer writes, `relevantKnowledge()` in `src/services/agent.js` sends the AI only the sections that match the question.
+
+Limits: 8 info pages, 6 list pages, 40 product pages and 48 posts per run (`LIMITS` in `learn.js`). Websites that only show content with JavaScript can't be read.
+
+## Removed in v2.3
+Instagram, WhatsApp and Fraud Shield. Old `on_hold` orders become `pending` when the server starts.

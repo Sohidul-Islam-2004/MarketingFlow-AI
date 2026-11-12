@@ -11,6 +11,7 @@ const organizationSchema = new Schema(
     _id: { type: String, default: newId },
     name: { type: String, required: true },
     phone: { type: String, default: "" },
+    website: { type: String, default: "" }, // read by "AI Training"
     logoUrl: { type: String, default: "" },
     returnPolicy: { type: String, default: "" }, // printed on invoices
     orderPrefix: { type: String, default: "ORD-" },
@@ -35,12 +36,6 @@ const organizationSchema = new Schema(
       needApproval: { type: Boolean, default: false }, // replies wait in "Approval" until you send them
       hideSpam: { type: Boolean, default: false },
       blockedWords: { type: [String], default: [] },
-    },
-
-    // Fraud Shield
-    fraud: {
-      holdAtScore: { type: Number, default: 60 }, // orders with this risk score or more go "on hold"
-      refuseBlocked: { type: Boolean, default: true }, // blocked phone numbers can't order
     },
   },
   options

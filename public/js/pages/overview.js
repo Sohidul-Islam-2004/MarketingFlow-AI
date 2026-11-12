@@ -20,7 +20,7 @@ function gettingStarted(setup) {
   const steps = [
     ["page", "Connect your Facebook Page", "So the AI can answer Messenger chats and comments", "#accounts", "Connect"],
     ["products", "Add your products", "Name, price, sizes/colours and how many you have", "#inventory?add=1", "Add product"],
-    ["knowledge", "Tell the AI about your shop", "Delivery time, return policy, size chart, common questions", "#settings", "Write"],
+    ["knowledge", "Train the AI on your shop", "It reads your Facebook Page and website and learns your products and rules", "#train", "Train"],
     ["chat", "Test the AI", "Chat with it as a customer. Nothing is sent to Facebook", "#inbox?simulate=1", "Try it"],
   ];
   const done = steps.filter(([key]) => setup[key]).length;
@@ -50,7 +50,7 @@ async function draw(root) {
     <div class="card">
       <h3>Needs your attention</h3><p class="sub">${Object.values(o.todo).some(Boolean) ? "Click a box to open the list." : "Nothing is waiting for you. 🎉"}</p>
       <div class="todo">
-        ${[["#inbox?tab=needs_human", o.todo.needsHuman, "chats need a person"], ["#comments", o.todo.newComments, "comments to answer"], ["#fraud", o.todo.onHold, "orders on hold"],
+        ${[["#inbox?tab=needs_human", o.todo.needsHuman, "chats need a person"], ["#comments", o.todo.newComments, "comments to answer"],
           ["#orders?status=pending,confirmed", o.todo.toPack, "orders to confirm / pack"], ["#inventory?low=1", o.todo.lowStock, "products low on stock"]]
           .map(([link, n, text]) => `<a href="${link}" class="${n ? "has" : ""}"><b>${n}</b>${text}</a>`).join("")}
       </div>

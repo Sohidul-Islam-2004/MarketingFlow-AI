@@ -1,4 +1,4 @@
-// Workspace settings: business profile, AI agent, comments, delivery zones, Fraud Shield.
+// Workspace settings: business profile, AI agent, comments, delivery zones.
 const router = require("express").Router();
 const { Organization } = require("../models");
 const { handle, fail } = require("../lib/errors");
@@ -12,7 +12,6 @@ router.get("/", handle(async (req, res) => {
     profile: { name: o.name, phone: o.phone, logoUrl: o.logoUrl, returnPolicy: o.returnPolicy, orderPrefix: o.orderPrefix },
     ai: { enabled: true, autoConfirm: true, tone: "friendly", handoffBelow: 60, knowledge: "", deliveryTime: "", handoffMessage: "", ...(o.ai || {}), ready: aiReady() },
     comments: { autoReply: true, sendDm: true, delaySec: 30, needApproval: false, hideSpam: false, blockedWords: [], ...(o.comments || {}) },
-    fraud: { holdAtScore: 60, refuseBlocked: true, ...(o.fraud || {}) },
     zones: o.zones?.length ? o.zones : DEFAULT_ZONES,
     usingDefaultZones: !o.zones?.length,
     districts: DISTRICT_NAMES,
@@ -46,11 +45,6 @@ router.put("/comments", handle(async (req, res) => {
   await Organization.updateOne({ _id: req.org }, {
     comments: { autoReply: !!b.autoReply, sendDm: !!b.sendDm, needApproval: !!b.needApproval, hideSpam: !!b.hideSpam, delaySec: Math.max(0, Math.min(600, Number(b.delaySec) || 0)), blockedWords: toList(b.blockedWords) },
   });
-  res.json({ ok: true });
-}));
-
-router.put("/fraud", handle(async (req, res) => {
-  await Organization.updateOne({ _id: req.org }, { fraud: { holdAtScore: Math.max(20, Math.min(100, Number(req.body.holdAtScore) || 60)), refuseBlocked: !!req.body.refuseBlocked } });
   res.json({ ok: true });
 }));
 

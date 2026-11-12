@@ -1,4 +1,4 @@
-// Sending messages to customers through the connected Facebook Page (Messenger + Instagram DMs).
+// Sending Messenger messages to customers through the connected Facebook Page.
 const { SocialAccount } = require("../models");
 const { graph } = require("../lib/graph");
 const { decrypt } = require("../lib/crypto");
@@ -26,7 +26,7 @@ async function pageOf(org, pageId) {
 // Sends text. quickReplies = ["✅ Confirm", "✏️ Change"] shows buttons under the message.
 async function sendText(org, conv, text, quickReplies = []) {
   if (isSimulator(conv)) return {};
-  if (!canReply(conv)) throw fail(400, "Messenger's 24-hour reply window is closed. The customer has to message first.");
+  if (!canReply(conv)) throw fail(400, "The 24-hour reply window is closed. Meta only lets you answer after the customer messages again.");
   const page = await pageOf(org, conv.pageId);
   const message = { text: String(text).slice(0, 2000) };
   if (quickReplies.length) message.quick_replies = quickReplies.map((t) => ({ content_type: "text", title: t.slice(0, 20), payload: t }));
@@ -35,7 +35,7 @@ async function sendText(org, conv, text, quickReplies = []) {
 
 // Shows "seen" + the typing dots to the customer while the AI thinks. Never throws.
 function showTyping(org, conv) {
-  if (isSimulator(conv) || conv.channel !== "Messenger") return;
+  if (isSimulator(conv)) return;
   pageOf(org, conv.pageId)
     .then(async (page) => {
       const send = (sender_action) => graph(`/${page.accountId}/messages`, { token: decrypt(page.accessToken), method: "POST", body: { recipient: { id: conv.psid }, sender_action } });

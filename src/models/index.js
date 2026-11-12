@@ -7,7 +7,6 @@ module.exports = {
   StockMovement: require("./StockMovement"),
   Order: require("./Order"),
   Counter: require("./Counter"),
-  Blacklist: require("./Blacklist"),
   Conversation: require("./Conversation"),
   Comment: require("./Comment"),
   SocialAccount: require("./SocialAccount"),
@@ -15,4 +14,5 @@ module.exports = {
   MediaAsset: require("./MediaAsset"),
   Notification: require("./Notification"),
   ProcessedEvent: require("./ProcessedEvent"),
+  ShopScan: require("./ShopScan"),
 };

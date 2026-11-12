@@ -2,7 +2,7 @@
 const { META } = require("../config");
 const { fail } = require("./errors");
 
-const GRAPH = `https://graph.facebook.com/${META.GRAPH_VERSION}`;
+const GRAPH = `${process.env.FB_GRAPH_URL || "https://graph.facebook.com"}/${META.GRAPH_VERSION}`; // FB_GRAPH_URL is only for automated tests
 const GRAPH_VIDEO = `https://graph-video.facebook.com/${META.GRAPH_VERSION}`;
 
 async function graph(path, { token, params = {}, method = "GET", body, base = GRAPH } = {}) {

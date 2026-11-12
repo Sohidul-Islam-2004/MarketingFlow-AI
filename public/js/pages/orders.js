@@ -4,7 +4,7 @@ import { esc, taka, table, orderPill, dateTime, onAction, openModal, closeModal,
 import { itemRow, readItems, districtList } from "../shared.js";
 import { updateCounts } from "../app.js";
 
-const TABS = [["", "All"], ["pending", "Pending"], ["on_hold", "On hold"], ["confirmed", "Confirmed"], ["packed", "Packed"], ["shipped", "Shipped"], ["delivered", "Delivered"], ["returned", "Returned"], ["cancelled", "Cancelled"]];
+const TABS = [["", "All"], ["pending", "Pending"], ["confirmed", "Confirmed"], ["packed", "Packed"], ["shipped", "Shipped"], ["delivered", "Delivered"], ["returned", "Returned"], ["cancelled", "Cancelled"]];
 let filters = { status: "", q: "", from: "", to: "", page: 1 };
 let places = null;
 
@@ -46,7 +46,6 @@ async function draw(root) {
         ["Customer", (o) => `${esc(o.customerName)}<div class="small muted">${esc(o.phone)} · ${esc(o.district || "")}</div>`],
         ["Items", (o) => o.items.map((i) => `${esc(i.name)}${i.variantName ? ` (${esc(i.variantName)})` : ""} ×${i.qty}`).join("<br>")],
         ["Total", (o) => `<b>${taka(o.total)}</b><div class="small muted">${o.paymentMethod}${o.paid ? " · paid" : ""}</div>`],
-        ["Risk", (o) => (o.riskScore >= 40 ? `<span class="pill p-${o.riskScore >= 60 ? "red" : "yellow"}">${o.riskScore}</span>` : `<span class="muted small">${o.riskScore}</span>`)],
         ["Status", (o) => orderPill(o.status)],
         ["Date", (o) => dateTime(o.createdAt)],
       ], data.rows, { emptyText: "No orders here", rowAttrs: (o) => `class="click" data-action="open" data-id="${o._id}"` })}
@@ -60,12 +59,11 @@ async function draw(root) {
 /* ---------- order details ---------- */
 async function openOrder(id, refresh) {
   const o = await get(`/api/orders/${id}`);
-  const early = ["pending", "on_hold", "confirmed"].includes(o.status);
+  const early = ["pending", "confirmed"].includes(o.status);
   const body = openModal({
     title: `Order ${o.orderNo}`, wide: true, buttons: [],
     body: `
-      <div class="row">${orderPill(o.status)} <span class="small muted">${dateTime(o.createdAt)}</span>
-        ${o.riskScore ? `<span class="pill p-${o.riskScore >= 60 ? "red" : o.riskScore >= 40 ? "yellow" : "grey"}">Risk ${o.riskScore}</span>` : ""}</div>
+      <div class="row">${orderPill(o.status)} <span class="small muted">${dateTime(o.createdAt)}</span></div>
       <div class="grid2 mt">
         <div class="box"><h4>Customer</h4><b>${esc(o.customerName)}</b><div>${esc(o.phone)}</div><div class="small">${esc(o.address)}</div><div class="small muted">${esc(o.district || "")} · ${esc(o.zone || "")}</div>
           ${o.conversationId ? `<button type="button" class="btn sm light mt" data-action="openChat">Open chat</button>` : ""}</div>
@@ -73,10 +71,9 @@ async function openOrder(id, refresh) {
           <div class="line"><span>Delivery</span><b>${taka(o.deliveryFee)}</b></div>${o.discount ? `<div class="line"><span>Discount</span><b>−${taka(o.discount)}</b></div>` : ""}
           <div class="line"><span><b>Total</b></span><b>${taka(o.total)}</b></div><div class="small muted">${o.paymentMethod} · ${o.paid ? "paid" : "not paid yet"}</div></div>
       </div>
-      ${o.riskReasons?.length ? `<div class="box mt"><h4>Why this risk score</h4>${o.riskReasons.map((r) => `<div class="small">• ${esc(r)}</div>`).join("")}</div>` : ""}
       ${o.trackingNo ? `<div class="box mt"><h4>Courier</h4>${esc(o.courierName)} · <b>${esc(o.trackingNo)}</b></div>` : ""}
       <div class="box mt"><h4>Change status</h4><div class="row">
-        ${o.next.map((s) => `<button type="button" class="btn sm ${s === "cancelled" || s === "returned" ? "danger" : ""}" data-action="status" data-to="${s}">${o.status === "on_hold" && s === "confirmed" ? "Approve (confirm)" : "→ " + ORDER_STATUS[s][0]}</button>`).join("") || `<span class="muted small">This order is finished.</span>`}
+        ${o.next.map((s) => `<button type="button" class="btn sm ${s === "cancelled" || s === "returned" ? "danger" : ""}" data-action="status" data-to="${s}">→ ${ORDER_STATUS[s][0]}</button>`).join("") || `<span class="muted small">This order is finished.</span>`}
         <a class="btn sm light" target="_blank" href="/api/orders/${o._id}/invoice">Print invoice</a>
         ${early ? `<button type="button" class="btn sm light" data-action="edit">Edit details</button>` : ""}
         <button type="button" class="btn sm light" data-action="togglePaid">${o.paid ? "Mark as not paid" : "Mark as paid"}</button></div></div>
@@ -141,7 +138,7 @@ async function orderForm(refresh) {
       <div class="box mt" id="price"><span class="muted small">Choose products to see the total.</span></div>`,
     onSubmit: async (d) => {
       const order = await post("/api/orders", { ...d, items: readItems(d), confirmed: !!d.confirmed });
-      toast(order.status === "on_hold" ? `Order ${order.orderNo} created but ON HOLD (risk ${order.riskScore})` : `Order ${order.orderNo} created`, order.status === "on_hold");
+      toast(`Order ${order.orderNo} created`);
       refresh();
       updateCounts();
     },

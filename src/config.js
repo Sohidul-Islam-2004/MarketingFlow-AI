@@ -14,7 +14,7 @@ module.exports = {
   // The first account that signs up takes over this workspace (keeps your old data)
   DEFAULT_TENANT: env.DEFAULT_TENANT || "org_123",
 
-  // Public https address of this server (Cloudflare tunnel / your domain). Needed for Instagram media.
+  // Public https address of this server (Cloudflare tunnel / your domain). Needed for webhooks and photo/video posts.
   PUBLIC_BASE_URL: (env.PUBLIC_BASE_URL || "").replace(/\/$/, ""),
 
   // Encrypts Facebook tokens in the database. Never change it after Pages are connected.

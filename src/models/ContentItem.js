@@ -1,4 +1,4 @@
-// A post for Facebook / Instagram.
+// A post for a Facebook Page.
 // Status: Draft -> Scheduled -> Publishing -> Published | Partly published | Failed
 const { mongoose, Schema, newId, options } = require("./_base");
 
@@ -10,7 +10,6 @@ const targetSchema = new Schema(
     status: { type: String, default: "pending" }, // pending | processing | published | failed
     postId: { type: String, default: null },
     permalink: { type: String, default: null },
-    containerId: { type: String, default: null }, // Instagram media container (reused on retry)
     error: { type: String, default: null },
     attempts: { type: Number, default: 0 },
   },
@@ -23,7 +22,6 @@ const contentItemSchema = new Schema(
     organizationId: { type: String, required: true },
     title: { type: String, default: "" },
     text: { type: String, default: "" }, // caption
-    instagramText: { type: String, default: "" }, // optional different caption for Instagram
     hashtags: { type: [String], default: [] },
     mediaIds: { type: [String], default: [] },
     targets: { type: [targetSchema], default: [] },

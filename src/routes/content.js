@@ -15,7 +15,7 @@ async function findItem(req) {
 }
 
 async function targetsFor(org, accountIds = []) {
-  const accounts = await SocialAccount.find({ organizationId: org, _id: { $in: accountIds } }).lean();
+  const accounts = await SocialAccount.find({ organizationId: org, _id: { $in: accountIds }, platform: "Facebook" }).lean();
   return accounts.map((a) => ({ accountId: a._id, platform: a.platform, accountName: a.accountName }));
 }
 
@@ -23,7 +23,6 @@ function cleanBody(b) {
   return {
     title: String(b.title || "").trim().slice(0, 120),
     text: String(b.text || "").trim(),
-    instagramText: String(b.instagramText || "").trim(),
     hashtags: toList(String(b.hashtags || "").replace(/\s+/g, ",")).map((h) => (h.startsWith("#") ? h : "#" + h)),
     mediaIds: Array.isArray(b.mediaIds) ? b.mediaIds.map(String) : [],
   };
@@ -114,10 +113,9 @@ router.post("/:id/move", handle(async (req, res) => {
   res.json(item);
 }));
 
-// AI writer: { kind: facebook_post | instagram_caption | product_post | offer_post, topic, productId, language }
+// AI writer: { kind: facebook_post | product_post | offer_post, topic, productId, language }
 const KINDS = {
   facebook_post: "a Facebook post: strong first line, short paragraphs, a few emojis, one clear call to action",
-  instagram_caption: "an Instagram caption: strong first line, line breaks, call to action, 8-15 hashtags",
   product_post: "a product post: hook, key benefits, who it is for, the price from PRODUCT, call to action",
   offer_post: "an offer post. Mention only offers written in the brief",
 };

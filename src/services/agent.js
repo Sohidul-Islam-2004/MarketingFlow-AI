@@ -1,4 +1,4 @@
-// AI sales agent for Messenger / Instagram.
+// AI sales agent for Messenger.
 //
 // How one customer message is handled (handleCustomerMessage):
 //   1. If the bot is waiting for "Confirm" and the customer confirms -> place the order (no AI involved).
@@ -13,7 +13,6 @@ const { normalizePhone, isValidPhone, taka } = require("../lib/utils");
 const { notify } = require("../lib/notify");
 const { priceOf } = require("./stock");
 const { createOrder } = require("./orders");
-const { isBlocked } = require("./fraud");
 const messenger = require("./messenger");
 
 const CONFIRM_WORDS = /^(confirm(ed)?|yes|yeah|yep|ok(ay)?|done|sure|হ্যাঁ|হ্যা|হা|জি|জ্বি|ঠিক আছে|কনফার্ম|ওকে|ji|hae|ha)$/i;
@@ -35,6 +34,39 @@ function productLines(products) {
   }).join("\n");
 }
 
+// The shop knowledge can be long (AI Training writes it from the whole website). Sending all of it with every
+// message is slow and costly, so when it is longer than `budget` we send the sections that match the chat.
+// Sections are separated by an empty line (AI Training writes "## Title" + "- fact" lines).
+// Customers write Bangla/Banglish, the knowledge is mostly English: these add the English topic words.
+const TOPICS = [
+  [/ডেলিভারি|delivery|পাঠা|কুরিয়ার|courier|চার্জ|charge|কতদিন|koto ?din|shipping/i, "delivery shipping courier charge days"],
+  [/ফেরত|রিটার্ন|return|exchange|বদল|change kor|refund|রিফান্ড/i, "return exchange refund"],
+  [/পেমেন্ট|payment|বিকাশ|bkash|নগদ|nagad|ক্যাশ|cash|cod|advance|অগ্রিম/i, "payment bkash nagad cash advance"],
+  [/ঠিকানা|address|শোরুম|showroom|outlet|আউটলেট|দোকান|store|location|কোথায়|kothay|খোলা|open/i, "address store outlet showroom location open hours"],
+  [/সাইজ|size|মাপ|map|measurement/i, "size chart measurement"],
+  [/ফোন|phone|নাম্বার|number|contact|যোগাযোগ|email/i, "phone contact email"],
+];
+
+function relevantKnowledge(knowledge, recentText, budget = 3500) {
+  const text = String(knowledge || "").trim();
+  if (text.length <= budget) return text;
+  const hints = TOPICS.filter(([test]) => test.test(recentText)).map(([, english]) => english).join(" ");
+  const words = [...new Set(normalizeText(`${recentText} ${hints}`).split(" ").filter((w) => w.length > 2))];
+  const sections = text.split(/\n\s*\n/).map((body, index) => {
+    const plain = normalizeText(body);
+    return { body, index, score: words.filter((w) => plain.includes(w)).length };
+  });
+  const chosen = [];
+  let used = 0;
+  // best matches first; with no match at all the first sections (usually "about" and delivery) are used
+  for (const s of [...sections].sort((a, b) => b.score - a.score || a.index - b.index)) {
+    if (used + s.body.length > budget) continue;
+    chosen.push(s);
+    used += s.body.length;
+  }
+  return chosen.sort((a, b) => a.index - b.index).map((s) => s.body).join("\n\n");
+}
+
 async function knowledgeFor(org, settings, recentText, draft) {
   const all = await Product.find({ organizationId: org, archived: { $ne: true } }).lean();
   // Send the 40 products that best match the chat (and everything already in the draft)
@@ -49,7 +81,7 @@ async function knowledgeFor(org, settings, recentText, draft) {
   const text = [
     `BUSINESS: ${settings.name || "our shop"}`,
     `DELIVERY FEES: ${zones.map((z) => `${z.name} ${taka(z.fee)}`).join(", ")}. Delivery time: ${settings.ai.deliveryTime || "ask the team"}. Payment: cash on delivery.`,
-    settings.ai.knowledge ? `BUSINESS INFO / POLICIES / FAQ:\n${settings.ai.knowledge}` : "",
+    settings.ai.knowledge ? `BUSINESS INFO / POLICIES / FAQ:\n${relevantKnowledge(settings.ai.knowledge, recentText)}` : "",
     `PRODUCTS (productId | name | category | variants as variantId=name price stock):\n${productLines(ranked) || "(no products yet)"}`,
   ].filter(Boolean).join("\n\n");
   return { text, products: all };
@@ -65,7 +97,7 @@ async function askAgent(org, settings, conv, latestText) {
   const d = conv.draft || {};
   const currentDraft = d.status === "placed" ? { items: [] } : { items: (d.items || []).map((i) => ({ productId: i.productId, variantId: i.variantId, qty: i.qty })), name: d.name || "", phone: d.phone || "", address: d.address || "", district: d.district || "" };
 
-  const system = `You are the sales assistant of a Bangladeshi online shop, chatting on Facebook Messenger / Instagram.
+  const system = `You are the sales assistant of a Bangladeshi online shop, chatting on Facebook Messenger.
 Reply in the customer's language and script (Bangla, Banglish or English). Short and warm, max 3-4 lines. Tone: ${settings.ai.tone}.
 RULES
 - Use ONLY the business info and PRODUCTS below. Never invent prices, stock, discounts, delivery times or policies. If you don't know, say you'll check with the team and set needsHuman=true.
@@ -180,13 +212,12 @@ async function placeOrderFromDraft(org, conv, settings, by) {
   conv.draft = { ...d, status: "placed", orderNo: order.orderNo };
   conv.markModified("draft");
   conv.lastOrderNo = order.orderNo;
-  messenger.addMessage(conv, "system", `Order #${order.orderNo} created by ${by} · ${taka(order.total)}${order.status === "on_hold" ? ` · ON HOLD (risk ${order.riskScore})` : ""}`);
-  if (order.status === "on_hold") conv.status = "needs_human";
+  messenger.addMessage(conv, "system", `Order #${order.orderNo} created by ${by} · ${taka(order.total)}`);
   return order;
 }
 
 function orderPlacedText(order, settings) {
-  if (order.status === "on_hold" || order.status === "pending") return `✅ আপনার অর্ডার #${order.orderNo} (${taka(order.total)}) পেয়েছি। কনফার্ম করতে আমাদের টিম আপনাকে কল করবে। ধন্যবাদ 🙏`;
+  if (order.status === "pending") return `✅ আপনার অর্ডার #${order.orderNo} (${taka(order.total)}) পেয়েছি। কনফার্ম করতে আমাদের টিম আপনাকে কল করবে। ধন্যবাদ 🙏`;
   return `✅ আপনার অর্ডার #${order.orderNo} কনফার্ম হয়েছে! মোট ${taka(order.total)}, ক্যাশ অন ডেলিভারি।${settings.ai.deliveryTime ? ` ডেলিভারি: ${settings.ai.deliveryTime}।` : ""} ধন্যবাদ 🙏`;
 }
 
@@ -217,7 +248,6 @@ async function handleCustomerMessage(org, conv, text) {
   }
   // The AI can't see photos or hear voice messages: a person has to look
   if (ATTACHMENT_ONLY.test(String(text || "").trim())) return handToHuman(org, conv, `Customer sent ${text} (the AI can't open it)`, settings.ai.handoffMessage);
-  if (await isBlocked(org, d.phone)) return handToHuman(org, conv, "Customer is on the block list", settings.ai.handoffMessage);
   if (HUMAN_WORDS.test(text)) return handToHuman(org, conv, `Customer said: "${text.slice(0, 80)}"`, settings.ai.handoffMessage);
   if (!aiReady()) return handToHuman(org, conv, "AI is not set up (AI_API_KEY missing)", settings.ai.handoffMessage);
 

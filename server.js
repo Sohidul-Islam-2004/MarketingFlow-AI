@@ -3,7 +3,7 @@
 //   src/config.js      settings from .env
 //   src/models/        MongoDB collections (one file each)
 //   src/lib/           small tools (errors, Facebook API, AI, Bangladesh places, encryption)
-//   src/services/      business logic (orders, stock, fraud, AI agent, comments, publishing)
+//   src/services/      business logic (orders, stock, AI agent, comments, publishing, page + website reader)
 //   src/routes/        URLs the dashboard calls (/api/...)
 //   public/            the dashboard (HTML, CSS, one JS file per page)
 const path = require("path");
@@ -37,12 +37,12 @@ app.use("/api", requireLogin);
 app.use("/api", require("./src/routes/overview"));
 app.use("/api/products", require("./src/routes/products"));
 app.use("/api/orders", require("./src/routes/orders"));
-app.use("/api/fraud", require("./src/routes/fraud"));
 app.use("/api/inbox", require("./src/routes/inbox"));
 app.use("/api/comments", require("./src/routes/comments"));
 app.use("/api/content", require("./src/routes/content"));
 app.use("/api/media", require("./src/routes/media"));
 app.use("/api/accounts", meta.router);
+app.use("/api/learn", require("./src/routes/learn"));
 app.use("/api/settings", require("./src/routes/settings"));
 app.use("/api", (req, res) => res.status(404).json({ error: `Unknown API: ${req.method} ${req.originalUrl}` }));
 

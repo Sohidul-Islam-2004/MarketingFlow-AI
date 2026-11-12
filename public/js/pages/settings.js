@@ -1,9 +1,9 @@
-// Settings: business profile, AI agent, comment replies, delivery zones, Fraud Shield, password.
+// Settings: business profile, AI agent, comment replies, delivery zones, password.
 import { get, put, post } from "../api.js";
 import { esc, onAction, toast, options, readForm, confirmBox } from "../ui.js";
 
 let tab = "ai";
-const TABS = [["ai", "AI agent"], ["comments", "Comments"], ["zones", "Delivery fees"], ["fraud", "Fraud Shield"], ["profile", "Business"], ["password", "Password"]];
+const TABS = [["ai", "AI agent"], ["comments", "Comments"], ["zones", "Delivery fees"], ["profile", "Business"], ["password", "Password"]];
 
 export async function render(root) {
   onAction(root, {
@@ -46,7 +46,7 @@ async function draw(root) {
   const check = (name, on, text) => `<label class="check"><input type="checkbox" name="${name}" ${on ? "checked" : ""}> ${text}</label>`;
   const forms = {
     ai: `${s.ai.ready ? "" : `<div class="note">AI is not set up: add AI_API_KEY to .env and restart the server.</div>`}
-      ${check("enabled", s.ai.enabled, "AI answers customers in Messenger / Instagram")}
+      ${check("enabled", s.ai.enabled, "AI answers customers in Messenger")}
       ${check("autoConfirm", s.ai.autoConfirm, "Orders the AI takes are Confirmed straight away (off = Pending, you call first)")}
       <div class="f2"><div><label>Tone</label><select name="tone">${options([["friendly", "Friendly"], ["professional", "Professional"], ["formal", "Formal"]], s.ai.tone)}</select></div>
         <div><label>Hand the chat to you when the AI is less sure than (%)</label><input type="number" name="handoffBelow" min="0" max="100" value="${s.ai.handoffBelow}"></div></div>
@@ -64,9 +64,6 @@ async function draw(root) {
       <div id="zones">${s.zones.map(zoneRow).join("")}</div>
       <div class="row mt"><button type="button" class="btn sm light" data-action="addZone">+ Zone</button>${s.usingDefaultZones ? "" : `<button type="button" class="btn sm light" data-action="resetZones">Use built-in zones</button>`}</div>
       <div class="box mt"><h4>Test an address</h4><div class="row"><input id="testAddress" placeholder="House 5, Mirpur 10" style="flex:1"><button type="button" class="btn sm light" data-action="testZone">Test</button></div><p class="small mt" id="testResult"></p></div>`,
-    fraud: `<div><label>Put an order on hold when its risk score is at least</label><input type="number" name="holdAtScore" min="20" max="100" value="${s.fraud.holdAtScore}"></div>
-      ${check("refuseBlocked", s.fraud.refuseBlocked, "Refuse orders from blocked phone numbers (off = create them on hold)")}
-      <p class="small muted">Score: +25 per returned order (max 50), +15 for 3+ orders in 24h, +20 if 3+ phones use one address, +20 for a fake-looking name/phone, −15 per delivered order (max −30), 100 if blocked.</p>`,
     profile: `<div class="f2"><div><label>Business name</label><input name="name" required value="${esc(s.profile.name)}"></div><div><label>Phone (on invoices)</label><input name="phone" value="${esc(s.profile.phone)}"></div></div>
       <div class="f2"><div><label>Order number prefix</label><input name="orderPrefix" value="${esc(s.profile.orderPrefix)}"></div><div><label>Logo URL (optional)</label><input name="logoUrl" value="${esc(s.profile.logoUrl)}"></div></div>
       <div><label>Return policy (printed on invoices)</label><textarea name="returnPolicy" rows="3">${esc(s.profile.returnPolicy)}</textarea></div>`,

@@ -1,9 +1,8 @@
-// Publishes content to Facebook Pages and Instagram.
+// Publishes content to Facebook Pages.
 // The background job (jobs.js) calls publishDuePosts() every 30 seconds.
 //
-// Supported posts: text only (Facebook), 1 image, several images (album / carousel), 1 video (Instagram: Reel).
-// Each target (Page / Instagram account) is tried up to 3 times. Instagram videos need a few seconds of
-// processing, so the item stays "Publishing" until Instagram is ready.
+// Supported posts: text only, 1 image, several images (album), 1 video.
+// Each Page is tried up to 3 times.
 const fs = require("fs");
 const path = require("path");
 const { ContentItem, MediaAsset, SocialAccount } = require("../models");
@@ -18,8 +17,8 @@ const UPLOAD_DIR = path.join(__dirname, "..", "..", "uploads");
 const isPublicServer = () => /^https:\/\//.test(PUBLIC_BASE_URL) && !/localhost|127\.0\.0\.1/.test(PUBLIC_BASE_URL);
 const publicUrl = (media) => (/^https?:\/\//.test(media.url) ? media.url : isPublicServer() ? PUBLIC_BASE_URL + media.url : null);
 
-function captionFor(item, platform) {
-  const text = platform === "Instagram" && item.instagramText ? item.instagramText : item.text;
+function captionFor(item) {
+  const text = item.text;
   const tags = (item.hashtags || []).filter((h) => !text.includes(h));
   return [text, tags.join(" ")].filter(Boolean).join("\n\n").trim();
 }
@@ -32,18 +31,10 @@ async function mediaOf(item) {
 // Problems that would make Meta reject the post. Shown before scheduling and stored on failure.
 function checkPost(item, platform, media) {
   const problems = [];
-  const text = captionFor(item, platform);
+  const text = captionFor(item);
   const videos = media.filter((m) => m.kind === "video");
   if (videos.length && media.length > 1) problems.push("Use either one video or images, not both");
-  if (platform === "Facebook" && !text && !media.length) problems.push("Write a caption or add a photo");
-  if (platform === "Instagram") {
-    if (!media.length) problems.push("Instagram needs at least one photo or video");
-    if (media.length > 10) problems.push("Instagram allows max 10 photos");
-    if (text.length > 2200) problems.push("Instagram caption is longer than 2,200 characters");
-    if ((text.match(/#[\p{L}\p{N}_]+/gu) || []).length > 30) problems.push("Instagram allows max 30 hashtags");
-    if (media.some((m) => m.kind === "image" && m.mimeType && !/jpe?g/i.test(m.mimeType))) problems.push("Instagram accepts JPG photos only");
-    if (media.some((m) => !publicUrl(m))) problems.push("Instagram needs PUBLIC_BASE_URL (your https tunnel/domain) in .env");
-  }
+  if (!text && !media.length) problems.push("Write a caption or add a photo");
   return problems;
 }
 
@@ -51,7 +42,7 @@ async function checkItem(item) {
   const media = await mediaOf(item);
   const problems = [];
   for (const t of item.targets) problems.push(...checkPost(item, t.platform, media).map((p) => `${t.accountName}: ${p}`));
-  if (!item.targets.length) problems.push("Choose at least one Page or Instagram account");
+  if (!item.targets.length) problems.push("Choose a Page to post to");
   return problems;
 }
 
@@ -72,7 +63,7 @@ async function uploadToFacebook(endpoint, token, media, fields, isVideo) {
 }
 
 async function publishToFacebook(item, account, media) {
-  const token = decrypt(account.accessToken), page = account.accountId, text = captionFor(item, "Facebook");
+  const token = decrypt(account.accessToken), page = account.accountId, text = captionFor(item);
   const video = media.find((m) => m.kind === "video");
   const images = media.filter((m) => m.kind === "image");
   let postId;
@@ -87,28 +78,6 @@ async function publishToFacebook(item, account, media) {
   return { postId, permalink: info.permalink_url || null };
 }
 
-async function publishToInstagram(item, target, account, media) {
-  const token = decrypt(account.accessToken), ig = account.accountId, caption = captionFor(item, "Instagram");
-  if (!target.containerId) {
-    const video = media.find((m) => m.kind === "video");
-    let body;
-    if (video) body = { media_type: "REELS", video_url: publicUrl(video), caption, share_to_feed: true };
-    else if (media.length === 1) body = { image_url: publicUrl(media[0]), caption };
-    else {
-      const children = [];
-      for (const img of media.slice(0, 10)) children.push((await graph(`/${ig}/media`, { token, method: "POST", body: { image_url: publicUrl(img), is_carousel_item: true } })).id);
-      body = { media_type: "CAROUSEL", children: children.join(","), caption };
-    }
-    target.containerId = (await graph(`/${ig}/media`, { token, method: "POST", body })).id;
-  }
-  const state = await graph(`/${target.containerId}`, { token, params: { fields: "status_code" } });
-  if (state.status_code === "IN_PROGRESS") return { processing: true };
-  if (state.status_code === "ERROR" || state.status_code === "EXPIRED") { target.containerId = null; throw fail(502, "Instagram couldn't process the media"); }
-  const published = await graph(`/${ig}/media_publish`, { token, method: "POST", body: { creation_id: target.containerId } });
-  const info = await graph(`/${published.id}`, { token, params: { fields: "permalink" } }).catch(() => ({}));
-  return { postId: published.id, permalink: info.permalink || null };
-}
-
 async function publishItem(item) {
   const media = await mediaOf(item);
   let retryLater = false, stillProcessing = false;
@@ -119,7 +88,7 @@ async function publishItem(item) {
       if (!account) throw fail(400, "Account was disconnected");
       const problems = checkPost(item, account.platform, media);
       if (problems.length) { Object.assign(t, { status: "failed", attempts: MAX_TRIES, error: problems.join("; ") }); continue; }
-      const r = account.platform === "Instagram" ? await publishToInstagram(item, t, account, media) : await publishToFacebook(item, account, media);
+      const r = await publishToFacebook(item, account, media);
       if (r.processing) { t.status = "processing"; stillProcessing = true; }
       else Object.assign(t, { status: "published", postId: r.postId, permalink: r.permalink, error: null });
     } catch (e) {

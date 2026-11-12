@@ -1,4 +1,4 @@
-// Meta webhooks: Messenger + Instagram messages and Page comments arrive here.
+// Meta webhooks: Messenger messages and Page comments arrive here.
 // The callback URL is registered automatically when the server starts (services/webhookSetup.js).
 const router = require("express").Router();
 const crypto = require("crypto");
@@ -39,31 +39,22 @@ async function handleEvents(body) {
       const page = await SocialAccount.findOne({ platform: "Facebook", accountId: String(entry.id) }).select("+accessToken");
       if (!page) continue;
       await SocialAccount.updateOne({ _id: page._id }, { lastWebhookAt: new Date() });
-      for (const event of entry.messaging || []) await onMessage(page, event, "Messenger").catch((e) => console.error("message:", e));
+      for (const event of entry.messaging || []) await onMessage(page, event).catch((e) => console.error("message:", e));
       for (const change of entry.changes || []) if (change.field === "feed") await onFeedChange(page, change.value || {}).catch((e) => console.error("comment:", e));
-    }
-    if (body.object === "instagram") {
-      const ig = await SocialAccount.findOne({ platform: "Instagram", accountId: String(entry.id) });
-      if (!ig) continue;
-      const page = await SocialAccount.findOne({ organizationId: ig.organizationId, platform: "Facebook", accountId: ig.pageId }).select("+accessToken");
-      if (!page) continue;
-      for (const event of entry.messaging || []) await onMessage(page, event, "Instagram", ig.accountId).catch((e) => console.error("ig message:", e));
     }
   }
 }
 
-async function customerProfile(page, psid, channel) {
+async function customerProfile(page, psid) {
   try {
-    const fields = channel === "Instagram" ? "name,username,profile_pic" : "first_name,last_name,profile_pic";
-    const p = await graph(`/${psid}`, { token: decrypt(page.accessToken), params: { fields } });
-    const name = channel === "Instagram" ? p.name || (p.username && "@" + p.username) : [p.first_name, p.last_name].filter(Boolean).join(" ");
-    return { name: name || "Customer", avatar: p.profile_pic || null };
+    const p = await graph(`/${psid}`, { token: decrypt(page.accessToken), params: { fields: "first_name,last_name,profile_pic" } });
+    return { name: [p.first_name, p.last_name].filter(Boolean).join(" ") || "Customer", avatar: p.profile_pic || null };
   } catch {
     return { name: "Customer", avatar: null };
   }
 }
 
-async function onMessage(page, event, channel, ownId = page.accountId) {
+async function onMessage(page, event) {
   const org = page.organizationId;
   const msg = event.message;
 
@@ -82,7 +73,7 @@ async function onMessage(page, event, channel, ownId = page.accountId) {
   }
 
   const psid = String(event.sender?.id || "");
-  if (!psid || psid === String(ownId)) return;
+  if (!psid || psid === String(page.accountId)) return;
   const text = msg?.quick_reply?.payload || msg?.text || event.postback?.title || (msg?.attachments?.length ? `[${msg.attachments.map((a) => a.type).join(", ")}]` : "");
   if (!text) return;
   if (!(await firstTime(`msg:${msg?.mid || `${event.timestamp}:${psid}`}`))) return;
@@ -90,8 +81,8 @@ async function onMessage(page, event, channel, ownId = page.accountId) {
   await messenger.oneAtATime(`${org}:${psid}`, async () => {
     let conv = await Conversation.findOne({ organizationId: org, psid });
     if (!conv) {
-      const profile = await customerProfile(page, psid, channel);
-      conv = new Conversation({ organizationId: org, psid, channel, pageId: page.accountId, customerName: profile.name, avatar: profile.avatar });
+      const profile = await customerProfile(page, psid);
+      conv = new Conversation({ organizationId: org, psid, channel: "Messenger", pageId: page.accountId, customerName: profile.name, avatar: profile.avatar });
     }
     messenger.addMessage(conv, "customer", text, { mid: msg?.mid || null });
     await agent.handleCustomerMessage(org, conv, text);

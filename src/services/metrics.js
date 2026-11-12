@@ -27,7 +27,7 @@ async function orderTotals(org, from, to) {
 async function setupSteps(org, productCount) {
   const [page, shop, chat] = await Promise.all([
     SocialAccount.exists({ organizationId: org, platform: "Facebook" }),
-    Organization.findById(org).select("ai.knowledge").lean(),
+    Organization.findById(org).select("ai").lean(),
     Conversation.exists({ organizationId: org }),
   ]);
   return { page: !!page, products: productCount > 0, knowledge: !!shop?.ai?.knowledge?.trim(), chat: !!chat };
@@ -35,10 +35,9 @@ async function setupSteps(org, productCount) {
 
 async function overview(org, period = "today") {
   const r = periodRange(period);
-  const [now, before, onHold, toPack, openChats, needsHuman, newComments, products, recent] = await Promise.all([
+  const [now, before, toPack, openChats, needsHuman, newComments, products, recent] = await Promise.all([
     orderTotals(org, r.from, r.to),
     orderTotals(org, r.prevFrom, r.prevTo),
-    Order.countDocuments({ organizationId: org, status: "on_hold" }),
     Order.countDocuments({ organizationId: org, status: { $in: ["pending", "confirmed"] } }),
     Conversation.countDocuments({ organizationId: org, status: { $ne: "closed" } }),
     Conversation.countDocuments({ organizationId: org, status: "needs_human" }),
@@ -51,7 +50,7 @@ async function overview(org, period = "today") {
     period,
     setup: await setupSteps(org, products.length),
     sales: { revenue: now.revenue, revenueChange: change(now.revenue, before.revenue), orders: now.count, ordersChange: change(now.count, before.count), aiOrders: now.ai },
-    todo: { onHold, toPack, needsHuman, newComments, lowStock: lowStock.length },
+    todo: { toPack, needsHuman, newComments, lowStock: lowStock.length },
     openChats,
     lowStock: lowStock.slice(0, 5).map((p) => ({ id: p._id, name: p.name, available: p.variants.reduce((s, v) => s + v.available, 0) })),
     recentOrders: recent,

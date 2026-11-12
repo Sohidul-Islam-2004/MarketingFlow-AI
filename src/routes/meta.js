@@ -1,4 +1,4 @@
-// Facebook Login: connect Pages + Instagram accounts, list them, check them, disconnect.
+// Facebook Login: connect Facebook Pages, list them, check them, disconnect.
 const router = require("express").Router();
 const crypto = require("crypto");
 const { SocialAccount } = require("../models");
@@ -11,7 +11,7 @@ const { META } = require("../config");
 // Permissions the app asks for. pages_messaging = reply in Messenger, pages_manage_engagement = reply to comments.
 const SCOPES = [
   "pages_show_list", "pages_read_engagement", "pages_manage_metadata", "pages_manage_posts", "pages_messaging", "pages_manage_engagement",
-  "instagram_basic", "instagram_content_publish", "instagram_manage_messages", "business_management",
+  "business_management",
 ].join(",");
 const WEBHOOK_FIELDS = ["messages", "messaging_postbacks", "message_echoes", "feed"];
 
@@ -26,7 +26,7 @@ function readState(state) {
   return Date.now() - Number(at) < 15 * 60e3 ? org : null; // valid for 15 minutes
 }
 
-const publicView = (a) => ({ _id: a._id, platform: a.platform, accountId: a.accountId, accountName: a.accountName, pictureUrl: a.pictureUrl, pageId: a.pageId, status: a.status, statusNote: a.statusNote, webhooksOn: a.webhooksOn, lastWebhookAt: a.lastWebhookAt });
+const publicView = (a) => ({ _id: a._id, platform: a.platform, accountId: a.accountId, accountName: a.accountName, pictureUrl: a.pictureUrl, status: a.status, statusNote: a.statusNote, webhooksOn: a.webhooksOn, lastWebhookAt: a.lastWebhookAt });
 
 // Tells Meta to send this Page's messages and comments to our /webhooks/meta
 async function turnOnWebhooks(page, pageToken) {
@@ -69,11 +69,11 @@ async function finishConnect(req, res) {
     const short = await graph("/oauth/access_token", { params: { client_id: META.APP_ID, client_secret: META.APP_SECRET, redirect_uri: META.REDIRECT_URI, code } });
     const long = await graph("/oauth/access_token", { params: { grant_type: "fb_exchange_token", client_id: META.APP_ID, client_secret: META.APP_SECRET, fb_exchange_token: short.access_token } });
     // Page tokens made from a long-lived user token don't expire
-    const pages = await graphAll("/me/accounts", { token: long.access_token, params: { fields: "id,name,access_token,picture{url},instagram_business_account{id,username,profile_picture_url}", limit: 100 } });
+    const pages = await graphAll("/me/accounts", { token: long.access_token, params: { fields: "id,name,access_token,picture{url}", limit: 100 } });
 
     if (!pages.length) return back("error=" + encodeURIComponent("No Facebook Page was selected. Press Connect Facebook again and tick your Page in the Facebook window."));
 
-    let nPages = 0, nInstagram = 0;
+    let nPages = 0;
     const taken = [];
     for (const p of pages) {
       // A Page can belong to one workspace only, otherwise its messages would go to the wrong shop
@@ -86,17 +86,8 @@ async function finishConnect(req, res) {
       await turnOnWebhooks(page, p.access_token);
       await page.save();
       nPages++;
-      const ig = p.instagram_business_account;
-      if (ig) {
-        await SocialAccount.updateOne(
-          { organizationId: login.org, platform: "Instagram", accountId: ig.id },
-          { $set: { accountName: ig.username || p.name, pageId: p.id, accessToken: encrypt(p.access_token), pictureUrl: ig.profile_picture_url || null, status: "active", statusNote: null } },
-          { upsert: true }
-        );
-        nInstagram++;
-      }
     }
-    back(`connected=1&pages=${nPages}&instagram=${nInstagram}${taken.length ? "&taken=" + encodeURIComponent(taken.join(", ")) : ""}`);
+    back(`connected=1&pages=${nPages}${taken.length ? "&taken=" + encodeURIComponent(taken.join(", ")) : ""}`);
   } catch (e) {
     console.error("Facebook connect:", e.message);
     back("error=" + encodeURIComponent(e.message));
@@ -104,20 +95,20 @@ async function finishConnect(req, res) {
 }
 
 router.get("/", handle(async (req, res) => {
-  const rows = await SocialAccount.find({ organizationId: req.org, platform: { $in: ["Facebook", "Instagram"] } }).sort({ platform: 1, accountName: 1 }).lean();
+  const rows = await SocialAccount.find({ organizationId: req.org, platform: "Facebook" }).sort({ accountName: 1 }).lean();
   res.json(rows.map(publicView));
 }));
 
 // Checks every token and turns webhooks on again for Pages where they are off
 router.post("/check", handle(async (req, res) => {
-  const accounts = await SocialAccount.find({ organizationId: req.org, platform: { $in: ["Facebook", "Instagram"] } }).select("+accessToken");
+  const accounts = await SocialAccount.find({ organizationId: req.org, platform: "Facebook" }).select("+accessToken");
   for (const a of accounts) {
     try {
       const token = decrypt(a.accessToken);
       await graph(`/${a.accountId}`, { token, params: { fields: "id" } });
       a.status = "active";
       a.statusNote = null;
-      if (a.platform === "Facebook") await turnOnWebhooks(a, token);
+      await turnOnWebhooks(a, token);
     } catch (e) {
       a.status = "needs_reconnect";
       a.statusNote = e.message;
@@ -130,11 +121,8 @@ router.post("/check", handle(async (req, res) => {
 router.delete("/:id", handle(async (req, res) => {
   const account = await SocialAccount.findOne({ _id: req.params.id, organizationId: req.org }).select("+accessToken");
   if (!account) throw fail(404, "Account not found");
-  if (account.platform === "Facebook") {
-    // Tell Meta to stop sending this Page's messages, and remove the Instagram account that came with it
-    await graph(`/${account.accountId}/subscribed_apps`, { token: decrypt(account.accessToken), method: "DELETE" }).catch(() => {});
-    await SocialAccount.deleteMany({ organizationId: req.org, platform: "Instagram", pageId: account.accountId });
-  }
+  // Tell Meta to stop sending this Page\'s messages
+  await graph(`/${account.accountId}/subscribed_apps`, { token: decrypt(account.accessToken), method: "DELETE" }).catch(() => {});
   await account.deleteOne();
   res.json({ ok: true });
 }));

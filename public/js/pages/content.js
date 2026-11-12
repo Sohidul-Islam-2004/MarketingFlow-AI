@@ -10,12 +10,12 @@ let versions = [];
 export async function render(root) {
   const products = await get("/api/products");
   root.innerHTML = `
-    <div class="page-head"><div><h1>Content Studio</h1><p>Write posts with AI, then schedule or publish them to your Page and Instagram.</p></div>
+    <div class="page-head"><div><h1>Content Studio</h1><p>Write posts with AI, then schedule or publish them to your Facebook Page.</p></div>
       <button class="btn" data-action="newPost">+ New post</button></div>
     <div class="split">
       <div class="card"><h3>✨ AI writer</h3><p class="sub">Uses your shop info and product prices. Nothing is invented.</p>
         <form id="aiForm" class="stack">
-          <div><label>Type</label><select name="kind">${options([["facebook_post", "Facebook post"], ["instagram_caption", "Instagram caption"], ["product_post", "Product post"], ["offer_post", "Offer post"]])}</select></div>
+          <div><label>Type</label><select name="kind">${options([["facebook_post", "Facebook post"], ["product_post", "Product post"], ["offer_post", "Offer post"]])}</select></div>
           <div><label>Product (optional)</label><select name="productId"><option value="">—</option>${products.map((p) => `<option value="${p._id}">${esc(p.name)}</option>`).join("")}</select></div>
           <div><label>Language</label><select name="language">${options([["bn", "বাংলা"], ["mixed", "Bangla + English"], ["en", "English"]])}</select></div>
           <div><label>What is the post about?</label><textarea name="topic" rows="3" placeholder="Eid collection arrived, cotton panjabi, free size chart in inbox"></textarea></div>

@@ -14,7 +14,7 @@ const page = (title, body) => `<!DOCTYPE html><html lang="en"><head><meta charse
 <footer class="muted"><a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a> · <a href="/data-deletion">Data Deletion</a> · Contact: <a href="mailto:${esc(L.SUPPORT_EMAIL)}">${esc(L.SUPPORT_EMAIL)}</a></footer></body></html>`;
 
 router.get("/privacy", (_req, res) => res.send(page("Privacy Policy", `
-<p>${L.BUSINESS_NAME} ("we", "us") provides software that helps businesses manage their Facebook Pages, Instagram professional accounts, Messenger conversations, and orders. This policy explains what data we process and why.</p>
+<p>${L.BUSINESS_NAME} ("we", "us") provides software that helps businesses manage their Facebook Pages, Messenger conversations, and orders. This policy explains what data we process and why.</p>
 <h2>1. Who this applies to</h2>
 <p><b>Business users</b> who sign in and connect their Meta accounts, and <b>their customers</b> who message or comment on those businesses' Facebook Pages or Instagram accounts.</p>
 <h2>2. Data we collect</h2>
@@ -29,7 +29,6 @@ router.get("/privacy", (_req, res) => res.send(page("Privacy Policy", `
 <ul>
 <li>To publish and schedule content for the business that connected the account.</li>
 <li>To reply to customer messages and comments (automatically with AI or by the business's staff) and prepare orders.</li>
-<li>To detect fraud risk on cash-on-delivery orders (risk scores are shown to the business and reviewed by people; we never label a person a fraudster automatically).</li>
 <li>To keep the service secure and fix problems.</li>
 </ul>
 <p>We do <b>not</b> sell personal data and do not use Meta Platform Data for advertising outside the business's own account.</p>
@@ -68,7 +67,7 @@ router.get("/data-deletion", async (req, res) => {
   }
   res.send(page("Data Deletion Instructions", `${status}
 <h2>Business users (Facebook Login)</h2><ol>
-<li>In the app, open <b>Meta Accounts</b> and press <b>Disconnect</b> on each account. Its encrypted token is deleted immediately.</li>
+<li>In the app, open <b>Channels</b> and press <b>Disconnect</b> on each account. Its encrypted token is deleted immediately.</li>
 <li>Remove the app from Facebook: <b>Settings &amp; privacy → Settings → Business integrations</b> → select ${esc(L.BUSINESS_NAME)} → <b>Remove</b>.</li>
 <li>Or email <a href="mailto:${esc(L.SUPPORT_EMAIL)}">${esc(L.SUPPORT_EMAIL)}</a> with the subject "Delete my data".</li></ol>
 <h2>Customers who messaged a business</h2>

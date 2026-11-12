@@ -8,7 +8,6 @@ const { graph } = require("../lib/graph");
 
 const SUBSCRIPTIONS = [
   { object: "page", fields: "messages,messaging_postbacks,message_echoes,feed" },
-  { object: "instagram", fields: "messages,comments" },
 ];
 
 async function registerWebhooks() {

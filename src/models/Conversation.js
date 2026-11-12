@@ -1,4 +1,4 @@
-// A Messenger / Instagram chat with one customer, plus the order the AI is collecting ("draft").
+// A Messenger chat with one customer, plus the order the AI is collecting ("draft").
 const { mongoose, Schema, Mixed, newId, options } = require("./_base");
 
 const messageSchema = new Schema(
@@ -17,7 +17,7 @@ const conversationSchema = new Schema(
     _id: { type: String, default: newId },
     organizationId: { type: String, required: true },
     psid: { type: String, required: true }, // customer id given by Meta ("sim_..." for the simulator)
-    channel: { type: String, default: "Messenger" }, // Messenger | Instagram | Simulator
+    channel: { type: String, default: "Messenger" }, // Messenger | Simulator
     pageId: { type: String, default: null },
     customerName: { type: String, default: "Customer" },
     avatar: { type: String, default: null },

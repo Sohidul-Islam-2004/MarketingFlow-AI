@@ -4,9 +4,9 @@ import { get, post } from "./api.js";
 import { $, esc, icon, toast, openModal, dateTime, loading } from "./ui.js";
 
 const MENU = [
-  ["SHOP", [["overview", "Overview"], ["inbox", "Customer Inbox"], ["comments", "FB Comments"], ["orders", "Orders"], ["inventory", "Inventory"], ["fraud", "Fraud Shield"]]],
+  ["SHOP", [["overview", "Overview"], ["inbox", "Customer Inbox"], ["comments", "FB Comments"], ["orders", "Orders"], ["inventory", "Inventory"]]],
   ["MARKETING", [["content", "Content Studio"], ["calendar", "Calendar"]]],
-  ["SETTINGS", [["accounts", "Meta Accounts"], ["settings", "Settings"]]],
+  ["SETTINGS", [["train", "AI Training"], ["accounts", "Facebook Page"], ["settings", "Settings"]]],
 ];
 const PAGES = MENU.flatMap(([, items]) => items.map(([id]) => id));
 const LABELS = Object.fromEntries(MENU.flatMap(([, items]) => items));
@@ -62,10 +62,10 @@ let menuCounts = {};
 async function refreshCounts() {
   try {
     const o = await get("/api/overview?period=today");
-    menuCounts = { inbox: o.todo.needsHuman, comments: o.todo.newComments, fraud: o.todo.onHold };
+    menuCounts = { inbox: o.todo.needsHuman, comments: o.todo.newComments };
     drawMenu(currentPage(), menuCounts);
     // the same total on the phone top bar and in the browser tab
-    const waiting = o.todo.needsHuman + o.todo.newComments + o.todo.onHold;
+    const waiting = o.todo.needsHuman + o.todo.newComments;
     $("#topCount").textContent = waiting;
     $("#topCount").classList.toggle("hidden", !waiting);
     document.title = `${waiting ? `(${waiting}) ` : ""}MarketingFlow AI`;

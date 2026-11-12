@@ -1,6 +1,6 @@
 // An order. Status flow (see services/orders.js):
 //   pending -> confirmed -> packed -> shipped -> delivered
-//   pending / on_hold / confirmed / packed -> cancelled
+//   pending / confirmed / packed -> cancelled
 //   shipped / delivered -> returned
 const { mongoose, Schema, newId, options } = require("./_base");
 
@@ -33,7 +33,6 @@ const orderSchema = new Schema(
     address: { type: String, required: true },
     district: { type: String, default: null },
     zone: { type: String, default: null },
-    addressKey: { type: String, default: null }, // normalised address, for fraud checks
 
     items: { type: [itemSchema], default: [] },
     subtotal: { type: Number, default: 0 },
@@ -49,8 +48,6 @@ const orderSchema = new Schema(
     psid: { type: String, default: null },
     idemKey: { type: String, default: null }, // stops the same AI draft creating two orders
 
-    riskScore: { type: Number, default: 0 },
-    riskReasons: { type: [String], default: [] },
 
     courierName: { type: String, default: "" }, // free text: Steadfast, Pathao, own rider...
     trackingNo: { type: String, default: "" },

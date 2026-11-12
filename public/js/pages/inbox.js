@@ -2,17 +2,18 @@
 // Refreshes every 5 seconds while the page is open (the server answers "nothing new" when nothing changed).
 // On a phone you see one part at a time: chat list -> chat -> order.
 import { get, post, put, del } from "../api.js";
-import { esc, taka, dateTime, onAction, openModal, toast, orderPill, $, confirmBox, debounce, icon, loading } from "../ui.js";
+import { esc, taka, dateTime, onAction, openModal, toast, orderPill, $, confirmBox, debounce, icon, loading, options } from "../ui.js";
 import { itemRow, readItems, districtList } from "../shared.js";
 import { updateCounts } from "../app.js";
 
 const state = { tab: "open", q: "", openId: null, chat: null };
+const channelTag = (c) => `<span class="pill ${c === "Simulator" ? "p-grey" : "p-blue"}">${esc(c)}</span>`;
 
 export async function render(root, params) {
   if (params.tab) state.tab = params.tab;
   if (params.open) state.openId = params.open;
   root.innerHTML = `
-    <div class="page-head"><div><h1>Customer Inbox</h1><p>Messenger and Instagram chats. The AI answers and takes orders; you can take over any time.</p></div>
+    <div class="page-head"><div><h1>Customer Inbox</h1><p>Messenger chats. The AI answers and takes orders; you can take over any time.</p></div>
       <button class="btn light" data-action="simulate">Test the AI (simulator)</button></div>
     <div class="inbox ${state.openId ? "show-chat" : ""}" id="inbox">
       <div class="chats"><div class="filters"><div class="tabs" id="tabs" style="margin:0"></div><input id="search" placeholder="Search name, message, phone…" value="${esc(state.q)}"></div><div class="chat-list" id="chatList">${loading()}</div></div>
@@ -69,8 +70,8 @@ async function drawList() {
       <div class="face">${c.avatar ? `<img src="${esc(c.avatar)}" alt="">` : esc(c.customerName[0] || "?")}</div>
       <div class="who"><b>${esc(c.customerName)} ${c.unread ? `<span class="pill p-red">${c.unread}</span>` : ""}</b>
         <small>${esc(c.lastMessage)}</small>
-        <small>${esc(c.channel)} · ${dateTime(c.updatedAt)} ${c.status === "needs_human" ? "· 🙋 needs you" : c.aiPaused ? "· AI off" : "· 🤖 AI"}${c.draftStatus === "placed" ? " · ✅ ordered" : ""}</small></div>
-    </div>`).join("") || `<div class="empty"><b>No chats</b>New Messenger/Instagram messages appear here.</div>`;
+        <small>${channelTag(c.channel)} ${dateTime(c.updatedAt)} ${c.status === "needs_human" ? "· 🙋 needs you" : c.aiPaused ? "· AI off" : "· 🤖 AI"}${c.draftStatus === "placed" ? " · ✅ ordered" : ""}</small></div>
+    </div>`).join("") || `<div class="empty"><b>No chats</b>New Messenger messages appear here.</div>`;
 }
 
 /* ---------- middle + right: one chat ---------- */
@@ -90,7 +91,7 @@ async function drawChat(quiet = false) {
   const oldScroll = $("#messages")?.scrollTop;
 
   $("#thread").innerHTML = `
-    <div class="thread-head"><div class="row" style="flex-wrap:nowrap"><button class="btn sm light back" data-action="back" title="Back to all chats">${icon("back")}</button><div><b>${esc(c.customerName)}</b> <span class="small muted">${esc(c.channel)}</span>
+    <div class="thread-head"><div class="row" style="flex-wrap:nowrap"><button class="btn sm light back" data-action="back" title="Back to all chats">${icon("back")}</button><div><b>${esc(c.customerName)}</b> ${channelTag(c.channel)}
       ${c.status === "needs_human" ? `<div class="small" style="color:var(--red)">Needs you: ${esc(c.handoffReason || "")}</div>` : ""}</div></div>
       <div class="row">
         <button class="btn sm light order-btn" data-action="toggleOrder">🧾 Order${c.draft?.items?.length && c.draft.status !== "placed" ? " •" : ""}</button>

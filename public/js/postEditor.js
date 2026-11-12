@@ -29,14 +29,13 @@ export async function openPostEditor(item, { date = null, onDone = () => {} } = 
         <div class="stack">
           <div><label>Caption</label><textarea name="text" rows="8" ${locked ? "disabled" : ""}>${esc(p.text)}</textarea></div>
           <div><label>Hashtags</label><input name="hashtags" value="${esc((p.hashtags || []).join(" "))}" placeholder="#eid #panjabi" ${locked ? "disabled" : ""}></div>
-          <details ${p.instagramText ? "open" : ""}><summary class="small">Different caption for Instagram (optional)</summary><textarea name="instagramText" rows="4" class="mt">${esc(p.instagramText || "")}</textarea></details>
         </div>
         <div class="stack">
-          <div><label>Post to</label>${accounts.map((a) => `<label class="check"><input type="checkbox" name="account[]" value="${a._id}" ${chosenAccounts.has(a._id) ? "checked" : ""} ${locked ? "disabled" : ""}> ${esc(a.platform)}: ${esc(a.accountName)}</label>`).join("") || `<p class="note small">No Page connected. Go to Meta Accounts first.</p>`}</div>
+          <div><label>Post to</label>${accounts.map((a) => `<label class="check"><input type="checkbox" name="account[]" value="${a._id}" ${chosenAccounts.has(a._id) ? "checked" : ""} ${locked ? "disabled" : ""}> ${esc(a.accountName)}</label>`).join("") || `<p class="note small">No Page connected. Go to Channels first.</p>`}</div>
           <div><label>Date & time (for Schedule)</label><input type="datetime-local" name="when" value="${toLocalInput(when)}"></div>
           <div><div class="row between"><label>Photos / video (click to choose, in order)</label><label class="btn sm light" style="margin:0">Upload<input type="file" id="upload" accept="image/*,video/*" multiple hidden></label></div>
             <div class="thumbs" id="thumbs">${thumbs()}</div>
-            <p class="small muted mt">Instagram needs a photo or video. One video, or up to 10 photos.</p></div>
+            <p class="small muted mt">One video, or several photos.</p></div>
         </div>
       </div>`,
     onSubmit: async (f, button) => {
@@ -46,7 +45,7 @@ export async function openPostEditor(item, { date = null, onDone = () => {} } = 
         toast("Post deleted");
         return onDone();
       }
-      const data = { text: f.text, hashtags: f.hashtags, instagramText: f.instagramText, mediaIds: picked, accountIds: f.account || [] };
+      const data = { text: f.text, hashtags: f.hashtags, mediaIds: picked, accountIds: f.account || [] };
       const savedPost = saved ? await put(`/api/content/${p._id}`, data) : await post("/api/content", data);
       if (button === "schedule") {
         if (!f.when) { toast("Choose a date and time", true); return true; }

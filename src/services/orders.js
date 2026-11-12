@@ -2,18 +2,16 @@
 const { Order, Product, Organization, Counter, Conversation } = require("../models");
 const { fail } = require("../lib/errors");
 const { normalizePhone, isValidPhone, taka } = require("../lib/utils");
-const { findZone, addressKey, canonicalDistrict } = require("../lib/places");
+const { findZone, canonicalDistrict } = require("../lib/places");
 const { notify } = require("../lib/notify");
 const stock = require("./stock");
-const fraud = require("./fraud");
 const messenger = require("./messenger");
 
-const STATUS_LABEL = { pending: "Pending", on_hold: "On hold", confirmed: "Confirmed", packed: "Packed", shipped: "Shipped", delivered: "Delivered", returned: "Returned", cancelled: "Cancelled" };
+const STATUS_LABEL = { pending: "Pending", confirmed: "Confirmed", packed: "Packed", shipped: "Shipped", delivered: "Delivered", returned: "Returned", cancelled: "Cancelled" };
 
 // Which status can follow which
 const NEXT = {
-  pending: ["confirmed", "on_hold", "cancelled"],
-  on_hold: ["confirmed", "cancelled"],
+  pending: ["confirmed", "cancelled"],
   confirmed: ["packed", "cancelled"],
   packed: ["shipped", "cancelled"],
   shipped: ["delivered", "returned"],
@@ -21,7 +19,7 @@ const NEXT = {
   returned: [],
   cancelled: [],
 };
-const HOLDS_STOCK = ["pending", "on_hold", "confirmed", "packed"]; // stock is reserved in these statuses
+const HOLDS_STOCK = ["pending", "confirmed", "packed"]; // stock is reserved in these statuses
 
 // Messages the customer gets on Messenger when the order moves (only inside the 24h window)
 const CUSTOMER_MESSAGE = {
@@ -67,11 +65,6 @@ async function createOrder(org, input, by) {
   const discount = input.source === "manual" ? input.discount : 0;
   const price = await priceOrder(org, { items: input.items, address, district: input.district, discount });
 
-  const settings = await fraud.fraudSettings(org);
-  const risk = await fraud.scoreOrder(org, { phone, address, customerName });
-  if (risk.blocked && settings.refuseBlocked) throw fail(403, "This phone number is on your block list. The order was not created.");
-  const hold = risk.blocked || risk.score >= settings.holdAtScore;
-
   const orderNo = await nextOrderNo(org);
   const reserved = [];
   for (const line of price.lines) {
@@ -82,20 +75,19 @@ async function createOrder(org, input, by) {
     reserved.push(line);
   }
 
-  const status = hold ? "on_hold" : input.confirmed ? "confirmed" : "pending";
+  const status = input.confirmed ? "confirmed" : "pending";
   try {
     const order = await Order.create({
       organizationId: org, orderNo, status,
-      customerName, phone, address, district: price.zone.district, zone: price.zone.zone, addressKey: addressKey(address),
+      customerName, phone, address, district: price.zone.district, zone: price.zone.zone,
       items: price.lines.map(({ available, ...l }) => l),
       subtotal: price.subtotal, deliveryFee: price.deliveryFee, discount: price.discount, total: price.total,
       paymentMethod: ["COD", "bKash", "Nagad"].includes(input.paymentMethod) ? input.paymentMethod : "COD",
       paid: !!input.paid,
       source: input.source || "manual", conversationId: input.conversationId || null, psid: input.psid || null, idemKey: input.idemKey || null,
-      riskScore: risk.score, riskReasons: risk.reasons, notes: String(input.notes || "").slice(0, 1000),
-      history: [{ status, by, note: hold ? `Held by Fraud Shield (risk ${risk.score})` : "Order created" }],
+      notes: String(input.notes || "").slice(0, 1000),
+      history: [{ status, by, note: "Order created" }],
     });
-    if (hold) await notify(org, `Order #${orderNo} is on hold`, risk.reasons.join(", "), "fraud");
     return order;
   } catch (e) {
     for (const r of reserved) await stock.release(org, r, orderNo);
@@ -145,7 +137,7 @@ async function tellCustomer(org, order, status) {
 async function editOrder(org, orderId, changes) {
   const order = await Order.findOne({ _id: orderId, organizationId: org });
   if (!order) throw fail(404, "Order not found");
-  const early = ["pending", "on_hold", "confirmed"].includes(order.status);
+  const early = ["pending", "confirmed"].includes(order.status);
   if ("notes" in changes) order.notes = String(changes.notes || "").slice(0, 1000);
   if ("paid" in changes) order.paid = !!changes.paid;
   if ("paymentMethod" in changes && ["COD", "bKash", "Nagad"].includes(changes.paymentMethod)) order.paymentMethod = changes.paymentMethod;
@@ -161,7 +153,7 @@ async function editOrder(org, orderId, changes) {
     if (changes.address) order.address = String(changes.address).trim();
     const o = await Organization.findById(org).select("zones").lean();
     const zone = findZone(o?.zones, { address: order.address, district: canonicalDistrict(changes.district) || order.district });
-    order.district = zone.district; order.zone = zone.zone; order.addressKey = addressKey(order.address);
+    order.district = zone.district; order.zone = zone.zone;
     order.deliveryFee = zone.freeOver && order.subtotal >= zone.freeOver ? 0 : zone.fee;
     if ("discount" in changes) order.discount = Math.max(0, Math.min(order.subtotal, Number(changes.discount) || 0));
     order.total = order.subtotal + order.deliveryFee - order.discount;

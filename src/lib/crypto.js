@@ -24,7 +24,7 @@ function decrypt(stored) {
     decipher.setAuthTag(Buffer.from(tag, "hex"));
     return Buffer.concat([decipher.update(Buffer.from(data, "hex")), decipher.final()]).toString("utf8");
   } catch {
-    throw fail(401, "Saved Facebook token can't be read (TOKEN_ENC_KEY changed). Reconnect Facebook in Meta Accounts.");
+    throw fail(401, "Saved Facebook token can't be read (TOKEN_ENC_KEY changed). Reconnect your Facebook Page.");
   }
 }
 

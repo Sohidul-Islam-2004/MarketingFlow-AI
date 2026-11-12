@@ -17,7 +17,7 @@ export const pill = (text, color = "grey") => `<span class="pill p-${color}">${e
 // empty("No orders yet", "They appear here…", `<button …>`)  (the 3rd part is ready-made HTML, e.g. a button)
 export const empty = (title, hint = "", actionHtml = "") => `<div class="empty"><b>${esc(title)}</b>${esc(hint)}${actionHtml ? `<div class="mt">${actionHtml}</div>` : ""}</div>`;
 
-export const ORDER_STATUS = { pending: ["Pending", "yellow"], on_hold: ["On hold", "red"], confirmed: ["Confirmed", "blue"], packed: ["Packed", "purple"], shipped: ["Shipped", "purple"], delivered: ["Delivered", "green"], returned: ["Returned", "grey"], cancelled: ["Cancelled", "grey"] };
+export const ORDER_STATUS = { pending: ["Pending", "yellow"], confirmed: ["Confirmed", "blue"], packed: ["Packed", "purple"], shipped: ["Shipped", "purple"], delivered: ["Delivered", "green"], returned: ["Returned", "grey"], cancelled: ["Cancelled", "grey"] };
 export const orderPill = (status) => pill(...(ORDER_STATUS[status] || [status, "grey"]));
 
 // <select> options from ["a","b"] or [["value","Label"], ...]
@@ -168,6 +168,7 @@ const ICONS = {
   send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/>',
   check: '<path d="m5 12 5 5 9-10"/>',
+  train: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
   back: '<path d="M15 5l-7 7 7 7"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
 };
