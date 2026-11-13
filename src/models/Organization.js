@@ -18,6 +18,10 @@ const organizationSchema = new Schema(
     plan: { type: String, default: "trial" }, // trial | basic | pro (just a label for now)
     expiresAt: { type: Date, default: null }, // null = no end date
     suspended: { type: Boolean, default: false },
+
+    // The shop's own Meta app (optional, services/metaApp.js). Empty = use the shared app from .env.
+    // { appId, appSecret (encrypted), configId, name, savedAt, webhookOk, webhookNote }
+    metaApp: { type: Schema.Types.Mixed, default: null },
     logoUrl: { type: String, default: "" },
     returnPolicy: { type: String, default: "" }, // printed on invoices
     orderPrefix: { type: String, default: "ORD-" },

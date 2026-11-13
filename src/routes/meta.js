@@ -1,12 +1,14 @@
 // Facebook Login: connect Facebook Pages, list them, check them, disconnect.
+// Connecting uses the shop's own Meta app if it saved one, otherwise the shared app (services/metaApp.js).
 const router = require("express").Router();
 const crypto = require("crypto");
-const { SocialAccount } = require("../models");
+const { SocialAccount, Organization } = require("../models");
 const { handle, fail } = require("../lib/errors");
 const { graph, graphAll } = require("../lib/graph");
 const { encrypt, decrypt } = require("../lib/crypto");
 const { currentUser } = require("../middleware/auth");
-const { META } = require("../config");
+const { META, TOKEN_ENC_KEY, PUBLIC_BASE_URL } = require("../config");
+const metaApp = require("../services/metaApp");
 
 // Permissions the app asks for. pages_messaging = reply in Messenger, pages_manage_engagement = reply to comments.
 const SCOPES = [
@@ -17,8 +19,8 @@ const WEBHOOK_FIELDS = ["messages", "messaging_postbacks", "message_echoes", "fe
 
 
 // The "state" Facebook sends back tells us which workspace started the login. It is signed with
-// the app secret, so it can't be faked and it still works if the server restarted in between.
-const sign = (text) => crypto.createHmac("sha256", META.APP_SECRET).update(text).digest("hex").slice(0, 32);
+// a server key, so it can't be faked and it still works if the server restarted in between.
+const sign = (text) => crypto.createHmac("sha256", `${TOKEN_ENC_KEY}|${META.APP_SECRET || ""}|state`).update(text).digest("hex").slice(0, 32);
 const makeState = (org) => { const body = `${org}.${Date.now()}`; return `${body}.${sign(body)}`; };
 function readState(state) {
   const [org, at, sig] = String(state || "").split(".");
@@ -43,14 +45,15 @@ async function turnOnWebhooks(page, pageToken) {
 async function startConnect(req, res) {
   const who = await currentUser(req);
   if (!who) return res.redirect("/");
-  if (!META.APP_ID || !META.APP_SECRET) return res.status(400).send("Set FB_APP_ID and FB_APP_SECRET in .env first.");
+  const app = await metaApp.appFor(who.org);
+  if (!app) return res.redirect("/#accounts?error=" + encodeURIComponent("Add your Meta app (App ID and App Secret) first"));
   const state = makeState(who.org);
   const url = new URL(`https://www.facebook.com/${META.GRAPH_VERSION}/dialog/oauth`);
-  url.searchParams.set("client_id", META.APP_ID);
+  url.searchParams.set("client_id", app.appId);
   url.searchParams.set("redirect_uri", META.REDIRECT_URI);
   url.searchParams.set("state", state);
   url.searchParams.set("response_type", "code");
-  if (META.CONFIG_ID) url.searchParams.set("config_id", META.CONFIG_ID); // Facebook Login for Business
+  if (app.configId) url.searchParams.set("config_id", app.configId); // Facebook Login for Business
   else url.searchParams.set("scope", SCOPES);
   res.redirect(url.toString());
 }
@@ -66,8 +69,10 @@ async function finishConnect(req, res) {
     if (!org || !who || who.org !== org) return back("error=" + encodeURIComponent("Login expired. Please press Connect Facebook again."));
     const login = { org };
 
-    const short = await graph("/oauth/access_token", { params: { client_id: META.APP_ID, client_secret: META.APP_SECRET, redirect_uri: META.REDIRECT_URI, code } });
-    const long = await graph("/oauth/access_token", { params: { grant_type: "fb_exchange_token", client_id: META.APP_ID, client_secret: META.APP_SECRET, fb_exchange_token: short.access_token } });
+    const app = await metaApp.appFor(login.org); // the same app the login started with
+    if (!app) return back("error=" + encodeURIComponent("No Meta app is set up"));
+    const short = await graph("/oauth/access_token", { params: { client_id: app.appId, client_secret: app.appSecret, redirect_uri: META.REDIRECT_URI, code } });
+    const long = await graph("/oauth/access_token", { params: { grant_type: "fb_exchange_token", client_id: app.appId, client_secret: app.appSecret, fb_exchange_token: short.access_token } });
     // Page tokens made from a long-lived user token don't expire
     const pages = await graphAll("/me/accounts", { token: long.access_token, params: { fields: "id,name,access_token,picture{url}", limit: 100 } });
 
@@ -93,6 +98,27 @@ async function finishConnect(req, res) {
     back("error=" + encodeURIComponent(e.message));
   }
 }
+
+/* ---------- the shop's own Meta app ---------- */
+// Everything the shop needs to copy into its app, and what it saved (never the secret)
+router.get("/app", handle(async (req, res) => {
+  const o = await Organization.findById(req.org).select("metaApp").lean();
+  const base = PUBLIC_BASE_URL || `${req.headers["x-forwarded-proto"] || "http"}://${req.headers.host}`;
+  const own = o?.metaApp?.appId ? { appId: o.metaApp.appId, name: o.metaApp.name, configId: o.metaApp.configId, savedAt: o.metaApp.savedAt, webhookOk: o.metaApp.webhookOk, webhookNote: o.metaApp.webhookNote } : null;
+  res.json({
+    own, sharedApp: !!(META.APP_ID && META.APP_SECRET),
+    copy: { redirectUri: META.REDIRECT_URI, domain: new URL(base).hostname, privacy: `${base}/privacy`, terms: `${base}/terms`, deletion: `${base}/data-deletion` },
+  });
+}));
+
+router.put("/app", handle(async (req, res) => {
+  res.json({ ok: true, ...(await metaApp.saveOwnApp(req.org, req.body)) });
+}));
+
+router.delete("/app", handle(async (req, res) => {
+  await metaApp.removeOwnApp(req.org);
+  res.json({ ok: true });
+}));
 
 router.get("/", handle(async (req, res) => {
   const rows = await SocialAccount.find({ organizationId: req.org, platform: "Facebook" }).sort({ accountName: 1 }).lean();

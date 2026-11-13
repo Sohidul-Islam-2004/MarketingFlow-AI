@@ -121,3 +121,11 @@ Rules (`src/services/account.js`):
 - `ALLOW_SIGNUP=off` (default): only the very first account can sign up by itself. After that you create accounts.
 - A **suspended** shop can't log in. A shop whose **paid-until date** has passed can log in but only sees "Your plan has ended". In both cases the AI and comment auto-replies stop. Their data stays.
 - Forgot password: the owner contacts you (`SUPPORT_CONTACT`), you press **Password link** and send it. No email service is needed.
+
+## Each shop's own Meta app (optional)
+On **Facebook Page** a shop can paste the App ID and App Secret of its own Meta app (`src/services/metaApp.js`).
+- The shop is Admin of that app, so it connects its own Page without being your Tester and without App Review.
+- The secret is stored encrypted and never sent back to the browser.
+- On save, MarketingFlow checks the ID + secret with Meta and registers `PUBLIC_BASE_URL/webhooks/meta` on that app (needs `META_WEBHOOK_VERIFY_TOKEN` and an https `PUBLIC_BASE_URL`).
+- Webhooks from every app arrive at the same URL. `routes/webhooks.js` accepts a message if it is signed by the shared app or by any shop's app.
+- No own app saved → the shared app from `.env` is used, like before. Changing or removing the app is only allowed after the Page is disconnected.

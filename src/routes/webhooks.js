@@ -7,6 +7,7 @@ const { graph } = require("../lib/graph");
 const { decrypt } = require("../lib/crypto");
 const { META } = require("../config");
 const messenger = require("../services/messenger");
+const { allSecrets } = require("../services/metaApp");
 const agent = require("../services/agent");
 const comments = require("../services/comments");
 
@@ -16,13 +17,15 @@ router.get("/", (req, res) => {
   ok ? res.send(req.query["hub.challenge"]) : res.sendStatus(403);
 });
 
-router.post("/", (req, res) => {
-  // Only accept events signed with our app secret
-  if (META.APP_SECRET) {
-    const got = Buffer.from(String(req.headers["x-hub-signature-256"] || ""));
-    const expected = Buffer.from("sha256=" + crypto.createHmac("sha256", META.APP_SECRET).update(req.rawBody || "").digest("hex"));
-    if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) return res.sendStatus(401);
-  }
+router.post("/", async (req, res) => {
+  // Only accept events signed with the secret of the shared app or of a shop's own app
+  const secrets = await allSecrets().catch(() => [META.APP_SECRET].filter(Boolean));
+  const got = Buffer.from(String(req.headers["x-hub-signature-256"] || ""));
+  const signedBy = secrets.some((secret) => {
+    const expected = Buffer.from("sha256=" + crypto.createHmac("sha256", secret).update(req.rawBody || "").digest("hex"));
+    return got.length === expected.length && crypto.timingSafeEqual(got, expected);
+  });
+  if (!signedBy) return res.sendStatus(401); // no known app signed it (or no app is set up at all)
   res.sendStatus(200); // answer Meta quickly, then work
   handleEvents(req.body).catch((e) => console.error("Webhook:", e));
 });

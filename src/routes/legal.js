@@ -1,6 +1,7 @@
 // Public legal pages (needed to publish the Meta app) + Meta's data-deletion and deauthorize callbacks.
 // Fill BUSINESS_NAME, SUPPORT_EMAIL, BUSINESS_ADDRESS in .env
 const router = require("express").Router();
+const { allSecrets } = require("../services/metaApp");
 const express = require("express");
 const crypto = require("crypto");
 const { ProcessedEvent } = require("../models");
@@ -75,20 +76,24 @@ router.get("/data-deletion", async (req, res) => {
 });
 
 // Meta sends a "signed_request" signed with the app secret
-function readSignedRequest(signed) {
-  if (!signed || !META.APP_SECRET) return null;
+// (the shared app's secret or one of the shops' own apps)
+async function readSignedRequest(signed) {
+  if (!signed) return null;
   const [sig, payload] = String(signed).split(".");
   if (!sig || !payload) return null;
   const decode = (s) => Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64");
-  const expected = crypto.createHmac("sha256", META.APP_SECRET).update(payload).digest();
   const got = decode(sig);
-  if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) return null;
+  const ok = (await allSecrets()).some((secret) => {
+    const expected = crypto.createHmac("sha256", secret).update(payload).digest();
+    return got.length === expected.length && crypto.timingSafeEqual(got, expected);
+  });
+  if (!ok) return null;
   return JSON.parse(decode(payload).toString("utf8"));
 }
 
 // App Dashboard → Settings → Basic → "Data deletion request URL" = https://YOUR-DOMAIN/api/meta/data-deletion
 router.post("/api/meta/data-deletion", express.urlencoded({ extended: false }), async (req, res) => {
-  const data = readSignedRequest(req.body?.signed_request);
+  const data = await readSignedRequest(req.body?.signed_request);
   if (!data) return res.status(400).json({ error: "Invalid signed_request" });
   const code = crypto.randomBytes(8).toString("hex");
   await ProcessedEvent.create({ _id: `deletion:${code}` }).catch(() => {});
@@ -97,8 +102,8 @@ router.post("/api/meta/data-deletion", express.urlencoded({ extended: false }), 
 });
 
 // App Dashboard → Facebook Login → "Deauthorize callback URL" = https://YOUR-DOMAIN/api/meta/deauthorize
-router.post("/api/meta/deauthorize", express.urlencoded({ extended: false }), (req, res) => {
-  const data = readSignedRequest(req.body?.signed_request);
+router.post("/api/meta/deauthorize", express.urlencoded({ extended: false }), async (req, res) => {
+  const data = await readSignedRequest(req.body?.signed_request);
   if (!data) return res.sendStatus(400);
   console.log("Meta: a user removed the app:", data.user_id);
   res.sendStatus(200);
