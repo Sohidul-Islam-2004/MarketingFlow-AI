@@ -5,6 +5,7 @@
 //   -> public reply from a fixed template with your real prices, sent after a delay (or after you approve)
 //   -> complaints and negative comments: nothing is sent, the comment waits for you in "Needs you"
 const { Comment, Conversation, Product, Organization } = require("../models");
+const { blockedReason } = require("./account");
 const { graph } = require("../lib/graph");
 const { decrypt } = require("../lib/crypto");
 const { taka } = require("../lib/utils");
@@ -107,8 +108,9 @@ async function hideOnFacebook(org, comment, hidden = true) {
 
 // Called for every new comment (from the webhook or the simulator)
 async function handleNewComment(org, { pageId, commentId, postId, fromName, message }) {
-  const o = await Organization.findById(org).select("comments zones").lean();
+  const o = await Organization.findById(org).select("comments zones suspended expiresAt").lean();
   const settings = { autoReply: true, sendDm: true, delaySec: 30, needApproval: false, hideSpam: false, blockedWords: [], ...(o?.comments || {}) };
+  if (blockedReason(o)) Object.assign(settings, { autoReply: false, sendDm: false, hideSpam: false }); // suspended / plan ended: comments are only saved
   let comment;
   try {
     comment = await Comment.create({ organizationId: org, pageId, commentId, postId, fromName: fromName || "Someone", message: String(message || "").slice(0, 2000) });

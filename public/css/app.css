@@ -328,3 +328,8 @@ a.step:hover { border-color: var(--green); }
 .found-row .price input { width: 96px; padding: 6px 8px; }
 .good-card { border-color: #cfe9a6; background: #f7fdec; }
 @media (max-width: 800px) { .found-row { flex-wrap: wrap; } .found-row .price { margin-left: 58px; } }
+
+/* Super Admin: KPI boxes work as filters */
+a.kpi { text-decoration: none; color: inherit; cursor: pointer; }
+a.kpi:hover { border-color: var(--green); }
+a.kpi.on { border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }

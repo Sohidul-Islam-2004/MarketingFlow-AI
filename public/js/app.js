@@ -8,18 +8,21 @@ const MENU = [
   ["MARKETING", [["content", "Content Studio"], ["calendar", "Calendar"]]],
   ["SETTINGS", [["train", "AI Training"], ["accounts", "Facebook Page"], ["settings", "Settings"]]],
 ];
-const PAGES = MENU.flatMap(([, items]) => items.map(([id]) => id));
-const LABELS = Object.fromEntries(MENU.flatMap(([, items]) => items));
+const ADMIN_MENU = ["SUPER ADMIN", [["admin-customers", "Customers"], ["admin-pages", "All Pages"]]]; // added for SUPER_ADMIN_EMAILS only
+let PAGES = MENU.flatMap(([, items]) => items.map(([id]) => id));
+let LABELS = Object.fromEntries(MENU.flatMap(([, items]) => items));
 
 /* ---------- login / sign up ---------- */
-function showLogin(mode = "login") {
+let loginOptions = null; // { signup: can people create accounts?, support: who to contact }
+async function showLogin(mode = "login") {
   $("#app").classList.add("hidden");
   const box = $("#auth");
   box.classList.remove("hidden");
-  const signup = mode === "signup";
+  loginOptions ||= await get("/api/auth/options").catch(() => ({ signup: false, support: "" }));
+  const signup = mode === "signup" && loginOptions.signup;
   box.innerHTML = `<div class="auth-card">
     <div class="brand"><div class="logo">${icon("send")}</div><span>MarketingFlow AI</span></div>
-    <div class="tabs"><button class="tab ${signup ? "" : "on"}" data-mode="login">Log in</button><button class="tab ${signup ? "on" : ""}" data-mode="signup">Create account</button></div>
+    ${loginOptions.signup ? `<div class="tabs"><button class="tab ${signup ? "" : "on"}" data-mode="login">Log in</button><button class="tab ${signup ? "on" : ""}" data-mode="signup">Create account</button></div>` : `<h2 style="margin:0 0 4px">Welcome back</h2><p class="small muted" style="margin:0 0 14px">Log in to your shop dashboard.</p>`}
     <form id="authForm" class="stack">
       ${signup ? `<div><label>Your name</label><input name="name" required></div>` : ""}
       <div><label>Email</label><input name="email" type="email" required autocomplete="email"></div>
@@ -28,9 +31,11 @@ function showLogin(mode = "login") {
       ${signup ? `<div><label>Business name</label><input name="business" placeholder="e.g. Rahim Fashion"></div>` : ""}
       <p class="note small hidden" id="authError"></p>
       <button class="btn full">${signup ? "Create account" : "Log in"}</button>
-      <p class="small muted center">${signup ? "Already have an account?" : "New here?"} <a href="#" data-mode="${signup ? "login" : "signup"}">${signup ? "Log in" : "Create an account"}</a></p>
+      ${signup ? "" : `<p class="small center"><a href="#" id="forgot">Forgot password?</a></p><p class="small muted center hidden" id="forgotText">Contact MarketingFlow${loginOptions.support ? `: <b>${esc(loginOptions.support)}</b>` : ""}. We will send you a link to set a new password.</p>`}
+      ${loginOptions.signup ? `<p class="small muted center">${signup ? "Already have an account?" : "New here?"} <a href="#" data-mode="${signup ? "login" : "signup"}">${signup ? "Log in" : "Create an account"}</a></p>` : ""}
     </form></div>`;
   $("#showPass").onclick = (e) => { const input = box.querySelector("[name=password]"); input.type = input.type === "password" ? "text" : "password"; e.target.textContent = input.type === "password" ? "Show" : "Hide"; };
+  if ($("#forgot")) $("#forgot").onclick = (e) => { e.preventDefault(); $("#forgotText").classList.remove("hidden"); };
   box.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = (e) => { e.preventDefault(); showLogin(b.dataset.mode); }));
   $("#authForm").onsubmit = async (e) => {
     e.preventDefault();
@@ -48,6 +53,56 @@ function showLogin(mode = "login") {
   };
 }
 window.addEventListener("logged-out", () => showLogin());
+
+/* ---------- "set your password" link (invite or reset): /#set-password?token=... ---------- */
+async function showSetPassword(token) {
+  $("#app").classList.add("hidden");
+  const box = $("#auth");
+  box.classList.remove("hidden");
+  let who;
+  try { who = await get(`/api/auth/set-password?token=${encodeURIComponent(token)}`); }
+  catch (e) {
+    box.innerHTML = `<div class="auth-card"><div class="brand"><div class="logo">${icon("send")}</div><span>MarketingFlow AI</span></div>
+      <p class="note">${esc(e.message)}</p><a class="btn full mt" href="/">Go to log in</a></div>`;
+    return;
+  }
+  box.innerHTML = `<div class="auth-card">
+    <div class="brand"><div class="logo">${icon("send")}</div><span>MarketingFlow AI</span></div>
+    <h2 style="margin:0 0 4px">Hi ${esc(who.name)}, set your password</h2>
+    <p class="small muted" style="margin:0 0 14px">You will log in with <b>${esc(who.email)}</b> and this password.</p>
+    <form id="setForm" class="stack">
+      <div><label>New password (at least 8 characters)</label><input name="password" type="password" minlength="8" required autocomplete="new-password"></div>
+      <div><label>Type it again</label><input name="again" type="password" minlength="8" required autocomplete="new-password"></div>
+      <p class="note small hidden" id="setError"></p>
+      <button class="btn full">Save and open my dashboard</button>
+    </form></div>`;
+  $("#setForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    const showError = (text) => { $("#setError").textContent = text; $("#setError").classList.remove("hidden"); };
+    if (f.password !== f.again) return showError("The two passwords are not the same");
+    try {
+      await post("/api/auth/set-password", { token, password: f.password });
+      location.replace("/#overview");
+      location.reload();
+    } catch (err) { showError(err.message); }
+  };
+}
+
+/* ---------- suspended / plan ended ---------- */
+function showBlocked(me) {
+  $("#app").classList.add("hidden");
+  const box = $("#auth");
+  box.classList.remove("hidden");
+  const ended = me.blocked === "expired";
+  box.innerHTML = `<div class="auth-card">
+    <div class="brand"><div class="logo">${icon("send")}</div><span>MarketingFlow AI</span></div>
+    <h2 style="margin:0 0 6px">${ended ? "Your plan has ended" : "Your account is paused"}</h2>
+    <p class="muted">${ended ? `It ended on ${esc(new Date(me.expiresAt).toLocaleDateString("en-GB"))}.` : "Your account was suspended."} The AI is not answering your customers right now. Your data is safe.</p>
+    <p>Contact MarketingFlow${me.support ? `: <b>${esc(me.support)}</b>` : ""} to continue.</p>
+    <button class="btn light full mt" id="blockedLogout">Log out</button></div>`;
+  $("#blockedLogout").onclick = async () => { await post("/api/auth/logout"); location.reload(); };
+}
 
 /* ---------- side menu ---------- */
 function drawMenu(active, counts = {}) {
@@ -125,8 +180,15 @@ window.addEventListener("hashchange", showPage);
 
 /* ---------- start ---------- */
 (async () => {
+  if (location.hash.startsWith("#set-password")) return showSetPassword(new URLSearchParams(location.hash.split("?")[1] || "").get("token") || "");
   let me;
   try { me = await get("/api/auth/me"); } catch { return showLogin(); }
+  if (me.blocked) return showBlocked(me);
+  if (me.user.isAdmin) {
+    MENU.push(ADMIN_MENU);
+    PAGES = MENU.flatMap(([, items]) => items.map(([id]) => id));
+    LABELS = Object.fromEntries(MENU.flatMap(([, items]) => items));
+  }
   $("#auth").classList.add("hidden");
   $("#app").classList.remove("hidden");
   $("#logo").innerHTML = icon("send");

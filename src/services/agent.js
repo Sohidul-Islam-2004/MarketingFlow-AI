@@ -7,6 +7,7 @@
 //   4. When the draft is complete the bot sends a summary with Confirm / Change buttons.
 // The AI never decides prices, delivery fees or totals: those come from the database (services/orders.js).
 const { Product, Organization } = require("../models");
+const { blockedReason } = require("./account");
 const { askAI, aiReady } = require("../lib/ai");
 const { findZone, canonicalDistrict, normalizeText, DEFAULT_ZONES } = require("../lib/places");
 const { normalizePhone, isValidPhone, taka } = require("../lib/utils");
@@ -22,8 +23,8 @@ const ATTACHMENT_ONLY = /^\[(image|audio|video|file|fallback|template|sticker|sh
 const BUTTONS = ["✅ Confirm", "✏️ Change"];
 
 async function aiSettings(org) {
-  const o = await Organization.findById(org).select("ai zones name").lean();
-  return { ...o, ai: { enabled: true, autoConfirm: true, tone: "friendly", handoffBelow: 60, knowledge: "", deliveryTime: "", handoffMessage: "", ...(o?.ai || {}) } };
+  const o = await Organization.findById(org).select("ai zones name suspended expiresAt").lean();
+  return { ...o, blocked: !!blockedReason(o), ai: { enabled: true, autoConfirm: true, tone: "friendly", handoffBelow: 60, knowledge: "", deliveryTime: "", handoffMessage: "", ...(o?.ai || {}) } };
 }
 
 /* ---------- what the AI is allowed to know ---------- */
@@ -236,7 +237,7 @@ async function handleCustomerMessage(org, conv, text) {
   conv.lastCustomerAt = new Date();
   conv.unread = (conv.unread || 0) + 1;
   if (conv.status === "closed") conv.status = "open";
-  if (!settings.ai.enabled || conv.aiPaused) return;
+  if (!settings.ai.enabled || conv.aiPaused || settings.blocked) return; // blocked = suspended / plan ended
 
   const d = conv.draft || { items: [], status: "collecting" };
   const plain = String(text || "").replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim(); // drop emoji and dots

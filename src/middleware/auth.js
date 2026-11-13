@@ -1,6 +1,7 @@
 // Login sessions with an HttpOnly cookie.
 // After requireLogin runs, every route has req.user and req.org (the workspace id).
-const { Session, User } = require("../models");
+const { Session, User, Organization } = require("../models");
+const { isAdminEmail, blockedReason } = require("../services/account");
 const { sha256, randomToken } = require("../lib/crypto");
 const { DAY } = require("../lib/utils");
 
@@ -42,7 +43,14 @@ async function currentUser(req) {
   if (!session || session.expiresAt < new Date()) return null;
   const user = await User.findById(session.userId).lean();
   if (!user) return null;
-  const who = { user: { id: user._id, name: user.name, email: user.email }, org: user.organizationId };
+  const org = await Organization.findById(user.organizationId).select("suspended expiresAt").lean();
+  const isAdmin = isAdminEmail(user.email);
+  const who = {
+    user: { id: user._id, name: user.name, email: user.email, isAdmin },
+    org: user.organizationId,
+    blocked: isAdmin ? null : blockedReason(org), // "suspended" | "expired" | null
+    expiresAt: org?.expiresAt || null,
+  };
   if (remembered.size > 5000) remembered.clear();
   remembered.set(id, { who, until: Date.now() + 60000 });
   return who;
@@ -53,6 +61,7 @@ async function requireLogin(req, res, next) {
   try {
     const who = await currentUser(req);
     if (!who) return res.status(401).json({ error: "Please log in", code: "LOGIN_REQUIRED" });
+    if (who.blocked) return res.status(403).json({ error: who.blocked === "expired" ? "Your plan has ended" : "Your account is suspended", code: "ACCOUNT_BLOCKED" });
     req.user = who.user;
     req.org = who.org;
     next();
@@ -61,4 +70,10 @@ async function requireLogin(req, res, next) {
   }
 }
 
-module.exports = { requireLogin, currentUser, startSession, endSession, forgetSessions };
+// Only for routes/admin.js (put it after requireLogin)
+function requireAdmin(req, res, next) {
+  if (!req.user?.isAdmin) return res.status(403).json({ error: "Super Admin only" });
+  next();
+}
+
+module.exports = { requireAdmin, requireLogin, currentUser, startSession, endSession, forgetSessions };

@@ -3,12 +3,20 @@ const router = require("express").Router();
 const { User, Organization, Session } = require("../models");
 const { handle, fail } = require("../lib/errors");
 const { hashPassword, checkPassword } = require("../lib/crypto");
+const { isAdminEmail, blockedReason } = require("../services/account");
 const { startSession, endSession, currentUser, requireLogin, forgetSessions } = require("../middleware/auth");
-const { DEFAULT_TENANT } = require("../config");
+const { DEFAULT_TENANT, ALLOW_SIGNUP, SUPPORT_CONTACT } = require("../config");
+const { sha256 } = require("../lib/crypto");
 
 const validEmail = (e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
 
+// The login page asks this: can people create their own account? who to contact for a new password?
+router.get("/options", handle(async (req, res) => {
+  res.json({ signup: ALLOW_SIGNUP || !(await User.exists({})), support: SUPPORT_CONTACT });
+}));
+
 router.post("/signup", handle(async (req, res) => {
+  if (!ALLOW_SIGNUP && (await User.exists({}))) throw fail(403, "Accounts are created by MarketingFlow. Please contact us.");
   const name = String(req.body.name || "").trim();
   const email = String(req.body.email || "").trim().toLowerCase();
   const password = String(req.body.password || "");
@@ -26,7 +34,7 @@ router.post("/signup", handle(async (req, res) => {
   } else {
     orgId = (await Organization.create({ name: business }))._id;
   }
-  const user = await User.create({ organizationId: orgId, name, email, passwordHash: await hashPassword(password) });
+  const user = await User.create({ organizationId: orgId, name, email, passwordHash: await hashPassword(password), lastLoginAt: new Date() });
   await startSession(req, res, user);
   res.json({ ok: true });
 }));
@@ -48,8 +56,13 @@ router.post("/login", handle(async (req, res) => {
     }
     throw fail(401, "Wrong email or password");
   }
+  const org = await Organization.findById(user.organizationId).select("suspended expiresAt").lean();
+  const blocked = isAdminEmail(user.email) ? null : blockedReason(org);
+  if (blocked === "suspended") throw fail(403, "Your account is suspended. Please contact MarketingFlow.");
+  // an expired account can still log in: it sees the "plan has ended" screen
   user.failedLogins = 0;
   user.lockedUntil = null;
+  user.lastLoginAt = new Date();
   await user.save();
   await startSession(req, res, user);
   res.json({ ok: true });
@@ -64,7 +77,31 @@ router.get("/me", handle(async (req, res) => {
   const who = await currentUser(req);
   if (!who) return res.status(401).json({ error: "Please log in", code: "LOGIN_REQUIRED" });
   const org = await Organization.findById(who.org).select("name").lean();
-  res.json({ user: who.user, business: org?.name || "My business" });
+  res.json({ user: who.user, business: org?.name || "My business", blocked: who.blocked, expiresAt: who.expiresAt, support: SUPPORT_CONTACT });
+}));
+
+// "Set your password" link from an invite or a reset (the Super Admin makes the link)
+router.get("/set-password", handle(async (req, res) => {
+  const user = await User.findOne({ resetTokenHash: sha256(String(req.query.token || "")), resetExpiresAt: { $gt: new Date() } }).lean();
+  if (!user) throw fail(400, "This link has expired or was already used. Ask MarketingFlow for a new one.");
+  res.json({ name: user.name, email: user.email });
+}));
+
+router.post("/set-password", handle(async (req, res) => {
+  const user = await User.findOne({ resetTokenHash: sha256(String(req.body.token || "")), resetExpiresAt: { $gt: new Date() } });
+  if (!user) throw fail(400, "This link has expired or was already used. Ask MarketingFlow for a new one.");
+  if (String(req.body.password || "").length < 8) throw fail(400, "Password must be at least 8 characters");
+  user.passwordHash = await hashPassword(req.body.password);
+  user.resetTokenHash = null; // the link works only once
+  user.resetExpiresAt = null;
+  user.failedLogins = 0;
+  user.lockedUntil = null;
+  user.lastLoginAt = new Date();
+  await user.save();
+  await Session.deleteMany({ userId: user._id }); // old logins end
+  forgetSessions();
+  await startSession(req, res, user);
+  res.json({ ok: true });
 }));
 
 router.post("/password", requireLogin, handle(async (req, res) => {

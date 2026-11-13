@@ -9,6 +9,7 @@ export async function api(url, { method = "GET", body } = {}) {
   }).catch(() => { throw new Error("Can't reach the server. Check your internet and try again."); });
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && data.code === "LOGIN_REQUIRED") window.dispatchEvent(new Event("logged-out"));
+  if (res.status === 403 && data.code === "ACCOUNT_BLOCKED") location.reload(); // suspended or plan ended: show that screen
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 }
@@ -16,7 +17,7 @@ export async function api(url, { method = "GET", body } = {}) {
 export const get = (url) => api(url);
 export const post = (url, body = {}) => api(url, { method: "POST", body });
 export const put = (url, body = {}) => api(url, { method: "PUT", body });
-export const del = (url) => api(url, { method: "DELETE" });
+export const del = (url, body) => api(url, { method: "DELETE", body });
 
 // Upload photos/videos. Returns the saved media records.
 export async function uploadFiles(files) {

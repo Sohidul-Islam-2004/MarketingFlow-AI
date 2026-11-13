@@ -100,31 +100,47 @@ router.get("/", handle(async (req, res) => {
 }));
 
 // Checks every token and turns webhooks on again for Pages where they are off
+// Asks Facebook if the Page token still works and switches webhooks on again. Saves the result.
+// Also used by the Super Admin "Check all Pages" button and the 6-hourly job.
+async function checkPage(a) {
+  try {
+    const token = decrypt(a.accessToken);
+    await graph(`/${a.accountId}`, { token, params: { fields: "id" } });
+    a.status = "active";
+    a.statusNote = null;
+    await turnOnWebhooks(a, token);
+  } catch (e) {
+    a.status = "needs_reconnect";
+    a.statusNote = e.message;
+  }
+  await a.save();
+}
+
+// Checks every connected Page of every shop, 5 at a time. Returns { checked, broken }.
+async function checkAllPages() {
+  const pages = await SocialAccount.find({ platform: "Facebook" }).select("+accessToken");
+  let next = 0;
+  await Promise.all(Array.from({ length: 5 }, async () => { while (next < pages.length) await checkPage(pages[next++]); }));
+  return { checked: pages.length, broken: pages.filter((p) => p.status !== "active").length };
+}
+
 router.post("/check", handle(async (req, res) => {
   const accounts = await SocialAccount.find({ organizationId: req.org, platform: "Facebook" }).select("+accessToken");
-  for (const a of accounts) {
-    try {
-      const token = decrypt(a.accessToken);
-      await graph(`/${a.accountId}`, { token, params: { fields: "id" } });
-      a.status = "active";
-      a.statusNote = null;
-      await turnOnWebhooks(a, token);
-    } catch (e) {
-      a.status = "needs_reconnect";
-      a.statusNote = e.message;
-    }
-    await a.save();
-  }
+  for (const a of accounts) await checkPage(a);
   res.json(accounts.map((a) => publicView(a.toObject())));
 }));
+
+// Tells Meta to stop sending this Page's messages, then forgets the Page
+async function disconnectPage(account) {
+  await graph(`/${account.accountId}/subscribed_apps`, { token: decrypt(account.accessToken), method: "DELETE" }).catch(() => {});
+  await account.deleteOne();
+}
 
 router.delete("/:id", handle(async (req, res) => {
   const account = await SocialAccount.findOne({ _id: req.params.id, organizationId: req.org }).select("+accessToken");
   if (!account) throw fail(404, "Account not found");
-  // Tell Meta to stop sending this Page\'s messages
-  await graph(`/${account.accountId}/subscribed_apps`, { token: decrypt(account.accessToken), method: "DELETE" }).catch(() => {});
-  await account.deleteOne();
+  await disconnectPage(account);
   res.json({ ok: true });
 }));
 
-module.exports = { router, startConnect, finishConnect };
+module.exports = { router, startConnect, finishConnect, checkPage, checkAllPages, disconnectPage };

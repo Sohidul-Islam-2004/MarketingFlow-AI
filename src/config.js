@@ -11,6 +11,14 @@ module.exports = {
   // Default: Google DNS. Set DNS_SERVERS=system to use your computer's DNS instead.
   DNS_SERVERS: env.DNS_SERVERS || "8.8.8.8,8.8.4.4",
 
+  // Super Admin: these emails see the Admin menu (comma separated). Example: SUPER_ADMIN_EMAILS=you@gmail.com
+  SUPER_ADMIN_EMAILS: String(env.SUPER_ADMIN_EMAILS || "").toLowerCase().split(",").map((e) => e.trim()).filter(Boolean),
+  // Anyone can create an account only when this is "on". Otherwise the Super Admin creates accounts.
+  // (The very first account can always be created, so you can make your own.)
+  ALLOW_SIGNUP: env.ALLOW_SIGNUP === "on",
+  // Shown on the login page under "Forgot password?" (your WhatsApp / phone / email)
+  SUPPORT_CONTACT: env.SUPPORT_CONTACT || "",
+
   // The first account that signs up takes over this workspace (keeps your old data)
   DEFAULT_TENANT: env.DEFAULT_TENANT || "org_123",
 

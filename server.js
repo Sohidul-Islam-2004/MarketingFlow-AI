@@ -10,7 +10,7 @@ const path = require("path");
 const express = require("express");
 const config = require("./src/config");
 const { connectDB } = require("./src/db");
-const { requireLogin } = require("./src/middleware/auth");
+const { requireLogin, requireAdmin } = require("./src/middleware/auth");
 const { startJobs } = require("./src/jobs");
 const { registerWebhooks } = require("./src/services/webhookSetup");
 const meta = require("./src/routes/meta");
@@ -43,6 +43,7 @@ app.use("/api/content", require("./src/routes/content"));
 app.use("/api/media", require("./src/routes/media"));
 app.use("/api/accounts", meta.router);
 app.use("/api/learn", require("./src/routes/learn"));
+app.use("/api/admin", requireAdmin, require("./src/routes/admin")); // Super Admin only
 app.use("/api/settings", require("./src/routes/settings"));
 app.use("/api", (req, res) => res.status(404).json({ error: `Unknown API: ${req.method} ${req.originalUrl}` }));
 

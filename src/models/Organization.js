@@ -12,6 +12,12 @@ const organizationSchema = new Schema(
     name: { type: String, required: true },
     phone: { type: String, default: "" },
     website: { type: String, default: "" }, // read by "AI Training"
+
+    // Set by the Super Admin (routes/admin.js). A suspended or expired shop can't open the
+    // dashboard and its AI stops answering customers.
+    plan: { type: String, default: "trial" }, // trial | basic | pro (just a label for now)
+    expiresAt: { type: Date, default: null }, // null = no end date
+    suspended: { type: Boolean, default: false },
     logoUrl: { type: String, default: "" },
     returnPolicy: { type: String, default: "" }, // printed on invoices
     orderPrefix: { type: String, default: "ORD-" },

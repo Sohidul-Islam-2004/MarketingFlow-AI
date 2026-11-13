@@ -111,3 +111,13 @@ Limits: 8 info pages, 6 list pages, 40 product pages and 48 posts per run (`LIMI
 
 ## Removed in v2.3
 Instagram, WhatsApp and Fraud Shield. Old `on_hold` orders become `pending` when the server starts.
+
+## Super Admin (you)
+Put your email in `.env`: `SUPER_ADMIN_EMAILS=you@gmail.com`. That account gets two extra menu items:
+- **Customers** (`public/js/pages/admin-customers.js`, `src/routes/admin.js`): create a shop + owner, get a "set your password" link to send on WhatsApp, set plan and paid-until date, suspend / activate, new password link, delete.
+- **All Pages** (`public/js/pages/admin-pages.js`): every connected Page, which ones need a reconnect, which have been quiet for 7 days, chats per Page, AI on/off, disconnect. Tokens are checked by themselves every 6 hours (`src/jobs.js`).
+
+Rules (`src/services/account.js`):
+- `ALLOW_SIGNUP=off` (default): only the very first account can sign up by itself. After that you create accounts.
+- A **suspended** shop can't log in. A shop whose **paid-until date** has passed can log in but only sees "Your plan has ended". In both cases the AI and comment auto-replies stop. Their data stays.
+- Forgot password: the owner contacts you (`SUPPORT_CONTACT`), you press **Password link** and send it. No email service is needed.
