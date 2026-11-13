@@ -45,7 +45,9 @@ async function turnOnWebhooks(page, pageToken) {
 async function startConnect(req, res) {
   const who = await currentUser(req);
   if (!who) return res.redirect("/");
-  const app = await metaApp.appFor(who.org);
+  let app;
+  try { app = await metaApp.appFor(who.org); }
+  catch (e) { return res.redirect("/#accounts?error=" + encodeURIComponent(e.message)); }
   if (!app) return res.redirect("/#accounts?error=" + encodeURIComponent("Add your Meta app (App ID and App Secret) first"));
   const state = makeState(who.org);
   const url = new URL(`https://www.facebook.com/${META.GRAPH_VERSION}/dialog/oauth`);
@@ -158,7 +160,7 @@ router.post("/check", handle(async (req, res) => {
 
 // Tells Meta to stop sending this Page's messages, then forgets the Page
 async function disconnectPage(account) {
-  await graph(`/${account.accountId}/subscribed_apps`, { token: decrypt(account.accessToken), method: "DELETE" }).catch(() => {});
+  await graph(`/${account.accountId}/subscribed_apps`, { token: decrypt(account.accessToken), method: "DELETE" }).catch(() => { });
   await account.deleteOne();
 }
 

@@ -22,7 +22,12 @@ const WEBHOOK_FIELDS = "messages,messaging_postbacks,message_echoes,feed";
 async function appFor(org) {
   const o = await Organization.findById(org).select("metaApp").lean();
   const own = o?.metaApp;
-  if (own?.appId && own?.appSecret) return { appId: own.appId, appSecret: decrypt(own.appSecret), configId: own.configId || "", own: true };
+  if (own?.appId && own?.appSecret) {
+    let appSecret;
+    try { appSecret = decrypt(own.appSecret); }
+    catch { throw fail(400, "Your saved App secret can't be read any more (the server key changed). Press Change and type the App secret again."); }
+    return { appId: own.appId, appSecret, configId: own.configId || "", own: true };
+  }
   if (META.APP_ID && META.APP_SECRET) return { appId: META.APP_ID, appSecret: META.APP_SECRET, configId: META.CONFIG_ID, own: false };
   return null;
 }
@@ -63,8 +68,8 @@ async function saveOwnApp(org, input) {
   if (!/^[0-9a-f]{32}$/i.test(appSecret)) throw fail(400, "App Secret is 32 letters and numbers. In App settings → Basic press Show next to App secret and copy it.");
   if (configId && !/^\d{6,}$/.test(configId)) throw fail(400, "Configuration ID is a long number (leave it empty if you don't use Facebook Login for Business)");
 
-  const current = await appFor(org);
-  if (current?.own && current.appId !== appId && (await SocialAccount.exists({ organizationId: org, platform: "Facebook" }))) {
+  const saved = (await Organization.findById(org).select("metaApp").lean())?.metaApp; // don't decrypt: the old secret may be unreadable
+  if (saved?.appId && saved.appId !== appId && (await SocialAccount.exists({ organizationId: org, platform: "Facebook" }))) {
     throw fail(400, "Disconnect your Page first, then change the app");
   }
 
@@ -82,8 +87,8 @@ async function saveOwnApp(org, input) {
 }
 
 async function removeOwnApp(org) {
-  const current = await appFor(org);
-  if (current?.own && (await SocialAccount.exists({ organizationId: org, platform: "Facebook" }))) {
+  const saved = (await Organization.findById(org).select("metaApp").lean())?.metaApp;
+  if (saved?.appId && (await SocialAccount.exists({ organizationId: org, platform: "Facebook" }))) {
     throw fail(400, "Disconnect your Page first, then remove the app");
   }
   await Organization.updateOne({ _id: org }, { $set: { metaApp: null } });
