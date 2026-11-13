@@ -46,7 +46,7 @@ async function draw(root) {
     ${scan?.status === "ready" ? review(scan) : ""}
     ${!scan && data.currentKnowledge ? `<div class="card"><h3>What the AI knows now</h3><p class="small muted">You wrote this in Settings. "Start reading" does not change it until you press Save.</p><pre class="pre">${esc(data.currentKnowledge)}</pre></div>` : ""}`;
 
-  if (scan?.status === "running") setTimeout(() => root.isConnected && draw(root), 3000); // ask again until it is done
+  if (scan?.status === "running") setTimeout(() => root.isConected && draw(root), 3000); // ask again until it is done
 }
 
 function review(scan) {
@@ -55,7 +55,6 @@ function review(scan) {
       <h3>2. Check what the AI learned about your shop</h3>
       <p class="sub">Read it carefully and fix anything wrong. The AI will tell customers exactly this.</p>
       ${scan.error ? `<div class="note small">${esc(scan.error)}</div>` : ""}
-      <p class="small muted">Read: ${scan.sources.map((s) => (s.url ? `<a target="_blank" rel="noopener" href="${esc(s.url)}">${esc(s.title)}</a>` : esc(s.title))).join(" · ") || "nothing"}</p>
       ${scan.knowledge ? "" : `<div class="note small mt">The AI found no clear facts. Write your delivery, payment and return rules here yourself.</div>`}
       <textarea id="knowledge" rows="16" class="mt" placeholder="## Delivery&#10;- Inside Dhaka 2-3 days…">${esc(scan.knowledge)}</textarea>
       <div class="f2 mt">
@@ -67,3 +66,4 @@ function review(scan) {
     </div>
 `;
 }
+
