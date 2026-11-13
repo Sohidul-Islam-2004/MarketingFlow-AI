@@ -7,7 +7,7 @@ const { graph } = require("../lib/graph");
 const { decrypt } = require("../lib/crypto");
 const { META } = require("../config");
 const messenger = require("../services/messenger");
-const { allSecrets } = require("../services/metaApp");
+const { allSecrets, ourAppIds } = require("../services/metaApp");
 const agent = require("../services/agent");
 const comments = require("../services/comments");
 
@@ -61,13 +61,15 @@ async function onMessage(page, event) {
   const org = page.organizationId;
   const msg = event.message;
 
-  // "Echo" = a message sent by the Page. If a person sent it from Business Suite, show it and pause the AI.
+  // "Echo" = Facebook's copy of a message the Page sent. Our own replies (AI or the Inbox) come back
+  // too: skip those. If a person answered from Business Suite / the Page inbox, show it and pause the AI.
   if (msg?.is_echo) {
-    if (String(msg.app_id || "") === String(META.APP_ID)) return; // sent by this app
+    if (msg.app_id && (await ourAppIds(org)).includes(String(msg.app_id))) return; // sent by MarketingFlow
     const psid = String(event.recipient?.id);
     await messenger.oneAtATime(`${org}:${psid}`, async () => {
       const conv = await Conversation.findOne({ organizationId: org, psid });
       if (!conv) return;
+      if (msg.mid && conv.messages.some((m) => m.mid === msg.mid)) return; // we sent it (we keep the id of every message we send)
       messenger.addMessage(conv, "agent", msg.text || "[attachment]", { mid: msg.mid });
       conv.aiPaused = true;
       await conv.save();

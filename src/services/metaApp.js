@@ -32,6 +32,12 @@ async function appFor(org) {
   return null;
 }
 
+// App IDs whose messages count as "sent by MarketingFlow" for this shop (the shared app and the shop's own)
+async function ourAppIds(org) {
+  const o = await Organization.findById(org).select("metaApp").lean();
+  return [META.APP_ID, o?.metaApp?.appId].filter(Boolean).map(String);
+}
+
 // Webhooks from every app come to the same URL, signed with that app's secret.
 // We keep the list for a minute so a busy server doesn't read the database for every message.
 let secrets = { list: [], until: 0 };
@@ -95,4 +101,4 @@ async function removeOwnApp(org) {
   forgetSecrets();
 }
 
-module.exports = { appFor, allSecrets, saveOwnApp, removeOwnApp };
+module.exports = { appFor, allSecrets, ourAppIds, saveOwnApp, removeOwnApp };
