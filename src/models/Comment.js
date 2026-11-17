@@ -1,11 +1,12 @@
-// A comment on one of your Facebook Page posts, and what the comment engine did with it.
+// A comment on one of your Facebook or Instagram posts, and what the comment engine did with it.
 const { mongoose, Schema, newId, options } = require("./_base");
 
 const commentSchema = new Schema(
   {
     _id: { type: String, default: newId },
     organizationId: { type: String, required: true },
-    pageId: { type: String, required: true },
+    platform: { type: String, default: "Facebook" }, // Facebook | Instagram
+    pageId: { type: String, required: true }, // the Facebook Page (Instagram comments too: its token is used)
     commentId: { type: String, required: true }, // Facebook comment id ("sim_..." for the simulator)
     postId: { type: String, default: null },
     fromName: { type: String, default: "Someone" },

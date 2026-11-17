@@ -1,13 +1,15 @@
-// A connected Facebook Page. The token is encrypted (lib/crypto.js).
+// A connected Facebook Page or Instagram account. The token is encrypted (lib/crypto.js).
+// An Instagram account works through its Facebook Page: it keeps a copy of the Page token and the Page id.
 const { mongoose, Schema, newId, options } = require("./_base");
 
 const socialAccountSchema = new Schema(
   {
     _id: { type: String, default: newId },
     organizationId: { type: String, required: true },
-    platform: { type: String, required: true }, // always "Facebook"
-    accountId: { type: String, required: true }, // Page id
+    platform: { type: String, required: true }, // Facebook | Instagram
+    accountId: { type: String, required: true }, // Page id, or Instagram account id
     accountName: { type: String, required: true },
+    pageId: { type: String, default: null }, // Instagram only: the Facebook Page it is linked to
     pictureUrl: { type: String, default: null },
     accessToken: { type: String, required: true, select: false },
     status: { type: String, default: "active" }, // active | needs_reconnect

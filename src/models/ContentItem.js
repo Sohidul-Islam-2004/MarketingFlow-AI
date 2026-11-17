@@ -1,4 +1,4 @@
-// A post for a Facebook Page.
+// A post for a Facebook Page and/or an Instagram account.
 // Status: Draft -> Scheduled -> Publishing -> Published | Partly published | Failed
 const { mongoose, Schema, newId, options } = require("./_base");
 
@@ -12,6 +12,7 @@ const targetSchema = new Schema(
     permalink: { type: String, default: null },
     error: { type: String, default: null },
     attempts: { type: Number, default: 0 },
+    containerId: { type: String, default: null }, // Instagram: the media container while Instagram prepares it
   },
   { _id: false }
 );

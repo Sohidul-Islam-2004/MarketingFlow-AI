@@ -31,7 +31,7 @@ export async function openPostEditor(item, { date = null, onDone = () => {} } = 
           <div><label>Hashtags</label><input name="hashtags" value="${esc((p.hashtags || []).join(" "))}" placeholder="#eid #panjabi" ${locked ? "disabled" : ""}></div>
         </div>
         <div class="stack">
-          <div><label>Post to</label>${accounts.map((a) => `<label class="check"><input type="checkbox" name="account[]" value="${a._id}" ${chosenAccounts.has(a._id) ? "checked" : ""} ${locked ? "disabled" : ""}> ${esc(a.accountName)}</label>`).join("") || `<p class="note small">No Page connected. Go to Channels first.</p>`}</div>
+          <div><label>Post to</label>${accounts.map((a) => `<label class="check"><input type="checkbox" name="account[]" value="${a._id}" ${chosenAccounts.has(a._id) ? "checked" : ""} ${locked ? "disabled" : ""}> ${esc(a.accountName)} <span class="small muted">${a.platform === "Instagram" ? "Instagram" : "Facebook"}</span></label>`).join("") || `<p class="note small">No Page connected. Go to Facebook & Instagram first.</p>`}</div>
           <div><label>Date & time (for Schedule)</label><input type="datetime-local" name="when" value="${toLocalInput(when)}"></div>
           <div><div class="row between"><label>Photos / video (click to choose, in order)</label><label class="btn sm light" style="margin:0">Upload<input type="file" id="upload" accept="image/*,video/*" multiple hidden></label></div>
             <div class="thumbs" id="thumbs">${thumbs()}</div>

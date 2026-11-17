@@ -1,20 +1,27 @@
-// Facebook Page: (optional) add your own Meta app, connect your Page, check it, disconnect.
+// Facebook Page + Instagram: add your own Meta app, connect your Page (and its Instagram), check, disconnect.
 //   GET/PUT/DELETE /api/accounts/app  -> the shop's own Meta app (services/metaApp.js)
 //   /api/meta/connect                 -> Facebook login (uses the own app if saved, otherwise the shared app)
+//   /api/meta/connect?with=instagram  -> same login, also asks for Instagram and saves the linked account
 import { get, post, put, del } from "../api.js";
 import { esc, dateTime, onAction, toast, pill, table, confirmBox, $ } from "../ui.js";
 
 let showForm = false;
 
 export async function render(root, params) {
-  if (params.connected) toast(`Connected ${params.pages || 0} Page(s)`);
+  if (params.connected) toast(Number(params.instagram) ? `Connected ${params.instagram} Instagram account(s)` : `Connected ${params.pages || 0} Page(s)`);
   if (params.taken) toast(`Not connected: ${params.taken}. This Page is already connected to another MarketingFlow account.`, true);
   if (params.error) toast(params.error, true);
   if (params.connected || params.error) history.replaceState(null, "", "#accounts");
   showForm = false;
   onAction(root, {
     check: async () => { await post("/api/accounts/check"); toast("Checked"); draw(root); },
-    remove: async (el) => { if (!(await confirmBox("Disconnect this Page? The AI will stop answering its messages and comments.", "Disconnect"))) return; await del(`/api/accounts/${el.dataset.id}`); draw(root); },
+    remove: async (el) => {
+      const ig = el.dataset.platform === "Instagram";
+      const q = ig ? "Disconnect this Instagram account? The AI will stop answering its messages and comments." : "Disconnect this Page? The AI will stop answering its messages and comments (and its Instagram, if connected).";
+      if (!(await confirmBox(q, "Disconnect"))) return;
+      await del(`/api/accounts/${el.dataset.id}`);
+      draw(root);
+    },
     openForm: () => { showForm = true; draw(root); },
     closeForm: () => { showForm = false; draw(root); },
     saveApp: async () => {
@@ -37,12 +44,14 @@ export async function render(root, params) {
 }
 
 async function draw(root, justConnected) {
-  const [pages, app] = await Promise.all([get("/api/accounts"), get("/api/accounts/app")]);
+  const [all, app] = await Promise.all([get("/api/accounts"), get("/api/accounts/app")]);
+  const pages = all.filter((a) => a.platform === "Facebook");
+  const instagram = all.filter((a) => a.platform === "Instagram");
   const canConnect = !!(app.own || app.sharedApp);
   const formOpen = showForm || !canConnect; // no app at all: the form is the first step
 
   root.innerHTML = `
-    <div class="page-head"><div><h1>Facebook Page</h1><p>Connect the Page you sell from. The AI answers its Messenger chats and comments, and your posts are published to it.</p></div>
+    <div class="page-head"><div><h1>Facebook & Instagram</h1><p>Connect the Page you sell from (and its Instagram). The AI answers chats and comments, and your posts are published there.</p></div>
       <div class="row">${pages.length ? `<button class="btn light" data-action="check">Check connection</button>` : ""}
         ${canConnect ? `<a class="btn ${pages.length ? "light" : ""}" href="/api/meta/connect">${pages.length ? "Add another Page" : "Connect Facebook"}</a>` : ""}</div></div>
     ${justConnected ? `<div class="card good-card"><b>Connected. Next: train the AI on your shop.</b><p class="small muted">It reads this Page and your website and learns your delivery, payment and return rules.</p><a class="btn mt" href="#train">Train the AI →</a></div>` : ""}
@@ -60,14 +69,35 @@ async function draw(root, justConnected) {
         ["Status", (a) => (a.status === "active" ? pill("Working", "green") : pill("Reconnect needed", "red")) + (a.statusNote ? `<div class="small muted">${esc(a.statusNote)}</div>` : "")],
         ["Messages & comments", (a) => (a.webhooksOn ? pill("On", "green") : pill("Off", "red"))],
         ["Last message from Facebook", (a) => (a.lastWebhookAt ? dateTime(a.lastWebhookAt) : `<span class="small muted">none yet</span>`)],
-        ["", (a) => `<button class="btn sm danger" data-action="remove" data-id="${a._id}">Disconnect</button>`],
+        ["", (a) => `<button class="btn sm danger" data-action="remove" data-platform="Facebook" data-id="${a._id}">Disconnect</button>`],
       ], pages, { emptyText: canConnect ? "No Page connected yet. Press Connect Facebook, log in, and tick the Page you sell from." : "First add your Meta app above." })}
     </div>
+    ${pages.length ? instagramCard(instagram) : ""}
     <div class="card"><h3>If messages don't arrive</h3><ol class="small" style="padding-left:18px;line-height:1.9">
       <li>Press <b>Check connection</b>. "Messages & comments" must say <b>On</b>, and Status must say <b>Working</b>.</li>
       <li>Send your Page a message from another Facebook account. "Last message from Facebook" should show the time within a few seconds.</li>
       ${app.own ? `<li>Using your own app: in developers.facebook.com check that the <b>Messenger</b> product is added and the app is not restricted.</li>` : ""}
       <li>Still "none yet"? Press <b>Connect Facebook</b> again and tick your Page in the Facebook window.</li></ol></div>`;
+}
+
+// Instagram works through the Facebook Page, so this card shows only after a Page is connected
+function instagramCard(list) {
+  const rows = list.map((a) => `<div class="row between ig-row">
+      <div class="row">${a.pictureUrl ? `<img src="${esc(a.pictureUrl)}" style="width:28px;height:28px;border-radius:50%">` : ""}
+        <div><b>${esc(a.accountName)}</b><div class="small muted">${a.lastWebhookAt ? `Last message ${dateTime(a.lastWebhookAt)}` : "No message yet"}</div></div></div>
+      <div class="row">${a.status === "active" ? pill("Working", "green") : pill("Reconnect needed", "red")}
+        <button class="btn sm danger" data-action="remove" data-platform="Instagram" data-id="${a._id}">Disconnect</button></div></div>`).join("");
+  return `<div class="card">
+    <div class="row between"><h3>Instagram</h3><a class="btn ${list.length ? "light sm" : ""}" href="/api/meta/connect?with=instagram">${list.length ? "Reconnect Instagram" : "Connect Instagram"}</a></div>
+    ${rows || `<p class="small muted">The AI can also answer Instagram DMs and comments, and post there.</p>`}
+    <details class="mt small" ${list.length ? "" : "open"}><summary>Before you connect (one time)</summary>
+      <ol class="small steps-list mt">
+        <li>In the Instagram app: <b>Settings → Account type</b> → switch to a <b>Business</b> account, and link it to your Facebook Page.</li>
+        <li>In the Instagram app: <b>Settings → Messages → Connected tools</b> → turn on <b>Allow access to messages</b>.</li>
+        <li>In developers.facebook.com, open your Meta app and add the <b>Instagram</b> product (Instagram API with Facebook Login).</li>
+        <li>Press <b>Connect Instagram</b> and tick your Page and your Instagram account.</li>
+      </ol></details>
+  </div>`;
 }
 
 function appStatus(app) {
@@ -96,10 +126,10 @@ function appForm(app) {
         ${copyRow("App domain", c.domain)}${copyRow("Privacy policy URL", c.privacy)}${copyRow("Terms of service URL", c.terms)}${copyRow("User data deletion URL", c.deletion)}</li>
       <li>Add the products <b>Facebook Login for Business</b> (or Facebook Login) and <b>Messenger</b>. In the login product's <b>Settings</b>, add this to <b>Valid OAuth Redirect URIs</b>:
         ${copyRow("Redirect URI", c.redirectUri)}</li>
+      <li>At the top of the app page, switch <b>App Mode</b> to <b>Live</b> (otherwise only you can message your Page).</li>
       <li>Back in <b>App settings → Basic</b>, copy the <b>App ID</b> and the <b>App secret</b> (press Show) into the boxes below.</li>
       <li>Press <b>Save app</b>. MarketingFlow checks it and switches on messages by itself. Then press <b>Connect Facebook</b>.</li>
     </ol>
-    <p class="small muted">You are the Admin of your own app, so you can connect your own Page right away. It can stay in Development mode.</p>
     <div class="f2 mt">
       <div><label>App ID</label><input id="appId" inputmode="numeric" placeholder="e.g. 1234567890123456" value="${esc(app.own?.appId || "")}"></div>
       <div><label>App secret</label><input id="appSecret" type="password" autocomplete="off" placeholder="${app.own ? "type it again to change" : "32 letters and numbers"}"></div>

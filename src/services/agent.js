@@ -1,4 +1,4 @@
-// AI sales agent for Messenger.
+// AI sales agent for Messenger and Instagram chats.
 //
 // How one customer message is handled (handleCustomerMessage):
 //   1. If the bot is waiting for "Confirm" and the customer confirms -> place the order (no AI involved).
@@ -98,7 +98,7 @@ async function askAgent(org, settings, conv, latestText) {
   const d = conv.draft || {};
   const currentDraft = d.status === "placed" ? { items: [] } : { items: (d.items || []).map((i) => ({ productId: i.productId, variantId: i.variantId, qty: i.qty })), name: d.name || "", phone: d.phone || "", address: d.address || "", district: d.district || "" };
 
-  const system = `You are the sales assistant of a Bangladeshi online shop, chatting on Facebook Messenger.
+  const system = `You are the sales assistant of a Bangladeshi online shop, chatting on ${conv.channel === "Instagram" ? "Instagram" : "Facebook Messenger"}.
 Reply in the customer's language and script (Bangla, Banglish or English). Short and warm, max 3-4 lines. Tone: ${settings.ai.tone}.
 RULES
 - Use ONLY the business info and PRODUCTS below. Never invent prices, stock, discounts, delivery times or policies. If you don't know, say you'll check with the team and set needsHuman=true.

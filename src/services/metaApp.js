@@ -66,6 +66,17 @@ async function registerWebhook(appId, appSecret) {
   }
 }
 
+// Same for Instagram: messages and comments of the Instagram accounts linked to the shop's Pages.
+// Called after "Connect Instagram". Fails quietly if the app has no Instagram product yet.
+async function registerInstagramWebhook(org) {
+  const app = await appFor(org).catch(() => null);
+  if (!app || !META.VERIFY_TOKEN || !PUBLIC_BASE_URL.startsWith("https://")) return;
+  await graph(`/${app.appId}/subscriptions`, {
+    token: `${app.appId}|${app.appSecret}`, method: "POST",
+    params: { object: "instagram", callback_url: `${PUBLIC_BASE_URL}/webhooks/meta`, fields: "messages,messaging_postbacks,comments", verify_token: META.VERIFY_TOKEN, include_values: "true" },
+  }).catch((e) => console.log(`ℹ️  Instagram webhook for ${org}: ${e.message}`));
+}
+
 async function saveOwnApp(org, input) {
   const appId = String(input.appId || "").trim();
   const appSecret = String(input.appSecret || "").trim();
@@ -101,4 +112,4 @@ async function removeOwnApp(org) {
   forgetSecrets();
 }
 
-module.exports = { appFor, allSecrets, ourAppIds, saveOwnApp, removeOwnApp };
+module.exports = { appFor, allSecrets, ourAppIds, saveOwnApp, removeOwnApp, registerInstagramWebhook };

@@ -46,7 +46,7 @@ function card(c) {
   const [label, color] = CATEGORY[c.category] || CATEGORY.other;
   const open = !["replied", "spam", "ignored"].includes(c.status);
   return `<div class="card">
-    <div class="row between"><div><b>${esc(c.fromName)}</b> <span class="small muted">${dateTime(c.createdAt)}${c.commentId.startsWith("sim_") ? " · test" : ""}</span></div>
+    <div class="row between"><div><b>${esc(c.fromName)}</b> <span class="small muted">${c.platform === "Instagram" ? "Instagram · " : ""}${dateTime(c.createdAt)}${c.commentId.startsWith("sim_") ? " · test" : ""}</span></div>
       <div class="row">${pill(label, color)} ${pill(STATUS[c.status] || c.status, c.status === "needs_human" || c.status === "failed" ? "red" : c.status === "replied" ? "green" : "grey")}</div></div>
     <p class="mt">“${esc(c.message)}”</p>
     ${c.note ? `<p class="small muted">${esc(c.note)}</p>` : ""}

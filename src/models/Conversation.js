@@ -17,7 +17,7 @@ const conversationSchema = new Schema(
     _id: { type: String, default: newId },
     organizationId: { type: String, required: true },
     psid: { type: String, required: true }, // customer id given by Meta ("sim_..." for the simulator)
-    channel: { type: String, default: "Messenger" }, // Messenger | Simulator
+    channel: { type: String, default: "Messenger" }, // Messenger | Instagram | Simulator
     pageId: { type: String, default: null },
     customerName: { type: String, default: "Customer" },
     avatar: { type: String, default: null },

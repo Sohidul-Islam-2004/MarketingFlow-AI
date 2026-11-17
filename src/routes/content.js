@@ -15,7 +15,7 @@ async function findItem(req) {
 }
 
 async function targetsFor(org, accountIds = []) {
-  const accounts = await SocialAccount.find({ organizationId: org, _id: { $in: accountIds }, platform: "Facebook" }).lean();
+  const accounts = await SocialAccount.find({ organizationId: org, _id: { $in: accountIds }, platform: { $in: ["Facebook", "Instagram"] } }).lean();
   return accounts.map((a) => ({ accountId: a._id, platform: a.platform, accountName: a.accountName }));
 }
 

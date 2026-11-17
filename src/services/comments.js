@@ -1,4 +1,4 @@
-// Facebook comment engine.
+// Comment engine for Facebook and Instagram posts.
 //
 // New comment -> spam check -> category (price, stock, size, delivery, order, complaint, praise, other)
 //   -> buying question: private Messenger reply (DM), and the chat continues with the AI agent
@@ -71,7 +71,7 @@ async function pageToken(org, pageId) {
 // Private reply: Meta allows exactly one Messenger message per comment. It opens a chat in the inbox.
 async function sendDm(org, comment) {
   if (comment.dmSent) return;
-  const text = `আসসালামু আলাইকুম ${String(comment.fromName).split(" ")[0]}! 👋 আপনার কমেন্টের জন্য ধন্যবাদ। কোন পণ্য, সাইজ/কালার আর কয়টা লাগবে জানালে এখানেই অর্ডার রেডি করে দিচ্ছি।`;
+  const text = `আসসালামু আলাইকুম ${String(comment.fromName).replace(/^@/, "").split(" ")[0]}! 👋 আপনার কমেন্টের জন্য ধন্যবাদ। কোন পণ্য, সাইজ/কালার আর কয়টা লাগবে জানালে এখানেই অর্ডার রেডি করে দিচ্ছি।`;
   let psid = `sim_comment_${comment.commentId}`;
   if (!isSimulated(comment)) {
     const { page, token } = await pageToken(org, comment.pageId);
@@ -80,7 +80,7 @@ async function sendDm(org, comment) {
   }
   await messenger.oneAtATime(`${org}:${psid}`, async () => {
     let conv = await Conversation.findOne({ organizationId: org, psid });
-    if (!conv) conv = new Conversation({ organizationId: org, psid, channel: isSimulated(comment) ? "Simulator" : "Messenger", pageId: comment.pageId, customerName: comment.fromName });
+    if (!conv) conv = new Conversation({ organizationId: org, psid, channel: isSimulated(comment) ? "Simulator" : comment.platform === "Instagram" ? "Instagram" : "Messenger", pageId: comment.pageId, customerName: comment.fromName });
     messenger.addMessage(conv, "customer", `(Comment on your post) ${comment.message}`);
     messenger.addMessage(conv, "ai", text);
     conv.unread = (conv.unread || 0) + 1;
@@ -92,7 +92,8 @@ async function sendDm(org, comment) {
 async function postPublicReply(org, comment, text) {
   if (!isSimulated(comment)) {
     const { token } = await pageToken(org, comment.pageId);
-    await graph(`/${comment.commentId}/comments`, { token, method: "POST", body: { message: text } });
+    // Instagram: /{comment}/replies, Facebook: /{comment}/comments
+    await graph(`/${comment.commentId}/${comment.platform === "Instagram" ? "replies" : "comments"}`, { token, method: "POST", body: { message: text } });
   }
   comment.reply = text;
   comment.replySentAt = new Date();
@@ -103,17 +104,17 @@ async function postPublicReply(org, comment, text) {
 async function hideOnFacebook(org, comment, hidden = true) {
   if (isSimulated(comment)) return;
   const { token } = await pageToken(org, comment.pageId);
-  await graph(`/${comment.commentId}`, { token, method: "POST", body: { is_hidden: hidden } });
+  await graph(`/${comment.commentId}`, { token, method: "POST", body: comment.platform === "Instagram" ? { hide: hidden } : { is_hidden: hidden } });
 }
 
 // Called for every new comment (from the webhook or the simulator)
-async function handleNewComment(org, { pageId, commentId, postId, fromName, message }) {
+async function handleNewComment(org, { platform = "Facebook", pageId, commentId, postId, fromName, message }) {
   const o = await Organization.findById(org).select("comments zones suspended expiresAt").lean();
   const settings = { autoReply: true, sendDm: true, delaySec: 30, needApproval: false, hideSpam: false, blockedWords: [], ...(o?.comments || {}) };
   if (blockedReason(o)) Object.assign(settings, { autoReply: false, sendDm: false, hideSpam: false }); // suspended / plan ended: comments are only saved
   let comment;
   try {
-    comment = await Comment.create({ organizationId: org, pageId, commentId, postId, fromName: fromName || "Someone", message: String(message || "").slice(0, 2000) });
+    comment = await Comment.create({ organizationId: org, platform, pageId, commentId, postId, fromName: fromName || "Someone", message: String(message || "").slice(0, 2000) });
   } catch (e) {
     if (e.code === 11000) return null; // Meta sent the same comment twice
     throw e;

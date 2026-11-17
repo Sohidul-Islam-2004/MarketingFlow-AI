@@ -1,4 +1,5 @@
-// Sending Messenger messages to customers through the connected Facebook Page.
+// Sending Messenger and Instagram messages to customers. Both go through the connected Facebook Page
+// (an Instagram chat keeps its Page id in conv.pageId).
 const { SocialAccount } = require("../models");
 const { graph } = require("../lib/graph");
 const { decrypt } = require("../lib/crypto");
@@ -28,7 +29,7 @@ async function sendText(org, conv, text, quickReplies = []) {
   if (isSimulator(conv)) return {};
   if (!canReply(conv)) throw fail(400, "The 24-hour reply window is closed. Meta only lets you answer after the customer messages again.");
   const page = await pageOf(org, conv.pageId);
-  const message = { text: String(text).slice(0, 2000) };
+  const message = { text: String(text).slice(0, conv.channel === "Instagram" ? 1000 : 2000) };
   if (quickReplies.length) message.quick_replies = quickReplies.map((t) => ({ content_type: "text", title: t.slice(0, 20), payload: t }));
   return graph(`/${page.accountId}/messages`, { token: decrypt(page.accessToken), method: "POST", body: { recipient: { id: conv.psid }, messaging_type: "RESPONSE", message } });
 }

@@ -4,9 +4,9 @@ import { get, post } from "./api.js";
 import { $, esc, icon, toast, openModal, dateTime, loading } from "./ui.js";
 
 const MENU = [
-  ["SHOP", [["overview", "Overview"], ["inbox", "Customer Inbox"], ["comments", "FB Comments"], ["orders", "Orders"], ["inventory", "Inventory"]]],
+  ["SHOP", [["overview", "Overview"], ["inbox", "Customer Inbox"], ["comments", "Comments"], ["orders", "Orders"], ["inventory", "Inventory"]]],
   ["MARKETING", [["content", "Content Studio"], ["calendar", "Calendar"]]],
-  ["SETTINGS", [["train", "AI Training"], ["accounts", "Facebook Page"], ["settings", "Settings"]]],
+  ["SETTINGS", [["train", "AI Training"], ["accounts", "Facebook & Instagram"], ["settings", "Settings"]]],
 ];
 const ADMIN_MENU = ["SUPER ADMIN", [["admin-customers", "Customers"], ["admin-pages", "All Pages"]]]; // added for SUPER_ADMIN_EMAILS only
 let PAGES = MENU.flatMap(([, items]) => items.map(([id]) => id));
@@ -105,11 +105,19 @@ function showBlocked(me) {
 }
 
 /* ---------- side menu ---------- */
+// Phone bottom bar: the 4 pages used all day + "More" (opens the full menu as a sheet)
+const TABS = [["overview", "Home"], ["inbox", "Inbox"], ["orders", "Orders"], ["comments", "Comments"]];
+
 function drawMenu(active, counts = {}) {
   $("#nav").innerHTML = MENU.map(([group, items]) =>
     `<div class="nav-group">${group}</div>` +
-    items.map(([id, label]) => `<a class="nav ${id === active ? "active" : ""}" href="#${id}">${icon(id)}${label}${counts[id] ? `<span class="count">${counts[id]}</span>` : ""}</a>`).join("")
+    items.map(([id, label]) => `<a class="nav ${id === active ? "active" : ""}" href="#${id}">${icon(id)}<span>${label}</span>${counts[id] ? `<span class="count">${counts[id]}</span>` : ""}</a>`).join("")
   ).join("");
+  const inTabs = TABS.some(([id]) => id === active);
+  if ($("#tabbar")) $("#tabbar").innerHTML = TABS.map(([id, label]) =>
+    `<a href="#${id}" class="${id === active ? "on" : ""}"><i>${icon(id)}${counts[id] ? `<b>${counts[id]}</b>` : ""}</i><span>${label}</span></a>`).join("") +
+    `<button type="button" id="tabMore" class="${inTabs ? "" : "on"}"><i><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></i><span>More</span></button>`;
+  if ($("#tabMore")) $("#tabMore").onclick = () => document.body.classList.toggle("menu-open");
 }
 
 // Red counters in the menu (chats that need a person, comments to answer, orders on hold)
@@ -121,11 +129,9 @@ async function refreshCounts() {
     drawMenu(currentPage(), menuCounts);
     // the same total on the phone top bar and in the browser tab
     const waiting = o.todo.needsHuman + o.todo.newComments;
-    $("#topCount").textContent = waiting;
-    $("#topCount").classList.toggle("hidden", !waiting);
     document.title = `${waiting ? `(${waiting}) ` : ""}MarketingFlow AI`;
     const n = await get("/api/notifications");
-    $("#bell").innerHTML = icon("bell") + (n.unread ? `<span class="badge">${n.unread}</span>` : "");
+    $("#bell").innerHTML = $("#topBell").innerHTML = icon("bell") + (n.unread ? `<span class="badge">${n.unread}</span>` : "");
   } catch {}
 }
 
@@ -157,7 +163,7 @@ async function showPage() {
   const id = ++renderId;
   drawMenu(page, menuCounts);
   closeMenu();
-  $("#topTitle").textContent = LABELS[page];
+  if ($("#topTitle")) $("#topTitle").textContent = LABELS[page];
   const root = document.createElement("div"); // a fresh element each time, so old click handlers disappear
   root.innerHTML = loading();
   $("#page").replaceChildren(root);
@@ -174,8 +180,7 @@ async function showPage() {
 
 /* ---------- phone: slide-in menu ---------- */
 const closeMenu = () => document.body.classList.remove("menu-open");
-$("#menuBtn").onclick = () => document.body.classList.toggle("menu-open");
-$("#shade").onclick = closeMenu;
+if ($("#shade")) $("#shade").onclick = closeMenu;
 window.addEventListener("hashchange", showPage);
 
 /* ---------- start ---------- */
@@ -197,8 +202,15 @@ window.addEventListener("hashchange", showPage);
   $("#meBusiness").textContent = me.business;
   $("#logout").innerHTML = icon("logout");
   $("#logout").onclick = async () => { await post("/api/auth/logout"); location.reload(); };
-  $("#bell").innerHTML = icon("bell");
-  $("#bell").onclick = () => showNotifications().catch((e) => toast(e.message, true));
+  // The phone top bar (#topBell, #topLogo) is in the new index.html. If an old index.html is still on the
+  // server or in the browser cache, skip it instead of stopping the whole app.
+  for (const id of ["#bell", "#topBell"]) {
+    const el = $(id);
+    if (!el) continue;
+    el.innerHTML = icon("bell");
+    el.onclick = () => showNotifications().catch((e) => toast(e.message, true));
+  }
+  if ($("#topLogo")) $("#topLogo").innerHTML = icon("send");
   await showPage();
   refreshCounts();
   setInterval(() => document.hidden || refreshCounts(), 60000); // not while the tab is in the background
