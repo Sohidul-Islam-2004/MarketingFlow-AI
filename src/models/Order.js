@@ -52,6 +52,8 @@ const orderSchema = new Schema(
     courierName: { type: String, default: "" }, // free text: Steadfast, Pathao, own rider...
     trackingNo: { type: String, default: "" },
     notes: { type: String, default: "" },
+    callTries: { type: Number, default: 0 }, // "No answer" presses while the order waits for a call
+    lastCallAt: { type: Date, default: null },
     history: { type: [historySchema], default: [] },
   },
   options

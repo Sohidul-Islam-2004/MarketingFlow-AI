@@ -210,7 +210,7 @@ async function placeOrderFromDraft(org, conv, settings, by) {
   const order = await createOrder(org, {
     customerName: d.name, phone: d.phone, address: d.address, district: d.district,
     items: d.items.map((i) => ({ productId: i.productId, variantId: i.variantId, qty: i.qty })),
-    paymentMethod: "COD", source: "ai_chat", confirmed: by !== "AI" || settings.ai.autoConfirm,
+    paymentMethod: "COD", source: "ai_chat", confirmed: by !== "AI", // AI orders wait until the shop calls the customer
     conversationId: conv._id, psid: conv.psid, idemKey: `chat:${conv._id}:v${d.version}`,
   }, by);
   conv.draft = { ...d, status: "placed", orderNo: order.orderNo };

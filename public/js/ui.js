@@ -17,7 +17,7 @@ export const pill = (text, color = "grey") => `<span class="pill p-${color}">${e
 // empty("No orders yet", "They appear here…", `<button …>`)  (the 3rd part is ready-made HTML, e.g. a button)
 export const empty = (title, hint = "", actionHtml = "") => `<div class="empty"><b>${esc(title)}</b>${esc(hint)}${actionHtml ? `<div class="mt">${actionHtml}</div>` : ""}</div>`;
 
-export const ORDER_STATUS = { pending: ["Pending", "yellow"], confirmed: ["Confirmed", "blue"], packed: ["Packed", "purple"], shipped: ["Shipped", "purple"], delivered: ["Delivered", "green"], returned: ["Returned", "grey"], cancelled: ["Cancelled", "grey"] };
+export const ORDER_STATUS = { pending: ["To call", "yellow"], confirmed: ["Confirmed", "blue"], packed: ["Packed", "purple"], shipped: ["Shipped", "purple"], delivered: ["Delivered", "green"], returned: ["Returned", "grey"], cancelled: ["Cancelled", "grey"] };
 export const orderPill = (status) => pill(...(ORDER_STATUS[status] || [status, "grey"]));
 
 // <select> options from ["a","b"] or [["value","Label"], ...]

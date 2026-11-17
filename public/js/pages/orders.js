@@ -4,7 +4,7 @@ import { esc, taka, table, orderPill, dateTime, onAction, openModal, closeModal,
 import { itemRow, readItems, districtList } from "../shared.js";
 import { updateCounts } from "../app.js";
 
-const TABS = [["", "All"], ["pending", "Pending"], ["confirmed", "Confirmed"], ["packed", "Packed"], ["shipped", "Shipped"], ["delivered", "Delivered"], ["returned", "Returned"], ["cancelled", "Cancelled"]];
+const TABS = [["", "All"], ["pending", "📞 To call"], ["confirmed", "Confirmed"], ["packed", "Packed"], ["shipped", "Shipped"], ["delivered", "Delivered"], ["returned", "Returned"], ["cancelled", "Cancelled"]];
 let filters = { status: "", q: "", from: "", to: "", page: 1 };
 let places = null;
 
@@ -46,7 +46,7 @@ async function draw(root) {
         ["Customer", (o) => `${esc(o.customerName)}<div class="small muted">${esc(o.phone)} · ${esc(o.district || "")}</div>`],
         ["Items", (o) => o.items.map((i) => `${esc(i.name)}${i.variantName ? ` (${esc(i.variantName)})` : ""} ×${i.qty}`).join("<br>")],
         ["Total", (o) => `<b>${taka(o.total)}</b><div class="small muted">${o.paymentMethod}${o.paid ? " · paid" : ""}</div>`],
-        ["Status", (o) => orderPill(o.status)],
+        ["Status", (o) => `${orderPill(o.status)}${o.status === "pending" && o.callTries ? `<div class="small muted">No answer ×${o.callTries}</div>` : ""}`],
         ["Date", (o) => dateTime(o.createdAt)],
       ], data.rows, { emptyText: "No orders here", rowAttrs: (o) => `class="click" data-action="open" data-id="${o._id}"` })}
       <div class="row between mt"><span class="small muted">${data.total} order(s)</span>
@@ -64,6 +64,7 @@ async function openOrder(id, refresh) {
     title: `Order ${o.orderNo}`, wide: true, buttons: [],
     body: `
       <div class="row">${orderPill(o.status)} <span class="small muted">${dateTime(o.createdAt)}</span></div>
+      ${o.status === "pending" ? callBox(o) : ""}
       <div class="grid2 mt">
         <div class="box"><h4>Customer</h4><b>${esc(o.customerName)}</b><div>${esc(o.phone)}</div><div class="small">${esc(o.address)}</div><div class="small muted">${esc(o.district || "")} · ${esc(o.zone || "")}</div>
           ${o.conversationId ? `<button type="button" class="btn sm light mt" data-action="openChat">Open chat</button>` : ""}</div>
@@ -72,8 +73,8 @@ async function openOrder(id, refresh) {
           <div class="line"><span><b>Total</b></span><b>${taka(o.total)}</b></div><div class="small muted">${o.paymentMethod} · ${o.paid ? "paid" : "not paid yet"}</div></div>
       </div>
       ${o.trackingNo ? `<div class="box mt"><h4>Courier</h4>${esc(o.courierName)} · <b>${esc(o.trackingNo)}</b></div>` : ""}
-      <div class="box mt"><h4>Change status</h4><div class="row">
-        ${o.next.map((s) => `<button type="button" class="btn sm ${s === "cancelled" || s === "returned" ? "danger" : ""}" data-action="status" data-to="${s}">→ ${ORDER_STATUS[s][0]}</button>`).join("") || `<span class="muted small">This order is finished.</span>`}
+      <div class="box mt"><h4>${o.status === "pending" ? "More" : "Change status"}</h4><div class="row">
+        ${(o.status === "pending" ? [] : o.next).map((s) => `<button type="button" class="btn sm ${s === "cancelled" || s === "returned" ? "danger" : ""}" data-action="status" data-to="${s}">→ ${ORDER_STATUS[s][0]}</button>`).join("") || (o.next.length ? "" : `<span class="muted small">This order is finished.</span>`)}
         <a class="btn sm light" target="_blank" href="/api/orders/${o._id}/invoice">Print invoice</a>
         ${early ? `<button type="button" class="btn sm light" data-action="edit">Edit details</button>` : ""}
         <button type="button" class="btn sm light" data-action="togglePaid">${o.paid ? "Mark as not paid" : "Mark as paid"}</button></div></div>
@@ -88,7 +89,23 @@ async function openOrder(id, refresh) {
     saveNotes: async () => { await put(`/api/orders/${o._id}`, { notes: $("#orderNotes").value }); toast("Notes saved"); },
     togglePaid: async () => { await put(`/api/orders/${o._id}`, { paid: !o.paid }); done("Payment updated"); },
     edit: () => editDetails(o, done),
+    noAnswer: async () => { await post(`/api/orders/${o._id}/no-answer`); done("Saved. Try again later"); },
   });
+}
+
+// Orders the AI takes wait here until the shop calls the customer and presses Confirm
+function callBox(o) {
+  const tel = String(o.phone).replace(/[^0-9+]/g, "");
+  return `<div class="call-box mt">
+    <div><div class="small muted">Call the customer, then confirm the order</div>
+      <a class="call-number" href="tel:${esc(tel)}">📞 ${esc(o.phone)}</a>
+      ${o.callTries ? `<div class="small muted">No answer ${o.callTries} time(s)${o.lastCallAt ? `, last ${dateTime(o.lastCallAt)}` : ""}</div>` : ""}</div>
+    <div class="call-actions">
+      <a class="btn light" href="tel:${esc(tel)}">📞 Call</a>
+      <button type="button" class="btn" data-action="status" data-to="confirmed">✅ Confirm</button>
+      <button type="button" class="btn light" data-action="noAnswer">No answer</button>
+      <button type="button" class="btn danger" data-action="status" data-to="cancelled">Cancel</button>
+    </div></div>`;
 }
 
 // Some statuses need extra information first
@@ -101,7 +118,7 @@ function changeStatus(o, to, done) {
   }
   if (to === "cancelled") {
     return openModal({ title: "Cancel order", buttons: [["ok", "Cancel order", "danger"]],
-      body: `<label>Why is it cancelled?</label><input name="note" required placeholder="Customer didn't pick up the phone">`,
+      body: `<label>Why is it cancelled?</label><input name="note" required placeholder="Customer didn't pick up the phone" value="${o.callTries ? `No answer after ${o.callTries} calls` : ""}">`,
       onSubmit: (d) => send(d) });
   }
   if (to === "returned") {

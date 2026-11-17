@@ -47,7 +47,6 @@ async function draw(root) {
   const forms = {
     ai: `${s.ai.ready ? "" : `<div class="note">AI is not set up: add AI_API_KEY to .env and restart the server.</div>`}
       ${check("enabled", s.ai.enabled, "AI answers customers in Messenger")}
-      ${check("autoConfirm", s.ai.autoConfirm, "Orders the AI takes are Confirmed straight away (off = Pending, you call first)")}
       <div class="f2"><div><label>Tone</label><select name="tone">${options([["friendly", "Friendly"], ["professional", "Professional"], ["formal", "Formal"]], s.ai.tone)}</select></div>
         <div><label>Hand the chat to you when the AI is less sure than (%)</label><input type="number" name="handoffBelow" min="0" max="100" value="${s.ai.handoffBelow}"></div></div>
       <div><label>Delivery time (the AI tells customers this)</label><input name="deliveryTime" value="${esc(s.ai.deliveryTime)}"></div>

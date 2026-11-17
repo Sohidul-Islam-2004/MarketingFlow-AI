@@ -66,6 +66,10 @@ router.put("/:id", handle(async (req, res) => {
   res.json(await orders.editOrder(req.org, req.params.id, req.body));
 }));
 
+router.post("/:id/no-answer", handle(async (req, res) => {
+  res.json(await orders.noAnswer(req.org, req.params.id, req.user.name));
+}));
+
 // { status, note, courierName, trackingNo, restock }
 router.post("/:id/status", handle(async (req, res) => {
   const { status, ...options } = req.body;

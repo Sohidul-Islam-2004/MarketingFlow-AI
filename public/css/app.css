@@ -289,3 +289,9 @@ a.kpi.on { border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green);
   .variant-row { grid-template-columns: 1.3fr 1fr 0.9fr 36px; }
   .pf-row input { min-width: 0; }
 }
+
+/* Order pop-up: "call the customer, then confirm" */
+.call-box { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; border-radius: 14px; background: #fff8db; border: 1px solid #f2df8a; }
+.call-number { display: block; font-size: 22px; font-weight: 700; color: inherit; text-decoration: none; margin: 4px 0; }
+.call-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 700px) { .call-actions { width: 100%; } .call-actions > * { flex: 1 1 45%; text-align: center; } }

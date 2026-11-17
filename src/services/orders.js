@@ -7,7 +7,7 @@ const { notify } = require("../lib/notify");
 const stock = require("./stock");
 const messenger = require("./messenger");
 
-const STATUS_LABEL = { pending: "Pending", confirmed: "Confirmed", packed: "Packed", shipped: "Shipped", delivered: "Delivered", returned: "Returned", cancelled: "Cancelled" };
+const STATUS_LABEL = { pending: "To call", confirmed: "Confirmed", packed: "Packed", shipped: "Shipped", delivered: "Delivered", returned: "Returned", cancelled: "Cancelled" };
 
 // Which status can follow which
 const NEXT = {
@@ -162,4 +162,16 @@ async function editOrder(org, orderId, changes) {
   return order;
 }
 
-module.exports = { STATUS_LABEL, NEXT, priceOrder, createOrder, changeStatus, editOrder };
+// "Called, no answer": the order stays "To call", we count the tries so the shop knows when to give up
+async function noAnswer(org, id, by) {
+  const order = await Order.findOne({ _id: id, organizationId: org });
+  if (!order) throw fail(404, "Order not found");
+  if (order.status !== "pending") throw fail(400, "This order is already confirmed or closed");
+  order.callTries = (order.callTries || 0) + 1;
+  order.lastCallAt = new Date();
+  order.history.push({ status: "pending", note: `Called, no answer (${order.callTries})`, by });
+  await order.save();
+  return order.toObject();
+}
+
+module.exports = { STATUS_LABEL, NEXT, priceOrder, createOrder, changeStatus, editOrder, noAnswer };
