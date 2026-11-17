@@ -1,4 +1,4 @@
-// Super Admin → All Pages: every Facebook Page connected by any shop.
+// Super Admin → All Pages: every Facebook Page and Instagram account connected by any shop.
 // See which ones work, which need a reconnect, and how busy they are. Pages are only connected
 // by their owners (Facebook login): the admin can check, switch the AI off, or disconnect.
 import { get, post, del } from "../api.js";
@@ -44,6 +44,7 @@ const SHOW = {
   reconnect: (p) => p.status !== "active",
   webhooksOff: (p) => p.status === "active" && !p.webhooksOn,
   silent: (p) => p.silent,
+  instagram: (p) => p.platform === "Instagram",
 };
 
 function statusOf(p) {
@@ -59,22 +60,26 @@ async function draw(root) {
   const rows = data.rows.filter((p) => SHOW[filters.show](p) && (!q || `${p.accountName} ${p.business} ${p.accountId}`.toLowerCase().includes(q)));
   const t = data.totals;
   root.innerHTML = `
-    <div class="page-head"><div><h1>All Facebook Pages</h1><p>Every Page your customers connected. Tokens are checked by themselves every 6 hours.</p></div>
-      <button class="btn light" data-action="checkAll">Check all Pages now</button></div>
+    <div class="page-head"><div><h1>All Pages</h1><p>Every Facebook Page and Instagram account your customers connected. Checked by themselves every 6 hours.</p></div>
+      <button class="btn light" data-action="checkAll">Check all now</button></div>
     <div class="kpis">
-      ${[["", "Connected", t.all], ["working", "Working", t.working], ["reconnect", "Reconnect needed", t.reconnect], ["webhooksOff", "Messages off", t.webhooksOff], ["silent", "Quiet 7+ days", t.silent]]
+      ${[["", "Connected", t.all], ["working", "Working", t.working], ["reconnect", "Reconnect needed", t.reconnect], ["webhooksOff", "Messages off", t.webhooksOff], ["silent", "Quiet 7+ days", t.silent], ["instagram", "Instagram", t.instagram || 0]]
         .map(([key, label, n]) => `<a href="#" class="kpi ${filters.show === key ? "on" : ""}" data-action="show" data-show="${key}"><div class="label">${label}</div><div class="value">${num(n)}</div></a>`).join("")}
     </div>
     <div class="card mt">
-      <div class="filters"><input data-filter="q" placeholder="Search Page or shop…" value="${esc(filters.q)}"></div>
+      <div class="filters"><input data-filter="q" placeholder="Search Page, Instagram or shop…" value="${esc(filters.q)}"></div>
       ${table([
-        ["Page", (p) => `<div class="row" style="flex-wrap:nowrap">${p.pictureUrl ? `<img src="${esc(p.pictureUrl)}" style="width:28px;height:28px;border-radius:50%">` : ""}<div><b>${esc(p.accountName)}</b><div class="small muted"><a href="https://facebook.com/${esc(p.accountId)}" target="_blank" rel="noopener">${esc(p.accountId)}</a></div></div></div>`],
+        ["Page / Instagram", (p) => {
+          const ig = p.platform === "Instagram";
+          const link = ig ? `https://instagram.com/${esc(p.accountName.replace(/^@/, ""))}` : `https://facebook.com/${esc(p.accountId)}`;
+          return `<div class="row" style="flex-wrap:nowrap">${p.pictureUrl ? `<img src="${esc(p.pictureUrl)}" style="width:28px;height:28px;border-radius:50%">` : ""}<div><b>${esc(p.accountName)}</b> ${pill(ig ? "Instagram" : "Facebook", ig ? "pink" : "blue")}<div class="small muted"><a href="${link}" target="_blank" rel="noopener">${ig ? "open profile" : esc(p.accountId)}</a></div></div></div>`;
+        }],
         ["Shop", (p) => `${esc(p.business)}${p.shopState !== "active" ? ` ${pill(p.shopState === "expired" ? "Plan ended" : "Suspended", "yellow")}` : ""}<div class="small muted">connected ${dateOnly(p.connectedAt)}</div>`],
         ["Status", statusOf],
-        ["Last message from Facebook", (p) => (p.lastWebhookAt ? dateTime(p.lastWebhookAt) : `<span class="muted">none yet</span>`)],
+        ["Last message", (p) => (p.lastWebhookAt ? dateTime(p.lastWebhookAt) : `<span class="muted">none yet</span>`)],
         ["Chats (30 days)", (p) => num(p.chats30)],
         ["AI", (p) => (p.aiOn ? pill("On", "green") : pill("Off", "grey"))],
         ["", (p) => `<div class="row" style="flex-wrap:nowrap"><button class="btn sm light" data-action="ai" data-id="${p._id}">${p.aiOn ? "AI off" : "AI on"}</button><button class="btn sm danger" data-action="remove" data-id="${p._id}">Disconnect</button></div>`],
-      ], rows, { emptyText: filters.q || filters.show ? "No Pages match" : "No shop has connected a Page yet" })}
+      ], rows, { emptyText: filters.q || filters.show ? "Nothing matches" : "No shop has connected a Page yet" })}
     </div>`;
 }

@@ -50,7 +50,7 @@ async function draw(root) {
         ["Owner", (c) => (c.owner ? `${esc(c.owner.name)}<div class="small muted">${esc(c.owner.email)}</div>${c.owner.invitePending ? pill("Hasn't set password", "yellow") : `<div class="small muted">Last login: ${c.owner.lastLoginAt ? dateOnly(c.owner.lastLoginAt) : "never"}</div>`}` : `<span class="muted">none</span>`)],
         ["Plan", (c) => `${esc(c.plan)}<div class="small muted">${c.expiresAt ? `until ${dateOnly(c.expiresAt)}` : "no end date"}</div>`],
         ["Status", (c) => pill(...STATE[c.state])],
-        ["Pages", (c) => `${c.pages}${c.brokenPages ? ` ${pill(`${c.brokenPages} need reconnect`, "red")}` : ""}`],
+        ["Pages", (c) => `${c.pages}${c.instagram ? ` <span class="small muted">+ ${c.instagram} Instagram</span>` : ""}${c.brokenPages ? ` ${pill(`${c.brokenPages} need reconnect`, "red")}` : ""}`],
         ["Last 30 days", (c) => `${num(c.chats30)} chats · ${num(c.orders30)} orders<div class="small muted">${taka(c.revenue30)}</div>`],
         ["", (c) => `<div class="row" style="flex-wrap:nowrap">
             <button class="btn sm light" data-action="edit" data-id="${c._id}">Edit</button>

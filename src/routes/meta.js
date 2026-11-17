@@ -166,12 +166,14 @@ async function checkPage(a) {
   await a.save();
 }
 
-// Checks every connected Page of every shop, 5 at a time. Returns { checked, broken }.
+// Checks every connected Page and Instagram account of every shop, 5 at a time. Returns { checked, broken }.
+// Pages first, so an Instagram account sees whether its Page still receives messages.
 async function checkAllPages() {
-  const pages = await SocialAccount.find({ platform: "Facebook" }).select("+accessToken");
-  let next = 0;
-  await Promise.all(Array.from({ length: 5 }, async () => { while (next < pages.length) await checkPage(pages[next++]); }));
-  return { checked: pages.length, broken: pages.filter((p) => p.status !== "active").length };
+  const all = await SocialAccount.find({ platform: { $in: ["Facebook", "Instagram"] } }).select("+accessToken");
+  const run = async (list) => { let next = 0; await Promise.all(Array.from({ length: 5 }, async () => { while (next < list.length) await checkPage(list[next++]); })); };
+  await run(all.filter((a) => a.platform === "Facebook"));
+  await run(all.filter((a) => a.platform === "Instagram"));
+  return { checked: all.length, broken: all.filter((p) => p.status !== "active").length };
 }
 
 router.post("/check", handle(async (req, res) => {

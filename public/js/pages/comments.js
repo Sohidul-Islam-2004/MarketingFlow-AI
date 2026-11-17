@@ -36,7 +36,7 @@ async function draw(root) {
   const data = await get(`/api/comments?tab=${tab}`);
   rows = data.rows;
   root.innerHTML = `
-    <div class="page-head"><div><h1>FB Comments</h1><p>Buying questions get a private message and a public reply with your real prices. Complaints wait for you. Change the rules in Settings.</p></div>
+    <div class="page-head"><div><h1>Comments</h1><p>Buying questions get a private message and a public reply with your real prices. Complaints wait for you. Change the rules in Settings.</p></div>
       <button class="btn light" data-action="simulate">Test a comment</button></div>
     <div class="tabs">${TABS.map(([k, l]) => `<button class="tab ${tab === k ? "on" : ""}" data-action="tab" data-tab="${k}">${l}${k === "needs_you" ? `<span class="n">${data.needsYou}</span>` : ""}</button>`).join("")}</div>
     <div class="stack">${rows.map(card).join("") || `<div class="card"><div class="empty"><b>Nothing here</b>New comments on your Page posts show up within seconds.</div></div>`}</div>`;

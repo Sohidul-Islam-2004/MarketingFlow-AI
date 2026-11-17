@@ -10,7 +10,7 @@ let versions = [];
 export async function render(root) {
   const products = await get("/api/products");
   root.innerHTML = `
-    <div class="page-head"><div><h1>Content Studio</h1><p>Write posts with AI, then schedule or publish them to your Facebook Page.</p></div>
+    <div class="page-head"><div><h1>Posts</h1><p>Write posts with AI, then publish or schedule them to Facebook and Instagram.</p></div>
       <button class="btn" data-action="newPost">+ New post</button></div>
     <div class="split">
       <div class="card"><h3>✨ AI writer</h3><p class="sub">Uses your shop info and product prices. Nothing is invented.</p>

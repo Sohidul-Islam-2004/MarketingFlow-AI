@@ -2,15 +2,27 @@
 // Each page lives in js/pages/<name>.js and exports render(root, params).
 import { get, post } from "./api.js";
 import { $, esc, icon, toast, openModal, dateTime, loading } from "./ui.js";
+import { applyTheme } from "./theme.js";
 
+applyTheme(); // the shop's colours (Setup → Look), before anything is drawn
+
+// The menu has 6 places. Some hold more than one page, shown as tabs at the top of the page.
+//   [menu id, menu label, [[page id, tab label], …]]   the first page opens when the menu item is clicked
 const MENU = [
-  ["SHOP", [["overview", "Overview"], ["inbox", "Customer Inbox"], ["comments", "Comments"], ["orders", "Orders"], ["inventory", "Inventory"]]],
-  ["MARKETING", [["content", "Content Studio"], ["calendar", "Calendar"]]],
-  ["SETTINGS", [["train", "AI Training"], ["accounts", "Facebook & Instagram"], ["settings", "Settings"]]],
+  ["overview", "Home", [["overview", "Home"]]],
+  ["inbox", "Inbox", [["inbox", "Chats"], ["comments", "Comments"]]],
+  ["orders", "Orders", [["orders", "Orders"]]],
+  ["inventory", "Products", [["inventory", "Products"]]],
+  ["content", "Posts", [["content", "Posts"], ["calendar", "Calendar"]]],
+  ["setup", "Setup", [["accounts", "Facebook & Instagram"], ["train", "AI Training"], ["settings", "Settings"], ["look", "Look"]]],
 ];
-const ADMIN_MENU = ["SUPER ADMIN", [["admin-customers", "Customers"], ["admin-pages", "All Pages"]]]; // added for SUPER_ADMIN_EMAILS only
-let PAGES = MENU.flatMap(([, items]) => items.map(([id]) => id));
-let LABELS = Object.fromEntries(MENU.flatMap(([, items]) => items));
+const ADMIN_MENU = [["admin-customers", "Customers", [["admin-customers", "Customers"]]], ["admin-pages", "All Pages", [["admin-pages", "All Pages"]]]]; // SUPER_ADMIN_EMAILS only
+let SHOW_ADMIN = false;
+const allMenu = () => (SHOW_ADMIN ? [...MENU, ...ADMIN_MENU] : MENU);
+const sectionOf = (page) => allMenu().find(([, , pages]) => pages.some(([id]) => id === page)) || MENU[0];
+const pageIds = () => allMenu().flatMap(([, , pages]) => pages.map(([id]) => id));
+const labelOf = (page) => { const s = sectionOf(page); return s[2].length > 1 ? s[1] : s[2].find(([id]) => id === page)?.[1] || s[1]; };
+const MENU_ICON = { setup: "settings" };
 
 /* ---------- login / sign up ---------- */
 let loginOptions = null; // { signup: can people create accounts?, support: who to contact }
@@ -106,16 +118,23 @@ function showBlocked(me) {
 
 /* ---------- side menu ---------- */
 // Phone bottom bar: the 4 pages used all day + "More" (opens the full menu as a sheet)
-const TABS = [["overview", "Home"], ["inbox", "Inbox"], ["orders", "Orders"], ["comments", "Comments"]];
+const TABS = [["overview", "Home"], ["inbox", "Inbox"], ["orders", "Orders"], ["inventory", "Products"]];
 
-function drawMenu(active, counts = {}) {
-  $("#nav").innerHTML = MENU.map(([group, items]) =>
-    `<div class="nav-group">${group}</div>` +
-    items.map(([id, label]) => `<a class="nav ${id === active ? "active" : ""}" href="#${id}">${icon(id)}<span>${label}</span>${counts[id] ? `<span class="count">${counts[id]}</span>` : ""}</a>`).join("")
-  ).join("");
+// counts are per page (inbox, comments…); a menu item shows the total of its pages
+const sectionCount = (pages, counts) => pages.reduce((n, [id]) => n + (counts[id] || 0), 0);
+
+function drawMenu(page, counts = {}) {
+  const active = sectionOf(page)[0];
+  const item = ([id, label, pages]) => {
+    const n = sectionCount(pages, counts);
+    return `<a class="nav ${id === active ? "active" : ""}" href="#${pages[0][0]}">${icon(MENU_ICON[id] || id)}<span>${label}</span>${n ? `<span class="count">${n}</span>` : ""}</a>`;
+  };
+  $("#nav").innerHTML = MENU.map(item).join("") + (SHOW_ADMIN ? `<div class="nav-group">SUPER ADMIN</div>${ADMIN_MENU.map(item).join("")}` : "");
   const inTabs = TABS.some(([id]) => id === active);
-  if ($("#tabbar")) $("#tabbar").innerHTML = TABS.map(([id, label]) =>
-    `<a href="#${id}" class="${id === active ? "on" : ""}"><i>${icon(id)}${counts[id] ? `<b>${counts[id]}</b>` : ""}</i><span>${label}</span></a>`).join("") +
+  if ($("#tabbar")) $("#tabbar").innerHTML = TABS.map(([id, label]) => {
+    const n = sectionCount(sectionOf(id)[2], counts);
+    return `<a href="#${id}" class="${id === active ? "on" : ""}"><i>${icon(id)}${n ? `<b>${n}</b>` : ""}</i><span>${label}</span></a>`;
+  }).join("") +
     `<button type="button" id="tabMore" class="${inTabs ? "" : "on"}"><i><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></i><span>More</span></button>`;
   if ($("#tabMore")) $("#tabMore").onclick = () => document.body.classList.toggle("menu-open");
 }
@@ -151,7 +170,8 @@ async function showNotifications() {
 // "#orders?status=pending" -> { page: "orders", params: { status: "pending" } }
 function currentPage() {
   const page = location.hash.slice(1).split("?")[0];
-  return PAGES.includes(page) ? page : "overview";
+  if (page === "setup") return "accounts";
+  return pageIds().includes(page) ? page : "overview";
 }
 function currentParams() {
   return Object.fromEntries(new URLSearchParams(location.hash.split("?")[1] || ""));
@@ -163,10 +183,12 @@ async function showPage() {
   const id = ++renderId;
   drawMenu(page, menuCounts);
   closeMenu();
-  if ($("#topTitle")) $("#topTitle").textContent = LABELS[page];
+  if ($("#topTitle")) $("#topTitle").textContent = labelOf(page);
   const root = document.createElement("div"); // a fresh element each time, so old click handlers disappear
   root.innerHTML = loading();
-  $("#page").replaceChildren(root);
+  const tabs = subTabs(page);
+  $("#page").replaceChildren(...(tabs ? [tabs, root] : [root]));
+  tabs?.querySelector(".on")?.scrollIntoView({ inline: "center", block: "nearest" }); // phone: the open tab is visible
   window.scrollTo(0, 0);
   try {
     const module = await import(`./pages/${page}.js`);
@@ -176,6 +198,16 @@ async function showPage() {
     root.innerHTML = `<div class="card"><b>Couldn't load this page</b><p class="muted">${esc(e.message)}</p><button class="btn light mt" id="retry">Try again</button></div>`;
     $("#retry").onclick = showPage;
   }
+}
+
+// Tabs at the top of pages that share one menu item, e.g. Inbox: Chats | Comments
+function subTabs(page) {
+  const pages = sectionOf(page)[2];
+  if (pages.length < 2) return null;
+  const nav = document.createElement("nav");
+  nav.className = "subtabs";
+  nav.innerHTML = pages.map(([id, label]) => `<a href="#${id}" class="${id === page ? "on" : ""}">${esc(label)}${menuCounts[id] ? `<span class="count">${menuCounts[id]}</span>` : ""}</a>`).join("");
+  return nav;
 }
 
 /* ---------- phone: slide-in menu ---------- */
@@ -189,11 +221,7 @@ window.addEventListener("hashchange", showPage);
   let me;
   try { me = await get("/api/auth/me"); } catch { return showLogin(); }
   if (me.blocked) return showBlocked(me);
-  if (me.user.isAdmin) {
-    MENU.push(ADMIN_MENU);
-    PAGES = MENU.flatMap(([, items]) => items.map(([id]) => id));
-    LABELS = Object.fromEntries(MENU.flatMap(([, items]) => items));
-  }
+  if (me.user.isAdmin) SHOW_ADMIN = true;
   $("#auth").classList.add("hidden");
   $("#app").classList.remove("hidden");
   $("#logo").innerHTML = icon("send");

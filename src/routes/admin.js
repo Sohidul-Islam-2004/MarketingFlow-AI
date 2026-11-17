@@ -1,4 +1,4 @@
-// Super Admin: create and manage customer accounts, and watch every connected Facebook Page.
+// Super Admin: create and manage customer accounts, and watch every connected Facebook Page and Instagram account.
 // Only emails in SUPER_ADMIN_EMAILS (.env) can use these routes (see server.js).
 //
 //   GET    /api/admin/customers               all shops with their numbers
@@ -47,20 +47,22 @@ router.get("/customers", handle(async (req, res) => {
   const [orgs, users, pages, orders, chats] = await Promise.all([
     Organization.find().select("name phone plan expiresAt suspended createdAt").sort({ createdAt: -1 }).lean(),
     User.find().select("organizationId name email lastLoginAt").lean(),
-    SocialAccount.find({ platform: "Facebook" }).select("organizationId status").lean(),
+    SocialAccount.find({ platform: { $in: ["Facebook", "Instagram"] } }).select("organizationId platform status").lean(),
     perShop(Order, "createdAt", { status: { $nin: ["cancelled", "returned"] } }),
     perShop(Conversation, "updatedAt", { channel: { $ne: "Simulator" } }),
   ]);
   const rows = orgs.map((o) => {
     const owner = users.find((u) => u.organizationId === o._id);
-    const myPages = pages.filter((p) => p.organizationId === o._id);
+    const mine = pages.filter((p) => p.organizationId === o._id);
+    const myPages = mine.filter((p) => p.platform === "Facebook");
     return {
       ...o,
       state: blockedReason(o) || "active", // active | suspended | expired
       isMe: o._id === req.org, // the admin's own workspace: can't be suspended or deleted here
       owner: owner && { name: owner.name, email: owner.email, lastLoginAt: owner.lastLoginAt, invitePending: !owner.lastLoginAt }, // set-password and login both set lastLoginAt
       pages: myPages.length,
-      brokenPages: myPages.filter((p) => p.status !== "active").length,
+      instagram: mine.length - myPages.length,
+      brokenPages: mine.filter((p) => p.status !== "active").length,
       orders30: orders[o._id]?.n || 0,
       revenue30: orders[o._id]?.revenue || 0,
       chats30: chats[o._id]?.n || 0,
@@ -129,25 +131,26 @@ router.delete("/customers/:org", handle(async (req, res) => {
 router.get("/pages", handle(async (req, res) => {
   const since = new Date(Date.now() - 30 * DAY);
   const [pages, orgs, chats] = await Promise.all([
-    SocialAccount.find({ platform: "Facebook" }).sort({ createdAt: -1 }).lean(),
+    SocialAccount.find({ platform: { $in: ["Facebook", "Instagram"] } }).sort({ createdAt: -1 }).lean(),
     Organization.find().select("name ai.enabled suspended expiresAt").lean(),
-    Conversation.aggregate([{ $match: { updatedAt: { $gte: since }, channel: "Messenger" } }, { $group: { _id: "$pageId", n: { $sum: 1 } } }]),
+    Conversation.aggregate([{ $match: { updatedAt: { $gte: since }, channel: { $in: ["Messenger", "Instagram"] } } }, { $group: { _id: { channel: "$channel", pageId: "$pageId" }, n: { $sum: 1 } } }]),
   ]);
-  const chatsOf = Object.fromEntries(chats.map((c) => [c._id, c.n]));
+  // Instagram chats keep their Facebook Page's id, so they are counted by channel + Page
+  const chatsOf = Object.fromEntries(chats.map((c) => [`${c._id.channel}:${c._id.pageId}`, c.n]));
   const rows = pages.map((p) => {
     const org = orgs.find((o) => o._id === p.organizationId);
     // "silent" = connected, but Facebook sent nothing for 7 days (webhooks may be broken)
     const silent = p.status === "active" && (!p.lastWebhookAt || new Date(p.lastWebhookAt) < new Date(Date.now() - 7 * DAY));
     return {
-      _id: p._id, accountId: p.accountId, accountName: p.accountName, pictureUrl: p.pictureUrl, organizationId: p.organizationId,
+      _id: p._id, platform: p.platform, pageId: p.pageId, accountId: p.accountId, accountName: p.accountName, pictureUrl: p.pictureUrl, organizationId: p.organizationId,
       business: org?.name || "(deleted)", shopState: blockedReason(org) || "active", aiOn: org?.ai?.enabled !== false,
       status: p.status, statusNote: p.statusNote, webhooksOn: p.webhooksOn, lastWebhookAt: p.lastWebhookAt, connectedAt: p.createdAt,
-      chats30: chatsOf[p.accountId] || 0, silent,
+      chats30: p.platform === "Instagram" ? chatsOf[`Instagram:${p.pageId}`] || 0 : chatsOf[`Messenger:${p.accountId}`] || 0, silent,
     };
   });
   res.json({
     rows,
-    totals: { all: rows.length, working: rows.filter((r) => r.status === "active" && r.webhooksOn).length, reconnect: rows.filter((r) => r.status !== "active").length, webhooksOff: rows.filter((r) => r.status === "active" && !r.webhooksOn).length, silent: rows.filter((r) => r.silent).length },
+    totals: { all: rows.length, instagram: rows.filter((r) => r.platform === "Instagram").length, working: rows.filter((r) => r.status === "active" && r.webhooksOn).length, reconnect: rows.filter((r) => r.status !== "active").length, webhooksOff: rows.filter((r) => r.status === "active" && !r.webhooksOn).length, silent: rows.filter((r) => r.silent).length },
   });
 }));
 

@@ -13,7 +13,7 @@ export async function render(root, params) {
   if (params.tab) state.tab = params.tab;
   if (params.open) state.openId = params.open;
   root.innerHTML = `
-    <div class="page-head"><div><h1>Customer Inbox</h1><p>Messenger chats. The AI answers and takes orders; you can take over any time.</p></div>
+    <div class="page-head"><div><h1>Chats</h1><p>Messenger and Instagram chats. The AI answers and takes orders; you can take over any time.</p></div>
       <button class="btn light" data-action="simulate">Test the AI (simulator)</button></div>
     <div class="inbox ${state.openId ? "show-chat" : ""}" id="inbox">
       <div class="chats"><div class="filters"><div class="tabs" id="tabs" style="margin:0"></div><input id="search" placeholder="Search name, message, phone…" value="${esc(state.q)}"></div><div class="chat-list" id="chatList">${loading()}</div></div>

@@ -35,7 +35,7 @@ async function draw(root) {
   products = await get(`/api/products?${new URLSearchParams(filters)}`);
   const units = products.reduce((s, p) => s + p.onHand, 0);
   root.innerHTML = `
-    <div class="page-head"><div><h1>Inventory</h1><p>Add what you sell, in your own words. The AI answers customers from here.</p></div>
+    <div class="page-head"><div><h1>Products</h1><p>Add what you sell, in your own words. The AI answers customers from here.</p></div>
       <button class="btn" data-action="add">+ Add product</button></div>
     <div class="kpis">
       <div class="kpi"><div class="label">Products</div><div class="value">${num(products.length)}</div></div>

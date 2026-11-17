@@ -21,9 +21,10 @@ async function upgradeOldData() {
   const orderStatus = { processing: "confirmed", out_for_delivery: "shipped", failed_delivery: "shipped", return_requested: "delivered", returned_to_sender: "returned", returned_restocked: "returned", returned_damaged: "returned", return_rejected: "delivered", rejected: "cancelled" };
   for (const [from, to] of Object.entries(orderStatus)) await col("orders").updateMany({ status: from }, { $set: { status: to } });
   await col("orders").updateMany({ paymentStatus: "paid", paid: { $exists: false } }, { $set: { paid: true } });
-  // v2.3: Fraud Shield, Instagram and WhatsApp were removed
+  // v2.3: Fraud Shield and WhatsApp were removed. Old-style Instagram rows (from before v2.3, without a Page id)
+  // are removed too; today's Instagram accounts always have pageId, so they are kept on every restart.
   await col("orders").updateMany({ status: "on_hold" }, { $set: { status: "pending" } });
-  await col("socialaccounts").deleteMany({ platform: { $in: ["Instagram", "WhatsApp"] } });
+  await col("socialaccounts").deleteMany({ $or: [{ platform: "WhatsApp" }, { platform: "Instagram", pageId: { $in: [null, ""] } }] });
   await col("orders").updateMany({ "courier.trackingId": { $exists: true } }, [{ $set: { trackingNo: { $ifNull: ["$courier.trackingId", ""] }, courierName: { $ifNull: ["$courier.provider", ""] } } }]);
 
   // Products: "status: archived" -> archived flag; products without variants get one "Default" variant
