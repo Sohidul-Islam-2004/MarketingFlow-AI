@@ -277,3 +277,15 @@ a.kpi.on { border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green);
 .filters input[type=checkbox] { min-width: 0; width: auto; flex: none; }
 .filters label.check, .filters label.small { display: inline-flex; align-items: center; gap: 6px; margin: 0; white-space: nowrap; }
 .ig-row { padding: 10px 0; border-top: 1px solid var(--line, #eee); flex-wrap: wrap; gap: 8px; }
+
+/* Inventory form: name + price, then rows of [label | value | ×] and [option | price | stock | ×] */
+.pf-main { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+.pf-row { display: grid; gap: 8px; margin-top: 8px; align-items: center; }
+.info-row { grid-template-columns: 1fr 2fr 36px; }
+.variant-row { grid-template-columns: 1.6fr 1fr 1fr 36px; }
+@media (max-width: 700px) {
+  .pf-main { grid-template-columns: 1fr; }
+  .info-row { grid-template-columns: 1fr 1.4fr 36px; }
+  .variant-row { grid-template-columns: 1.3fr 1fr 0.9fr 36px; }
+  .pf-row input { min-width: 0; }
+}

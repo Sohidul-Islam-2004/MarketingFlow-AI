@@ -46,8 +46,9 @@ function mentionedProducts(text, products) {
 function templateReply(category, product, zones) {
   const prices = product ? [...new Set(product.variants.map((v) => priceOf(product, v)))].sort((a, b) => a - b) : [];
   const priceText = prices.length > 1 ? `${taka(prices[0])} – ${taka(prices[prices.length - 1])}` : prices.length ? taka(prices[0]) : "";
-  const sizes = product ? product.variants.filter((v) => v.available > 0 && v.name !== "Default").map((v) => v.name).join(", ") : "";
-  const inStock = product && product.variants.some((v) => v.available > 0);
+  const has = (v) => product.alwaysAvailable || v.available > 0;
+  const sizes = product ? product.variants.filter((v) => has(v) && v.name !== "Default").map((v) => v.name).join(", ") : "";
+  const inStock = product && product.variants.some(has);
   const inside = zones.find((z) => (z.districts || []).includes("Dhaka")) || zones[0];
   const outside = zones.find((z) => z.isDefault) || zones[zones.length - 1];
   switch (category) {

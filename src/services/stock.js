@@ -23,7 +23,7 @@ async function logMovement(org, product, variantId, data) {
 
 // New order: hold units so nobody else can buy them. Returns false if not enough stock.
 async function reserve(org, line, orderNo) {
-  const p = await changeVariant(org, line, { reserved: line.qty, available: -line.qty }, { available: { $gte: line.qty } });
+  const p = await changeVariant(org, line, { reserved: line.qty, available: -line.qty }, line.always ? {} : { available: { $gte: line.qty } });
   if (!p) return false;
   await logMovement(org, p, line.variantId, { reservedChange: line.qty, reason: "order_reserve", orderNo });
   return true;
@@ -65,9 +65,9 @@ function resolveLine(products, item) {
   let variant = variants.find((v) => v._id === String(item.variantId || ""));
   if (!variant && variants.length === 1) variant = variants[0];
   if (!variant && item.variantName) variant = variants.find((v) => v.name.toLowerCase() === String(item.variantName).toLowerCase());
-  if (!variant) throw fail(400, `Choose a size/colour for ${product.name}`);
+  if (!variant) throw fail(400, `Choose an option for ${product.name}`);
   const qty = Math.max(1, Math.min(999, parseInt(item.qty, 10) || 1));
-  return { productId: product._id, variantId: variant._id, name: product.name, variantName: variant.name === "Default" ? "" : variant.name, qty, price: priceOf(product, variant), available: variant.available };
+  return { productId: product._id, variantId: variant._id, name: product.name, variantName: variant.name === "Default" ? "" : variant.name, qty, price: priceOf(product, variant), available: product.alwaysAvailable ? 999 : variant.available, always: !!product.alwaysAvailable };
 }
 
 module.exports = { priceOf, labelOf, reserve, release, ship, putBack, adjust, resolveLine };

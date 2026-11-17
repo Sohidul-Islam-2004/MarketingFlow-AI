@@ -1,4 +1,7 @@
-// Inventory: products, sizes/colours (variants) and stock.
+// Inventory: one simple form for every kind of shop. The shop writes things in its own words:
+//   Details  = "label: value" lines (Warranty: 1 year, Fabric: cotton, RAM: 8GB…) that the AI reads
+//   Options  = what the customer picks (M / L, 8/128GB Black, 500g…), each with its own stock
+
 import { get, post, put, del } from "../api.js";
 import { esc, taka, num, table, onAction, openModal, toast, options, dateTime, pill, confirmBox, liveSearch, empty } from "../ui.js";
 
@@ -32,7 +35,7 @@ async function draw(root) {
   products = await get(`/api/products?${new URLSearchParams(filters)}`);
   const units = products.reduce((s, p) => s + p.onHand, 0);
   root.innerHTML = `
-    <div class="page-head"><div><h1>Inventory</h1><p>Stock is counted per size/colour. Units in open orders are "reserved" until the parcel ships.</p></div>
+    <div class="page-head"><div><h1>Inventory</h1><p>Add what you sell, in your own words. The AI answers customers from here.</p></div>
       <button class="btn" data-action="add">+ Add product</button></div>
     <div class="kpis">
       <div class="kpi"><div class="label">Products</div><div class="value">${num(products.length)}</div></div>
@@ -41,17 +44,17 @@ async function draw(root) {
     </div>
     <div class="card">
       <div class="filters">
-        <input data-filter="q" placeholder="Search name, SKU, category…" value="${esc(filters.q)}" style="min-width:260px">
+        <input data-filter="q" placeholder="Search products…" value="${esc(filters.q)}" style="min-width:260px">
         <label class="check small"><input type="checkbox" data-filter="low" ${filters.low ? "checked" : ""}> Low stock only</label>
         <label class="check small"><input type="checkbox" data-filter="archived" ${filters.archived ? "checked" : ""}> Show archived</label>
       </div>
       ${!products.length && !filters.q && !filters.low && !filters.archived ? empty("No products yet", "Add what you sell. The AI can only talk about products that are here.", `<button class="btn" data-action="add">+ Add your first product</button>`) : table([
-        ["Product", (p) => `<b>${esc(p.name)}</b>${p.nameBn ? `<div class="small">${esc(p.nameBn)}</div>` : ""}<div class="small muted">${esc(p.category)}${p.sku ? " · " + esc(p.sku) : ""}</div>`],
+        ["Product", (p) => `<b>${esc(p.name)}</b>${detailsLine(p) ? `<div class="small muted">${esc(detailsLine(p))}</div>` : ""}`],
         ["Price", (p) => taka(p.price)],
-        ["Sizes / colours (available / in shop)", (p) => p.variants.map((v) => pill(`${v.name}: ${v.available}/${v.onHand}`, v.available <= 0 ? "red" : v.available <= p.lowStockAt ? "yellow" : "grey")).join(" ")],
-        ["Available", (p) => `<b>${p.available}</b>${p.reserved ? `<div class="small muted">${p.reserved} reserved</div>` : ""}`],
+        ["Options", (p) => p.variants.map((v) => pill(optionText(p, v), p.alwaysAvailable ? "grey" : v.available <= 0 ? "red" : v.available <= p.lowStockAt ? "yellow" : "grey")).join(" ")],
+        ["Stock", (p) => p.alwaysAvailable ? pill("Always available", "green") : `<b>${p.available}</b>${p.reserved ? `<div class="small muted">${p.reserved} in orders</div>` : ""}`],
         ["", (p) => `<div class="row" style="flex-wrap:nowrap">
-          <button class="btn sm light" data-action="adjust" data-id="${p._id}">Stock +/−</button>
+          ${p.alwaysAvailable ? "" : `<button class="btn sm light" data-action="adjust" data-id="${p._id}">Stock +/−</button>`}
           <button class="btn sm light" data-action="edit" data-id="${p._id}">Edit</button>
           <button class="btn sm light" data-action="history" data-id="${p._id}">History</button>
           <button class="btn sm light" data-action="archive" data-id="${p._id}">${filters.archived ? "Restore" : "Archive"}</button>
@@ -60,36 +63,74 @@ async function draw(root) {
     </div>`;
 }
 
+// "Warranty: 1 year · RAM: 8GB" under the product name
+const detailsLine = (p) => (p.info || []).filter((i) => i.value).slice(0, 3).map((i) => (i.label ? `${i.label}: ${i.value}` : i.value)).join(" · ");
+const optionText = (p, v) => {
+  const name = v.name === "Default" ? "" : v.name;
+  if (p.alwaysAvailable) return name || "One option";
+  return name ? `${name}: ${v.available}` : `${v.available} left`;
+};
+
 /* ---------- add / edit ---------- */
-const variantRow = (v = {}) => `<div class="f3 variant-row" style="grid-template-columns:1.3fr 1fr 1fr 1fr 36px;margin-top:8px">
+const EXAMPLES = [["Warranty", "1 year"], ["Fabric", "Cotton"], ["Brand", "Xiaomi"], ["Weight", "500g"]];
+const infoRow = (i = {}, n = 0) => `<div class="pf-row info-row">
+  <input name="ilabel[]" placeholder="${EXAMPLES[n % 4][0]}" list="infoLabels" value="${esc(i.label || "")}">
+  <input name="ivalue[]" placeholder="${EXAMPLES[n % 4][1]}" value="${esc(i.value || "")}">
+  <button type="button" class="btn sm light" data-action="removeRow" title="Remove">×</button></div>`;
+
+const variantRow = (v = {}) => `<div class="pf-row variant-row">
   <input type="hidden" name="vid[]" value="${esc(v._id || "")}">
-  <input name="vname[]" placeholder="Size/colour, e.g. M or Red" value="${esc(v.name && v.name !== "Default" ? v.name : "")}">
-  <input name="vsku[]" placeholder="SKU (optional)" value="${esc(v.sku || "")}">
-  <input type="number" name="vprice[]" placeholder="Price (if different)" value="${v.price ?? ""}">
-  ${v._id ? `<input disabled value="${v.onHand} in shop" title="Use Stock +/− to change">` : `<input type="number" name="vstock[]" placeholder="Stock" min="0">`}
-  <button type="button" class="btn sm light" data-action="removeVariant">×</button></div>`;
+  <input name="vname[]" placeholder="M, Red, 8/128GB…" value="${esc(v.name && v.name !== "Default" ? v.name : "")}">
+  <input type="number" name="vprice[]" placeholder="Own price" title="Leave empty to use the product price" value="${v.price ?? ""}">
+  ${v._id ? `<input class="stock-box" disabled value="${v.onHand} in stock" title="Use Stock +/− to change">` : `<input class="stock-box" type="number" name="vstock[]" placeholder="Stock" min="0">`}
+  <button type="button" class="btn sm light" data-action="removeRow" title="Remove">×</button></div>`;
+
+// Label ideas for every kind of shop. They are only suggestions: the shop can type anything.
+const LABEL_IDEAS = ["Brand", "Model", "Warranty", "Fabric", "Size chart", "Colour", "Material", "RAM / Storage", "Battery", "Weight", "Ingredients", "Expiry", "Origin", "Delivery time", "In the box"];
 
 function productForm(p, refresh) {
   const body = openModal({
     title: p ? `Edit ${p.name}` : "Add product", wide: true,
-    body: `<div class="f3"><div><label>Name</label><input name="name" required value="${esc(p?.name || "")}"></div><div><label>Name in Bangla (optional)</label><input name="nameBn" value="${esc(p?.nameBn || "")}"></div><div><label>Category</label><input name="category" value="${esc(p?.category || "General")}"></div></div>
-      <div class="f3 mt"><div><label>Price (৳)</label><input type="number" name="price" min="0" required value="${p?.price ?? ""}"></div><div><label>Cost price (৳, optional)</label><input type="number" name="costPrice" value="${p?.costPrice ?? ""}"></div><div><label>Warn when stock is at or below</label><input type="number" name="lowStockAt" value="${p?.lowStockAt ?? 5}"></div></div>
-      <div class="mt"><label>Description (the AI uses this to answer questions)</label><textarea name="description" rows="2">${esc(p?.description || "")}</textarea></div>
-      <h4 class="mt">Sizes / colours</h4><p class="small muted">No sizes? Keep one row with an empty name.</p>
+    body: `<div class="pf-main"><div><label>Product name</label><input name="name" required placeholder="e.g. Cotton Panjabi, Redmi 13, Honey" value="${esc(p?.name || "")}"></div>
+        <div><label>Price (৳)</label><input type="number" name="price" min="0" required value="${p?.price ?? ""}"></div></div>
+
+      <h4 class="mt">Details <span class="small muted">(optional, write anything customers ask about)</span></h4>
+      <div id="infoRows">${(p?.info?.length ? p.info : [{}, {}]).map(infoRow).join("")}</div>
+      <datalist id="infoLabels">${LABEL_IDEAS.map((l) => `<option value="${l}">`).join("")}</datalist>
+      <button type="button" class="btn sm light mt" data-action="addInfo">+ Add detail</button>
+
+      <h4 class="mt">Options and stock</h4>
+      <p class="small muted">Sizes, colours, models, weights… "Own price" only if it costs more or less. Only one kind? Leave the name empty.</p>
       <div id="variants">${(p?.variants || [{}]).map(variantRow).join("")}</div>
-      <button type="button" class="btn sm light mt" data-action="addVariant">+ Add size/colour</button>`,
+      <button type="button" class="btn sm light mt" data-action="addVariant">+ Add option</button>
+      <label class="check small mt"><input type="checkbox" name="alwaysAvailable" ${p?.alwaysAvailable ? "checked" : ""}> Always available (pre-order or made to order, don't count stock)</label>
+
+      <div class="mt"><label>Anything else the AI should know <span class="small muted">(optional)</span></label><textarea name="description" rows="2" placeholder="e.g. Original product, box with charger, ready in 3-5 days">${esc(p?.description || "")}</textarea></div>`,
     onSubmit: async (d) => {
+      const list = (x) => [].concat(x ?? []);
       let stockIndex = 0; // only new rows have a stock box
-      const variants = d.vid.map((id, i) => ({ id: id || undefined, name: d.vname[i], sku: d.vsku[i], price: d.vprice[i], stock: id ? undefined : (d.vstock || [])[stockIndex++] }));
-      const product = { name: d.name, nameBn: d.nameBn, category: d.category, price: d.price, costPrice: d.costPrice, lowStockAt: d.lowStockAt, description: d.description, variants };
+      const ids = list(d.vid), names = list(d.vname), prices = list(d.vprice), stocks = list(d.vstock);
+      const variants = ids.map((id, i) => ({ id: id || undefined, name: names[i], price: prices[i], stock: id ? undefined : stocks[stockIndex++] }));
+      const labels = list(d.ilabel), values = list(d.ivalue);
+      const info = labels.map((label, i) => ({ label, value: values[i] }));
+      const product = { name: d.name, price: d.price, description: d.description, info, variants, alwaysAvailable: !!d.alwaysAvailable };
       if (p) await put(`/api/products/${p._id}`, product); else await post("/api/products", product);
       toast(p ? "Product saved" : "Product added");
       refresh();
     },
   });
+  const always = body.querySelector("[name=alwaysAvailable]");
+  const showStock = () => body.querySelectorAll(".stock-box").forEach((b) => (b.style.visibility = always.checked ? "hidden" : ""));
+  always.onchange = showStock;
+  showStock();
   onAction(body, {
-    addVariant: () => body.querySelector("#variants").insertAdjacentHTML("beforeend", variantRow()),
-    removeVariant: (el) => { if (body.querySelectorAll(".variant-row").length > 1) el.closest(".variant-row").remove(); },
+    addInfo: () => body.querySelector("#infoRows").insertAdjacentHTML("beforeend", infoRow({}, body.querySelectorAll(".info-row").length)),
+    addVariant: () => { body.querySelector("#variants").insertAdjacentHTML("beforeend", variantRow()); showStock(); },
+    removeRow: (el) => {
+      const row = el.closest(".pf-row");
+      if (row.classList.contains("variant-row") && body.querySelectorAll(".variant-row").length === 1) return; // keep at least one option
+      row.remove();
+    },
   });
 }
 
@@ -97,7 +138,7 @@ function productForm(p, refresh) {
 function adjustForm(p, refresh) {
   openModal({
     title: `Stock +/− · ${p.name}`,
-    body: `<div class="f2"><div><label>Size/colour</label><select name="variantId">${options(p.variants.map((v) => [v._id, `${v.name} (in shop ${v.onHand}, available ${v.available})`]))}</select></div>
+    body: `<div class="f2"><div><label>Option</label><select name="variantId">${options(p.variants.map((v) => [v._id, `${v.name === "Default" ? p.name : v.name} (in stock ${v.onHand}, free to sell ${v.available})`]))}</select></div>
       <div><label>Change (10 = add, −2 = remove)</label><input type="number" name="change" required></div></div>
       <div class="f2 mt"><div><label>Reason</label><select name="reason">${options([["restock", "New stock arrived"], ["correction", "Counting correction"], ["damage", "Damaged / lost"], ["return", "Customer return"]])}</select></div>
       <div><label>Note (optional)</label><input name="note"></div></div>`,
@@ -112,7 +153,7 @@ async function showHistory(p) {
   openModal({
     title: `Stock history · ${p.name}`, wide: true, buttons: [],
     body: table([
-      ["When", (m) => dateTime(m.createdAt)], ["Size/colour", (m) => esc(m.label)], ["In shop", (m) => signed(m.onHandChange)],
+      ["When", (m) => dateTime(m.createdAt)], ["Option", (m) => esc(m.label)], ["In shop", (m) => signed(m.onHandChange)],
       ["Reserved", (m) => signed(m.reservedChange)], ["Why", (m) => esc(reason[m.reason] || m.reason)], ["Order / note", (m) => esc([m.orderNo, m.note].filter(Boolean).join(" · "))],
     ], rows, { emptyText: "No changes yet" }),
   });

@@ -30,8 +30,11 @@ async function aiSettings(org) {
 /* ---------- what the AI is allowed to know ---------- */
 function productLines(products) {
   return products.map((p) => {
-    const variants = p.variants.map((v) => `${v._id}=${v.name} ${taka(priceOf(p, v))} ${v.available > 0 ? `${v.available} in stock` : "OUT OF STOCK"}`).join("; ");
-    return `${p._id} | ${p.name}${p.nameBn ? " / " + p.nameBn : ""} | ${p.category} | ${variants}`;
+    const stockText = (v) => (p.alwaysAvailable ? "available to order" : v.available > 0 ? `${v.available} in stock` : "OUT OF STOCK");
+    const variants = p.variants.map((v) => `${v._id}=${v.name} ${taka(priceOf(p, v))} ${stockText(v)}`).join("; ");
+    // the shop's own details, in its own words (warranty, fabric, RAM…)
+    const details = [...(p.info || []).filter((i) => i.value).map((i) => (i.label ? `${i.label}: ${i.value}` : i.value)), p.description].filter(Boolean).join("; ").replace(/\s+/g, " ").slice(0, 600);
+    return `${p._id} | ${p.name}${p.nameBn ? " / " + p.nameBn : ""} | ${variants}${details ? ` | details: ${details}` : ""}`;
   }).join("\n");
 }
 
@@ -83,7 +86,7 @@ async function knowledgeFor(org, settings, recentText, draft) {
     `BUSINESS: ${settings.name || "our shop"}`,
     `DELIVERY FEES: ${zones.map((z) => `${z.name} ${taka(z.fee)}`).join(", ")}. Delivery time: ${settings.ai.deliveryTime || "ask the team"}. Payment: cash on delivery.`,
     settings.ai.knowledge ? `BUSINESS INFO / POLICIES / FAQ:\n${relevantKnowledge(settings.ai.knowledge, recentText)}` : "",
-    `PRODUCTS (productId | name | category | variants as variantId=name price stock):\n${productLines(ranked) || "(no products yet)"}`,
+    `PRODUCTS (productId | name | options as variantId=name price stock | details written by the shop):\n${productLines(ranked) || "(no products yet)"}`,
   ].filter(Boolean).join("\n\n");
   return { text, products: all };
 }
@@ -124,7 +127,7 @@ function draftLine(products, item) {
   const v = p.variants.find((x) => x._id === String(item.variantId || "")) || (p.variants.length === 1 ? p.variants[0] : null);
   return {
     productId: p._id, variantId: v?._id || null, name: p.name, variantName: v && v.name !== "Default" ? v.name : "",
-    qty: Math.max(1, Math.min(99, parseInt(item.qty, 10) || 1)), price: priceOf(p, v), available: v ? v.available : 0, variantCount: p.variants.length,
+    qty: Math.max(1, Math.min(99, parseInt(item.qty, 10) || 1)), price: priceOf(p, v), available: p.alwaysAvailable ? 999 : v ? v.available : 0, variantCount: p.variants.length,
   };
 }
 

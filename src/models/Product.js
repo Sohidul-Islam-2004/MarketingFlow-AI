@@ -1,4 +1,8 @@
-// A product with one or more variants (size / colour). Stock lives on the variant:
+// A product for any kind of shop (clothes, electronics, food…). The shop writes everything in its own words:
+//   info     = free "label: value" lines, e.g. Warranty: 1 year, Fabric: cotton, RAM: 8GB
+//   variants = options the customer picks, e.g. M / L, 8/128GB Black, 500g. Each has its own price and stock.
+//   alwaysAvailable = don't count stock (pre-order, made to order, digital)
+// Stock lives on the variant:
 //   onHand    = units physically in the shop
 //   reserved  = units held by open orders (not shipped yet)
 //   available = onHand - reserved  (what can still be sold)
@@ -29,6 +33,8 @@ const productSchema = new Schema(
     description: { type: String, default: "" },
     imageUrl: { type: String, default: "" },
     lowStockAt: { type: Number, default: 5 },
+    info: { type: [{ _id: false, label: String, value: String }], default: [] },
+    alwaysAvailable: { type: Boolean, default: false },
     archived: { type: Boolean, default: false },
     variants: { type: [variantSchema], default: [] },
   },

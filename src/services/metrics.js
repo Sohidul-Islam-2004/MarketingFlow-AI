@@ -45,7 +45,7 @@ async function overview(org, period = "today") {
     Product.find({ organizationId: org, archived: { $ne: true } }).select("name lowStockAt variants").lean(),
     Order.find({ organizationId: org }).sort({ createdAt: -1 }).limit(8).lean(),
   ]);
-  const lowStock = products.filter((p) => p.variants.reduce((s, v) => s + v.available, 0) <= (p.lowStockAt ?? 5));
+  const lowStock = products.filter((p) => !p.alwaysAvailable && p.variants.reduce((s, v) => s + v.available, 0) <= (p.lowStockAt ?? 5));
   return {
     period,
     setup: await setupSteps(org, products.length),
