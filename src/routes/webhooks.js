@@ -100,6 +100,9 @@ async function onMessage(page, event, { channel = "Messenger", ownId = page.acco
   const images = (msg?.attachments || []).filter((a) => a.type === "image" && a.payload?.url).map((a) => a.payload.url); // the AI can look at photos
   const captions = (msg?.attachments || []).map((a) => a.payload?.title || a.title).filter(Boolean); // caption of a shared post / reel
   const audios = (msg?.attachments || []).filter((a) => a.type === "audio" && a.payload?.url).map((a) => a.payload.url); // voice messages: turned into text
+  // a shared post / reel (often the shop's own): its id and caption, so the AI can tell which product it shows
+  const shared = (msg?.attachments || []).filter((a) => ["share", "post", "ig_post", "reel", "ig_reel"].includes(a.type))
+    .map((a) => ({ type: a.type, id: a.payload?.ig_post_media_id || a.payload?.reel_video_id || a.payload?.id || null, title: a.payload?.title || a.title || "" }));
 
   await messenger.oneAtATime(`${org}:${psid}`, async () => {
     let conv = await Conversation.findOne({ organizationId: org, psid });
@@ -108,7 +111,7 @@ async function onMessage(page, event, { channel = "Messenger", ownId = page.acco
       conv = new Conversation({ organizationId: org, psid, channel, pageId: page.accountId, customerName: profile.name, avatar: profile.avatar });
     }
     messenger.addMessage(conv, "customer", text, { mid: msg?.mid || null, image: images[0] || null });
-    await agent.handleCustomerMessage(org, conv, text, { images, captions, audios });
+    await agent.handleCustomerMessage(org, conv, text, { images, captions, audios, shared });
     await conv.save();
   });
 }

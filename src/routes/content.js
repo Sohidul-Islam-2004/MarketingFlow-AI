@@ -4,6 +4,7 @@ const { ContentItem, SocialAccount, MediaAsset, Product, Organization } = requir
 const { handle, fail } = require("../lib/errors");
 const { toList } = require("../lib/utils");
 const { cleanOffer, activeOffer, applyOffer, offerLabel } = require("../lib/offer");
+const { productsIn } = require("../lib/productMatch");
 const { removeMedia } = require("../services/tempMedia");
 const { askAI } = require("../lib/ai");
 const publisher = require("../services/publisher");
@@ -139,18 +140,6 @@ const STYLES = `Pick the style from the brief:
 - about a discount, sale or offer -> an offer post (mention only offers given in the input)
 - about one or more products -> a product post (hook, key benefits, who it is for, the price, call to action)
 - anything else -> a Facebook post (strong first line, short paragraphs, a few emojis, one call to action)`;
-
-// Products whose name is in the topic ("cotton panjabi er notun collection" -> Cotton Panjabi). Bangla names work too.
-function productsIn(topic, products) {
-  const text = String(topic).toLowerCase();
-  const words = (s) => String(s || "").toLowerCase().split(/[^\p{L}\p{M}\p{N}]+/u).filter((w) => w.length >= 3);
-  return products.filter((p) => [p.name, p.nameBn].some((name) => {
-    if (!name) return false;
-    if (text.includes(String(name).toLowerCase())) return true;
-    const w = words(name);
-    return w.length > 0 && w.filter((x) => text.includes(x)).length / w.length >= 0.6;
-  })).slice(0, 5);
-}
 
 const productLine = (p) => {
   const offer = activeOffer(p);

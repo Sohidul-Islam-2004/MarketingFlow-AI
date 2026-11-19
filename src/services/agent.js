@@ -24,23 +24,29 @@ const { priceOf, fullPriceOf } = require("./stock");
 const { activeOffer, offerLabel } = require("../lib/offer");
 const { createOrder } = require("./orders");
 const messenger = require("./messenger");
+const { productsIn } = require("../lib/productMatch");
+const { graph } = require("../lib/graph");
+const { decrypt } = require("../lib/crypto");
 
 const CONFIRM_WORDS = /^(confirm(ed)?|yes|yeah|yep|ok(ay)?|done|sure|হ্যাঁ|হ্যা|হা|জি|জ্বি|ঠিক আছে|কনফার্ম|ওকে|ji|hae|ha)$/i;
 const CHANGE_WORDS = /^(change|edit|বদল|পরিবর্তন)/i;
 const HUMAN_WORDS = /(human|real person|agent|manush|মানুষ|complain|অভিযোগ|refund|রিফান্ড|ফেরত দিতে|damaged|broken|নষ্ট|ভাঙা|fraud|প্রতারণা|scam)/i;
-const ATTACHMENT_ONLY = /^\[(image|audio|video|file|fallback|template|sticker|share|story_mention|reel|ig_reel)(, \w+)*\]$/i;
+const ATTACHMENT_ONLY = /^\[(image|audio|video|file|fallback|template|sticker|share|post|ig_post|story_mention|story|ig_story|media|reel|ig_reel)(, \w+)*\]$/i;
 const BUTTONS = ["✅ Confirm", "✏️ Change"];
 
 // Shares, reels, stories, stickers, voice… the AI can't open these. It answers from the caption when there is one,
 // otherwise it politely asks which product the customer means (no hand-over to a person for this).
 const ATTACHMENT_NOTE = {
-  share: "shared a post", ig_reel: "shared a reel", reel: "shared a reel", story_mention: "mentioned the shop in a story",
+  share: "shared a post", post: "shared a post", ig_post: "shared a post", ig_reel: "shared a reel", reel: "shared a reel",
+  story_mention: "mentioned the shop in a story", story: "shared a story", ig_story: "shared a story", media: "sent a photo or video",
   fallback: "shared a link", template: "shared a post", sticker: "sent a sticker (like 👍)", audio: "sent a voice message",
   video: "sent a video", file: "sent a file", image: "sent a photo",
 };
-function attachmentText(text, captions = []) {
+function attachmentText(text, captions = [], products = []) {
   const what = [...new Set(String(text).slice(1, -1).split(/,\s*/))].map((k) => ATTACHMENT_NOTE[k.toLowerCase()] || "sent an attachment").join(" and ");
   const caption = captions.find((c) => String(c || "").trim());
+  // The post / reel shows our products: answer about them (in stock? price) and show their photos
+  if (products.length) return `[Customer ${what} from our shop${caption ? ` (caption: "${String(caption).slice(0, 300)}")` : ""}. It shows our product${products.length > 1 ? "s" : ""}: ${products.map((p) => `${p.name} (productId ${p._id})`).join(", ")}. Answer about ${products.length > 1 ? "them" : "it"}: say if it is in stock and the price, ask which size/option if needed, and put the productIds that have a photo in "photos"]`;
   if (caption) return `[Customer ${what}. Its caption says: "${String(caption).slice(0, 300)}". If it is about one of our products, answer about that product; if you are not sure, ask which product they want]`;
   if (what.includes("sticker")) return `[Customer ${what}]`;
   return `[Customer ${what} that you cannot open. Do not guess what it shows. Politely ask which product they want: the name, or a photo/screenshot of it${what.includes("voice") ? ". Also ask them to type their message" : ""}]`;
@@ -288,7 +294,7 @@ async function confirmOrder(org, conv, settings) {
 
 // Main entry: the customer's message is already added to conv.messages. Caller saves conv.
 // options = { images: [photo links / data URLs] } when the customer sent photos
-async function handleCustomerMessage(org, conv, text, { images = [], captions = [], audios = [] } = {}) {
+async function handleCustomerMessage(org, conv, text, { images = [], captions = [], audios = [], shared = [] } = {}) {
   const settings = await aiSettings(org);
   conv.lastCustomerAt = new Date();
   conv.unread = (conv.unread || 0) + 1;
@@ -318,7 +324,10 @@ async function handleCustomerMessage(org, conv, text, { images = [], captions = 
     } else if (seen) {
       messenger.addMessage(conv, "system", `📷 AI saw: ${seen.text}${seen.productName ? ` (looks like ${seen.productName})` : ""}`);
       text = `[Customer sent a photo: ${seen.text}${seen.productName ? `. It looks like our product "${seen.productName}"` : ""}]`;
-    } else text = attachmentText(String(text).trim(), captions);
+    } else {
+      const post = await sharedPost(org, conv, shared, captions).catch((e) => { console.warn("shared post:", e.message); return null; });
+      text = attachmentText(String(text).trim(), post?.caption ? [post.caption] : captions, post?.products || []);
+    }
   }
   if (HUMAN_WORDS.test(text)) return handToHuman(org, conv, `Customer said: "${text.slice(0, 80)}"`, settings.ai.handoffMessage);
   if (!aiReady()) return handToHuman(org, conv, "AI is not set up (AI_API_KEY missing)", settings.ai.handoffMessage);
@@ -377,6 +386,22 @@ function optionButtons(draft, products) {
   const p = item && products.find((x) => x._id === item.productId);
   if (!p) return [];
   return p.variants.filter((v) => v.name !== "Default" && (p.alwaysAvailable || v.available > 0)).map((v) => v.name).slice(0, 11);
+}
+
+// A shared post or reel: its caption (from the message, or asked from Facebook / Instagram when it is the shop's own post)
+// and the shop's products named in it
+async function sharedPost(org, conv, shared, captions) {
+  const s = shared.find((x) => x.title || x.id);
+  let caption = s?.title || captions.find(Boolean) || "";
+  if (!caption && s?.id && !messenger.isSimulator(conv)) {
+    const page = await messenger.pageOf(org, conv.pageId);
+    const field = /^ig_/.test(s.type) || conv.channel === "Instagram" ? "caption" : s.type === "reel" ? "description" : "message";
+    const r = await graph(`/${s.id}`, { token: decrypt(page.accessToken), params: { fields: field } }).catch(() => ({})); // works for the shop's own posts
+    caption = r[field] || "";
+  }
+  if (!caption) return null;
+  const products = await Product.find({ organizationId: org, archived: { $ne: true } }).select("name nameBn").lean();
+  return { caption, products: productsIn(caption, products, 3) };
 }
 
 async function lookAtPhoto(org, image) {
