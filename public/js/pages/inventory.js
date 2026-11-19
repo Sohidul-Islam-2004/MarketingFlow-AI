@@ -1,6 +1,7 @@
 // Inventory: one simple form for every kind of shop. The shop writes things in its own words:
 //   Details  = "label: value" lines (Warranty: 1 year, Fabric: cotton, RAM: 8GB…) that the AI reads
 //   Options  = what the customer picks (M / L, 8/128GB Black, 500g…), each with its own stock
+//   Offer    = "10% off" or "৳100 off" until a date: the AI quotes the sale price and orders use it
 
 import { get, post, put, del } from "../api.js";
 import { esc, taka, num, table, onAction, openModal, toast, options, dateTime, pill, confirmBox, liveSearch, empty } from "../ui.js";
@@ -12,6 +13,7 @@ export async function render(root, params) {
   if (params.low) filters.low = "1";
   onAction(root, {
     add: () => productForm(null, () => draw(root)),
+    offerAll: () => offerForAll(() => draw(root)),
     edit: (el) => productForm(find(el), () => draw(root)),
     adjust: (el) => adjustForm(find(el), () => draw(root)),
     history: (el) => showHistory(find(el)),
@@ -36,7 +38,7 @@ async function draw(root) {
   const units = products.reduce((s, p) => s + p.onHand, 0);
   root.innerHTML = `
     <div class="page-head"><div><h1>Products</h1><p>Add what you sell, in your own words. The AI answers customers from here.</p></div>
-      <button class="btn" data-action="add">+ Add product</button></div>
+      <div class="row"><button class="btn light" data-action="offerAll">🏷️ Offer</button><button class="btn" data-action="add">+ Add product</button></div></div>
     <div class="kpis">
       <div class="kpi"><div class="label">Products</div><div class="value">${num(products.length)}</div></div>
       <div class="kpi"><div class="label">Units in shop</div><div class="value">${num(units)}</div></div>
@@ -50,7 +52,9 @@ async function draw(root) {
       </div>
       ${!products.length && !filters.q && !filters.low && !filters.archived ? empty("No products yet", "Add what you sell. The AI can only talk about products that are here.", `<button class="btn" data-action="add">+ Add your first product</button>`) : table([
         ["Product", (p) => `<b>${esc(p.name)}</b>${detailsLine(p) ? `<div class="small muted">${esc(detailsLine(p))}</div>` : ""}`],
-        ["Price", (p) => taka(p.price)],
+        ["Price", (p) => (p.offerOn
+          ? `<b>${taka(p.salePrice)}</b> <s class="small muted">${taka(p.price)}</s><div>${pill(offerText(p.offer), "pink")}</div>${p.offer.until ? `<div class="small muted">until ${untilText(p.offer.until)}</div>` : ""}`
+          : taka(p.price) + (p.offerEnded ? `<div class="small muted">offer ended</div>` : ""))],
         ["Options", (p) => p.variants.map((v) => pill(optionText(p, v), p.alwaysAvailable ? "grey" : v.available <= 0 ? "red" : v.available <= p.lowStockAt ? "yellow" : "grey")).join(" ")],
         ["Stock", (p) => p.alwaysAvailable ? pill("Always available", "green") : `<b>${p.available}</b>${p.reserved ? `<div class="small muted">${p.reserved} in orders</div>` : ""}`],
         ["", (p) => `<div class="row" style="flex-wrap:nowrap">
@@ -85,6 +89,37 @@ const variantRow = (v = {}) => `<div class="pf-row variant-row">
   ${v._id ? `<input class="stock-box" disabled value="${v.onHand} in stock" title="Use Stock +/− to change">` : `<input class="stock-box" type="number" name="vstock[]" placeholder="Stock" min="0">`}
   <button type="button" class="btn sm light" data-action="removeRow" title="Remove">×</button></div>`;
 
+/* ---------- offers ---------- */
+const offerText = (o) => (o.kind === "amount" ? `৳${o.value} off` : `${o.value}% off`);
+const untilText = (d) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Dhaka" });
+const dayValue = (d) => (d ? new Date(new Date(d).getTime() + 6 * 3600e3).toISOString().slice(0, 10) : ""); // Bangladesh date for <input type=date>
+
+// The 3 boxes used in the product form and in "Offer for all products"
+const offerFields = (o) => `<div class="offer-row">
+    <div><label>Offer</label><select name="offerKind">${options([["percent", "% off"], ["amount", "৳ off"]], o?.kind || "percent")}</select></div>
+    <div><label>How much</label><input type="number" name="offerValue" min="0" placeholder="e.g. 10" value="${o?.value || ""}"></div>
+    <div><label>Until <span class="small muted">(optional)</span></label><input type="date" name="offerUntil" value="${dayValue(o?.until)}"></div>
+  </div>`;
+const offerFrom = (d) => ({ kind: d.offerKind, value: Number(d.offerValue) || 0, until: d.offerUntil || null });
+
+function offerForAll(refresh) {
+  openModal({
+    title: "🏷️ Offer for all products",
+    body: `<p class="muted">The same offer on every product. The AI tells customers the sale price, and orders are charged at that price. To give an offer on one product only, open it with Edit.</p>
+      <div class="mt">${offerFields(null)}</div>
+      <p class="small muted mt">Leave "Until" empty to keep the offer on until you stop it.</p>`,
+    buttons: [["stop", "Stop all offers", "danger"], ["start", "Start offer"]],
+    onSubmit: async (d, button) => {
+      if (button === "stop") { await post("/api/products/offer", { value: 0 }); toast("All offers stopped"); return refresh(); }
+      const offer = offerFrom(d);
+      if (!(offer.value > 0)) throw new Error("Write how much off, e.g. 10");
+      await post("/api/products/offer", offer);
+      toast(`Offer on: ${offerText(offer)} on every product`);
+      refresh();
+    },
+  });
+}
+
 // Label ideas for every kind of shop. They are only suggestions: the shop can type anything.
 const LABEL_IDEAS = ["Brand", "Model", "Warranty", "Fabric", "Size chart", "Colour", "Material", "RAM / Storage", "Battery", "Weight", "Ingredients", "Expiry", "Origin", "Delivery time", "In the box"];
 
@@ -105,6 +140,10 @@ function productForm(p, refresh) {
       <button type="button" class="btn sm light mt" data-action="addVariant">+ Add option</button>
       <label class="check small mt"><input type="checkbox" name="alwaysAvailable" ${p?.alwaysAvailable ? "checked" : ""}> Always available (pre-order or made to order, don't count stock)</label>
 
+      <h4 class="mt">🏷️ Offer <span class="small muted">(optional, leave "How much" empty for no offer)</span></h4>
+      ${p?.offerEnded ? `<p class="small muted">The last offer has ended.</p>` : ""}
+      <div class="mt">${offerFields(p?.offerOn ? p.offer : null)}</div>
+
       <div class="mt"><label>Anything else the AI should know <span class="small muted">(optional)</span></label><textarea name="description" rows="2" placeholder="e.g. Original product, box with charger, ready in 3-5 days">${esc(p?.description || "")}</textarea></div>`,
     onSubmit: async (d) => {
       const list = (x) => [].concat(x ?? []);
@@ -113,7 +152,7 @@ function productForm(p, refresh) {
       const variants = ids.map((id, i) => ({ id: id || undefined, name: names[i], price: prices[i], stock: id ? undefined : stocks[stockIndex++] }));
       const labels = list(d.ilabel), values = list(d.ivalue);
       const info = labels.map((label, i) => ({ label, value: values[i] }));
-      const product = { name: d.name, price: d.price, description: d.description, info, variants, alwaysAvailable: !!d.alwaysAvailable };
+      const product = { name: d.name, price: d.price, description: d.description, info, variants, alwaysAvailable: !!d.alwaysAvailable, offer: offerFrom(d) };
       if (p) await put(`/api/products/${p._id}`, product); else await post("/api/products", product);
       toast(p ? "Product saved" : "Product added");
       refresh();

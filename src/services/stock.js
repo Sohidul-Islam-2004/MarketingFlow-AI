@@ -2,7 +2,12 @@
 const { Product, StockMovement } = require("../models");
 const { fail } = require("../lib/errors");
 
-const priceOf = (product, variant) => (variant && variant.price != null ? Number(variant.price) : Number(product.price) || 0);
+const { activeOffer, applyOffer } = require("../lib/offer");
+
+// Normal price of an option (its own price, or the product price)
+const fullPriceOf = (product, variant) => (variant && variant.price != null ? Number(variant.price) : Number(product.price) || 0);
+// The price the customer pays today: the normal price minus a running offer
+const priceOf = (product, variant) => applyOffer(fullPriceOf(product, variant), activeOffer(product));
 const labelOf = (product, variant) => (variant && variant.name !== "Default" ? `${product.name} · ${variant.name}` : product.name);
 
 // Changes one variant's numbers. `onlyIf` adds a condition (e.g. enough available stock).
@@ -67,7 +72,7 @@ function resolveLine(products, item) {
   if (!variant && item.variantName) variant = variants.find((v) => v.name.toLowerCase() === String(item.variantName).toLowerCase());
   if (!variant) throw fail(400, `Choose an option for ${product.name}`);
   const qty = Math.max(1, Math.min(999, parseInt(item.qty, 10) || 1));
-  return { productId: product._id, variantId: variant._id, name: product.name, variantName: variant.name === "Default" ? "" : variant.name, qty, price: priceOf(product, variant), available: product.alwaysAvailable ? 999 : variant.available, always: !!product.alwaysAvailable };
+  return { productId: product._id, variantId: variant._id, name: product.name, variantName: variant.name === "Default" ? "" : variant.name, qty, price: priceOf(product, variant), fullPrice: activeOffer(product) ? fullPriceOf(product, variant) : null, available: product.alwaysAvailable ? 999 : variant.available, always: !!product.alwaysAvailable };
 }
 
-module.exports = { priceOf, labelOf, reserve, release, ship, putBack, adjust, resolveLine };
+module.exports = { priceOf, fullPriceOf, labelOf, reserve, release, ship, putBack, adjust, resolveLine };

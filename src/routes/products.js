@@ -5,13 +5,16 @@ const { handle, fail } = require("../lib/errors");
 const { escapeRegex } = require("../lib/utils");
 const { newId } = require("../models/_base");
 const stock = require("../services/stock");
+const { activeOffer, cleanOffer } = require("../lib/offer");
 
 const REASONS = ["restock", "damage", "correction", "return"];
 
 function withTotals(p) {
   const sum = (field) => p.variants.reduce((s, v) => s + (v[field] || 0), 0);
   const available = sum("available");
-  return { ...p, onHand: sum("onHand"), reserved: sum("reserved"), available, lowStock: !p.alwaysAvailable && available <= (p.lowStockAt ?? 5) };
+  const offer = activeOffer(p);
+  return { ...p, onHand: sum("onHand"), reserved: sum("reserved"), available, lowStock: !p.alwaysAvailable && available <= (p.lowStockAt ?? 5),
+    offerOn: !!offer, salePrice: offer ? stock.priceOf(p, null) : null, offerEnded: !!(p.offer?.value && !offer) };
 }
 
 // Turns form rows into variants. Stock of an existing variant is never changed here (use "adjust").
@@ -36,6 +39,7 @@ function cleanProduct(b) {
   if (b.category !== undefined) p.category = String(b.category || "").trim() || "General";
   if (b.costPrice !== undefined) p.costPrice = b.costPrice === "" || b.costPrice == null ? null : Number(b.costPrice);
   if (b.lowStockAt !== undefined) p.lowStockAt = Math.max(0, Number(b.lowStockAt) || 0);
+  if (b.offer !== undefined) p.offer = cleanOffer(b.offer);
   if (b.alwaysAvailable !== undefined) p.alwaysAvailable = !!b.alwaysAvailable && b.alwaysAvailable !== "false";
   if (Array.isArray(b.info)) {
     p.info = b.info.map((r) => ({ label: String(r.label || "").trim().slice(0, 40), value: String(r.value || "").trim().slice(0, 300) }))
@@ -81,6 +85,15 @@ router.put("/:id", handle(async (req, res) => {
 }));
 
 // Archived products disappear from the shop and the AI but stay on old orders
+// One offer for many products at once: { kind, value, until, ids? } (no ids = every product). value 0 = stop the offers.
+router.post("/offer", handle(async (req, res) => {
+  const offer = cleanOffer(req.body);
+  const q = { organizationId: req.org, archived: { $ne: true } };
+  if (Array.isArray(req.body.ids) && req.body.ids.length) q._id = { $in: req.body.ids.map(String) };
+  const r = await Product.updateMany(q, { $set: { offer } });
+  res.json({ ok: true, changed: r.modifiedCount ?? r.nModified ?? 0 });
+}));
+
 router.post("/:id/archive", handle(async (req, res) => {
   const product = await Product.findOneAndUpdate({ _id: req.params.id, organizationId: req.org }, { archived: req.body.archived !== false }, { new: true });
   if (!product) throw fail(404, "Product not found");

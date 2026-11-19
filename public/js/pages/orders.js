@@ -68,7 +68,7 @@ async function openOrder(id, refresh) {
       <div class="grid2 mt">
         <div class="box"><h4>Customer</h4><b>${esc(o.customerName)}</b><div>${esc(o.phone)}</div><div class="small">${esc(o.address)}</div><div class="small muted">${esc(o.district || "")} · ${esc(o.zone || "")}</div>
           ${o.conversationId ? `<button type="button" class="btn sm light mt" data-action="openChat">Open chat</button>` : ""}</div>
-        <div class="box"><h4>Items</h4>${o.items.map((i) => `<div class="line"><span>${esc(i.name)}${i.variantName ? ` (${esc(i.variantName)})` : ""} × ${i.qty}</span><b>${taka(i.price * i.qty)}</b></div>`).join("")}
+        <div class="box"><h4>Items</h4>${o.items.map((i) => `<div class="line"><span>${esc(i.name)}${i.variantName ? ` (${esc(i.variantName)})` : ""} × ${i.qty}${i.fullPrice > i.price ? ` <span class="pill p-pink">offer</span>` : ""}</span><b>${i.fullPrice > i.price ? `<s class="small muted">${taka(i.fullPrice * i.qty)}</s> ` : ""}${taka(i.price * i.qty)}</b></div>`).join("")}
           <div class="line"><span>Delivery</span><b>${taka(o.deliveryFee)}</b></div>${o.discount ? `<div class="line"><span>Discount</span><b>−${taka(o.discount)}</b></div>` : ""}
           <div class="line"><span><b>Total</b></span><b>${taka(o.total)}</b></div><div class="small muted">${o.paymentMethod} · ${o.paid ? "paid" : "not paid yet"}</div></div>
       </div>

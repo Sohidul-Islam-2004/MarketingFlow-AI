@@ -3,6 +3,7 @@ const router = require("express").Router();
 const { ContentItem, SocialAccount, MediaAsset, Product, Organization } = require("../models");
 const { handle, fail } = require("../lib/errors");
 const { toList } = require("../lib/utils");
+const { cleanOffer } = require("../lib/offer");
 const { askAI } = require("../lib/ai");
 const publisher = require("../services/publisher");
 
@@ -19,12 +20,23 @@ async function targetsFor(org, accountIds = []) {
   return accounts.map((a) => ({ accountId: a._id, platform: a.platform, accountName: a.accountName }));
 }
 
+// Post offer from the editor: { kind, value, until, all, productIds }. No value = no offer.
+function cleanPostOffer(b) {
+  const o = cleanOffer(b);
+  if (!o) return null;
+  const productIds = Array.isArray(b.productIds) ? b.productIds.map(String).slice(0, 500) : [];
+  const all = b.all !== false && b.all !== "false";
+  if (!all && !productIds.length) throw fail(400, "Choose the products for the offer, or pick All products");
+  return { ...o, all, productIds: all ? [] : productIds, appliedAt: null };
+}
+
 function cleanBody(b) {
   return {
     title: String(b.title || "").trim().slice(0, 120),
     text: String(b.text || "").trim(),
     hashtags: toList(String(b.hashtags || "").replace(/\s+/g, ",")).map((h) => (h.startsWith("#") ? h : "#" + h)),
     mediaIds: Array.isArray(b.mediaIds) ? b.mediaIds.map(String) : [],
+    ...(b.offer !== undefined ? { offer: cleanPostOffer(b.offer || {}) } : {}),
   };
 }
 

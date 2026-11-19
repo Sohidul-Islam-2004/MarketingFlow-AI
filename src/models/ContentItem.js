@@ -17,6 +17,19 @@ const targetSchema = new Schema(
   { _id: false }
 );
 
+// An offer that starts when the post goes live: on every product (all) or on the chosen ones
+const postOfferSchema = new Schema(
+  {
+    kind: { type: String, default: "percent" }, // percent | amount
+    value: { type: Number, default: 0 },
+    until: { type: Date, default: null },
+    all: { type: Boolean, default: true },
+    productIds: { type: [String], default: [] },
+    appliedAt: { type: Date, default: null }, // set when the offer was put on the products
+  },
+  { _id: false }
+);
+
 const contentItemSchema = new Schema(
   {
     _id: { type: String, default: newId },
@@ -32,6 +45,7 @@ const contentItemSchema = new Schema(
     nextTryAt: { type: Date, default: null },
     lockedUntil: { type: Date, default: null },
     lastError: { type: String, default: null },
+    offer: { type: postOfferSchema, default: null },
   },
   options
 );

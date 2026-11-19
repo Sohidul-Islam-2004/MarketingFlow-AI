@@ -381,3 +381,10 @@ body.text-large { font-size: 15.5px; }
   .call-actions { width: 100%; } .call-actions > * { flex: 1 1 45%; text-align: center; }
 }
 .dlg-head button:focus:not(:focus-visible) { outline: none; }
+
+/* Products: offer boxes [kind | how much | until] */
+.offer-row { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 12px; }
+@media (max-width: 700px) { .offer-row { grid-template-columns: 1fr 1fr; } .offer-row > div:last-child { grid-column: 1 / -1; } }
+.offer-box summary { font-weight: 650; color: var(--ink); }
+.offer-products { display: grid; gap: 6px; max-height: 180px; overflow: auto; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--soft); }
+.offer-products[hidden] { display: none; }

@@ -7,7 +7,7 @@
 // Each Page is tried up to 3 times.
 const fs = require("fs");
 const path = require("path");
-const { ContentItem, MediaAsset, SocialAccount } = require("../models");
+const { ContentItem, MediaAsset, SocialAccount, Product } = require("../models");
 const { graph, GRAPH, GRAPH_VIDEO } = require("../lib/graph");
 const { decrypt } = require("../lib/crypto");
 const { fail } = require("../lib/errors");
@@ -140,10 +140,25 @@ async function publishItem(item) {
     const failed = item.targets.filter((t) => t.status === "failed");
     item.lastError = failed.map((t) => `${t.accountName}: ${t.error}`).join(" | ") || null;
     if (failed.length) await notify(item.organizationId, `Post failed: ${item.title || "untitled"}`, item.lastError, "content");
+    if (ok) await startPostOffer(item);
   }
   item.lockedUntil = null;
   item.markModified("targets");
   await item.save();
+}
+
+// A post can carry an offer (Posts → "Offer with this post"). It goes on the products once the post is live,
+// so the AI quotes the sale price from the moment customers see the post.
+async function startPostOffer(item) {
+  const o = item.offer;
+  if (!o || !(o.value > 0) || o.appliedAt) return;
+  const q = { organizationId: item.organizationId, archived: { $ne: true } };
+  if (!o.all) q._id = { $in: o.productIds || [] };
+  const r = await Product.updateMany(q, { $set: { offer: { kind: o.kind, value: o.value, until: o.until || null } } });
+  o.appliedAt = new Date();
+  item.markModified("offer");
+  const label = o.kind === "amount" ? `৳${o.value} off` : `${o.value}% off`;
+  await notify(item.organizationId, `Offer started: ${label}`, `${o.all ? "All products" : `${r.modifiedCount ?? o.productIds.length} product(s)`} now show the offer price. The AI tells customers about it.`, "inventory");
 }
 
 // Picks scheduled posts one by one. The lock stops two servers publishing the same post.

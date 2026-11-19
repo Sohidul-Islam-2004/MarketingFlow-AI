@@ -12,7 +12,8 @@ const { askAI, aiReady } = require("../lib/ai");
 const { findZone, canonicalDistrict, normalizeText, DEFAULT_ZONES } = require("../lib/places");
 const { normalizePhone, isValidPhone, taka } = require("../lib/utils");
 const { notify } = require("../lib/notify");
-const { priceOf } = require("./stock");
+const { priceOf, fullPriceOf } = require("./stock");
+const { activeOffer, offerLabel } = require("../lib/offer");
 const { createOrder } = require("./orders");
 const messenger = require("./messenger");
 
@@ -31,10 +32,13 @@ async function aiSettings(org) {
 function productLines(products) {
   return products.map((p) => {
     const stockText = (v) => (p.alwaysAvailable ? "available to order" : v.available > 0 ? `${v.available} in stock` : "OUT OF STOCK");
-    const variants = p.variants.map((v) => `${v._id}=${v.name} ${taka(priceOf(p, v))} ${stockText(v)}`).join("; ");
+    const offer = activeOffer(p);
+    const priceText = (v) => (offer ? `${taka(priceOf(p, v))} (OFFER, normal price ${taka(fullPriceOf(p, v))})` : taka(priceOf(p, v)));
+    const variants = p.variants.map((v) => `${v._id}=${v.name} ${priceText(v)} ${stockText(v)}`).join("; ");
+    const offerText = offer ? ` | OFFER: ${offerLabel(offer)}${offer.until ? ` until ${new Date(offer.until).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Dhaka" })}` : ""}` : "";
     // the shop's own details, in its own words (warranty, fabric, RAM…)
     const details = [...(p.info || []).filter((i) => i.value).map((i) => (i.label ? `${i.label}: ${i.value}` : i.value)), p.description].filter(Boolean).join("; ").replace(/\s+/g, " ").slice(0, 600);
-    return `${p._id} | ${p.name}${p.nameBn ? " / " + p.nameBn : ""} | ${variants}${details ? ` | details: ${details}` : ""}`;
+    return `${p._id} | ${p.name}${p.nameBn ? " / " + p.nameBn : ""} | ${variants}${offerText}${details ? ` | details: ${details}` : ""}`;
   }).join("\n");
 }
 
@@ -108,8 +112,8 @@ RULES
 - To take an order you need: product (exact productId), the variantId when the product has several sizes/colours, quantity, name, phone (01XXXXXXXXX), full address with area, and district (one of Bangladesh's 64 districts).
 - Ask only for what is missing, one or two things at a time.
 - If something is OUT OF STOCK, say so and suggest an in-stock alternative.
-- Never offer discounts, free delivery or gifts unless the business info says so. Never calculate totals: the system sends the exact total.
-- When everything is collected set readyToConfirm=true and reply with a short line like "Here is your order summary 👇". Never say the order is placed.
+- Never offer discounts, free delivery or gifts unless the business info says so. Products marked OFFER already show their sale price: tell the customer about the offer and quote that price. Never give any other discount. Never calculate totals: the system sends the exact total.
+- When everything is collected set readyToConfirm=true and reply with one short line in the customer's language saying the summary is below (e.g. "অর্ডারের সামারি নিচে দিলাম 👇"). Never say the order is placed.
 - needsHuman=true for complaints, refunds, damaged items, angry customers, wholesale bargaining, or when unsure.
 - "draft" must always contain the FULL draft (keep known values, add new ones).
 - confidence: 0-100, how sure you are that your reply is correct.
@@ -127,7 +131,7 @@ function draftLine(products, item) {
   const v = p.variants.find((x) => x._id === String(item.variantId || "")) || (p.variants.length === 1 ? p.variants[0] : null);
   return {
     productId: p._id, variantId: v?._id || null, name: p.name, variantName: v && v.name !== "Default" ? v.name : "",
-    qty: Math.max(1, Math.min(99, parseInt(item.qty, 10) || 1)), price: priceOf(p, v), available: p.alwaysAvailable ? 999 : v ? v.available : 0, variantCount: p.variants.length,
+    qty: Math.max(1, Math.min(99, parseInt(item.qty, 10) || 1)), price: priceOf(p, v), fullPrice: activeOffer(p) ? fullPriceOf(p, v) : null, available: p.alwaysAvailable ? 999 : v ? v.available : 0, variantCount: p.variants.length,
   };
 }
 
@@ -179,7 +183,7 @@ function summary(d) {
   const t = draftTotal(d);
   return [
     "🧾 অর্ডার সামারি",
-    ...d.items.map((i) => `• ${i.name}${i.variantName ? ` (${i.variantName})` : ""} × ${i.qty} = ${taka(i.price * i.qty)}`),
+    ...d.items.map((i) => `• ${i.name}${i.variantName ? ` (${i.variantName})` : ""} × ${i.qty} = ${taka(i.price * i.qty)}${i.fullPrice > i.price ? ` 🏷️ (অফার, আগে ${taka(i.fullPrice * i.qty)})` : ""}`),
     "",
     `পণ্যের দাম: ${taka(t.subtotal)}`,
     `ডেলিভারি (${d.zone?.name || "-"}): ${taka(t.fee)}`,

@@ -12,6 +12,7 @@ const itemSchema = new Schema(
     variantName: { type: String, default: "" },
     qty: { type: Number, default: 1, min: 1 },
     price: { type: Number, default: 0 },
+    fullPrice: { type: Number, default: null }, // price before the offer (only when there was one)
   },
   { _id: false }
 );

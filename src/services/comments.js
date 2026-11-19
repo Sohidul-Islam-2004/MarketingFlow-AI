@@ -12,6 +12,7 @@ const { taka } = require("../lib/utils");
 const { normalizeText, DEFAULT_ZONES } = require("../lib/places");
 const { notify } = require("../lib/notify");
 const { priceOf } = require("./stock");
+const { activeOffer, offerLabel } = require("../lib/offer");
 const messenger = require("./messenger");
 
 const RULES = [
@@ -52,7 +53,7 @@ function templateReply(category, product, zones) {
   const inside = zones.find((z) => (z.districts || []).includes("Dhaka")) || zones[0];
   const outside = zones.find((z) => z.isDefault) || zones[zones.length - 1];
   switch (category) {
-    case "price": return product ? `${product.name} এর দাম ${priceText}। বিস্তারিত ইনবক্সে পাঠিয়েছি ✅` : "দাম ও বিস্তারিত ইনবক্সে পাঠিয়েছি, চেক করুন ✅";
+    case "price": return product ? `${product.name} এর দাম ${priceText}${activeOffer(product) ? ` (🏷️ ${offerLabel(activeOffer(product))} অফারে)` : ""}। বিস্তারিত ইনবক্সে পাঠিয়েছি ✅` : "দাম ও বিস্তারিত ইনবক্সে পাঠিয়েছি, চেক করুন ✅";
     case "stock": return !product ? "বিস্তারিত ইনবক্সে পাঠিয়েছি ✅" : inStock ? `জি, ${product.name} স্টকে আছে ✅${sizes ? ` (${sizes})` : ""} অর্ডার করতে ইনবক্স চেক করুন।` : `দুঃখিত, ${product.name} এখন স্টকে নেই। ইনবক্সে অন্য অপশন জানাচ্ছি 🙏`;
     case "size": return product && sizes ? `${product.name} পাওয়া যাচ্ছে: ${sizes}। ইনবক্সে বিস্তারিত পাঠিয়েছি ✅` : "সাইজ/কালারের বিস্তারিত ইনবক্সে পাঠিয়েছি ✅";
     case "delivery": return `ডেলিভারি চার্জ: ${inside.name} ${taka(inside.fee)}, ${outside.name} ${taka(outside.fee)}। ক্যাশ অন ডেলিভারি ✅`;
