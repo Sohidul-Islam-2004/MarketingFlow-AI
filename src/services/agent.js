@@ -67,7 +67,7 @@ function productLines(products) {
     const offerText = offer ? ` | OFFER: ${offerLabel(offer)}${offer.until ? ` until ${new Date(offer.until).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Dhaka" })}` : ""}` : "";
     // the shop's own details, in its own words (warranty, fabric, RAM…)
     const details = [...(p.info || []).filter((i) => i.value).map((i) => (i.label ? `${i.label}: ${i.value}` : i.value)), p.description].filter(Boolean).join("; ").replace(/\s+/g, " ").slice(0, 600);
-    return `${p._id} | ${p.name}${p.nameBn ? " / " + p.nameBn : ""} | ${variants}${offerText}${details ? ` | details: ${details}` : ""}${p.imageUrl ? " | photo: yes" : ""}`;
+    return `${p._id} | ${p.name}${p.nameBn ? " / " + p.nameBn : ""} | ${variants}${offerText}${details ? ` | details: ${details}` : ""} | photo: ${p.imageUrl ? "yes" : "no"}`;
   }).join("\n");
 }
 
@@ -168,7 +168,7 @@ RULES
 - A message like "[Customer sent a photo: …]" is a photo described by the system: answer about that product as if they had asked about it.
 - If the customer asks about an order they already placed (status, when it arrives), answer from CUSTOMER'S ORDERS ("To call" means the shop will call to confirm it). Never invent dates or tracking. To cancel or change a placed order set needsHuman=true.
 - If RETURNING CUSTOMER details are given and the draft already has them, don't ask for name, phone or address again: say you'll send it to the same address and they can change it in the summary.
-- PHOTOS: products marked "photo: yes" have a photo the system can send. When the customer asks to see a product (ছবি, pic, photo, দেখান) or asks about one specific product for the first time, put its productId in "photos" (max 3) and say the photo is below (e.g. "ছবি নিচে দিলাম 👇"). Never send the same photo twice in a row. If they want a photo of a product without "photo: yes", say a team member will send it and set needsHuman=true with handoffReason "wants a photo of <product>".
+- PHOTOS: products marked "photo: yes" have a photo the system can send. When the customer asks to see a product (ছবি, pic, photo, দেখান) or asks about one specific product for the first time, put its productId in "photos" (max 3) and say the photo is below (e.g. "ছবি নিচে দিলাম 👇"). Never send the same photo twice in a row. Never write that a photo is below unless you put its productId in "photos". If they want a photo of a product with "photo: no", say a team member will send it and set needsHuman=true with handoffReason "wants a photo of <product>".
 Return JSON only: ${ANSWER_SHAPE}`;
   const known = history.known ? `RETURNING CUSTOMER (from their last order): ${history.known.name}, ${history.known.phone}, ${history.known.address}, ${history.known.district || ""}` : "";
   const user = [k.text, ordersText(history.orders), known, `CURRENT DRAFT: ${JSON.stringify(currentDraft)}`, `CHAT SO FAR:\n${chat || "(new chat)"}`, `CUSTOMER (latest): ${latestText}`].filter(Boolean).join("\n\n");
@@ -315,17 +315,19 @@ async function handleCustomerMessage(org, conv, text, { images = [], captions = 
   if (ATTACHMENT_ONLY.test(String(text || "").trim())) {
     // A voice message: turned into text, then answered like a typed message (the chat shows "🎤 what they said")
     const heard = audios.length ? await voice.transcribe(audios[0]).catch((e) => { console.warn("voice:", e.message); return null; }) : null;
-    const seen = !heard && images.length ? await lookAtPhoto(org, images[0]).catch(() => null) : null;
+    const seen = !heard && images.length ? await lookAtPhoto(org, images[0]).catch((e) => { console.warn("photo:", e.message); return null; }) : null;
     if (heard) {
       const said = [...conv.messages].reverse().find((m) => m.from === "customer");
       if (said) said.text = `🎤 ${heard}`;
       conv.lastMessage = `🎤 ${heard}`.slice(0, 200);
       text = ownWords = heard;
     } else if (seen) {
+      if (seen.productId) conv.lastProductIds = [seen.productId];
       messenger.addMessage(conv, "system", `📷 AI saw: ${seen.text}${seen.productName ? ` (looks like ${seen.productName})` : ""}`);
       text = `[Customer sent a photo: ${seen.text}${seen.productName ? `. It looks like our product "${seen.productName}"` : ""}]`;
     } else {
       const post = await sharedPost(org, conv, shared, captions).catch((e) => { console.warn("shared post:", e.message); return null; });
+      if (post?.products?.length) conv.lastProductIds = post.products.map((p) => p._id);
       text = attachmentText(String(text).trim(), post?.caption ? [post.caption] : captions, post?.products || []);
     }
   }
@@ -368,16 +370,34 @@ async function handleCustomerMessage(org, conv, text, { images = [], captions = 
   await sendProductPhotos(org, conv, products, answer, ownWords, draft);
 }
 
-// Product photos after the reply: the ones the AI chose, or (customer asked for a photo) the products in the order so far.
-// Max 3, and not a photo that was sent in the last hour unless the customer asks again.
+// Product photos after the reply: the ones the AI chose (by id or name), or, when the customer asked for a photo
+// or the reply says one is below, the products this chat is about (order draft, shared post, customer's photo).
+// Max 3, and not a photo sent in the last hour unless the customer asks again.
+// No photo to send? The customer is told honestly and the shop gets an alert to add the photo.
 const PHOTO_WORDS = /ছবি|ফটো|দেখান|দেখাও|chobi|chobe|\bpic|picture|photo|dekhan|dekhao/i;
-async function sendProductPhotos(org, conv, products, answer, text, draft) {
-  const asked = PHOTO_WORDS.test(text);
-  let ids = (Array.isArray(answer.photos) ? answer.photos : []).map(String).filter(Boolean);
-  if (!ids.length && asked) ids = (draft.items || []).map((i) => i.productId);
+const PHOTO_PROMISE = /ছবি নিচে|নিচে দিলাম|নিচে দিচ্ছি|👇/;
+async function sendProductPhotos(org, conv, products, answer, ownWords, draft) {
+  const asked = PHOTO_WORDS.test(ownWords || "");
+  const promised = PHOTO_PROMISE.test(answer.reply || "");
+  const find = (x) => products.find((p) => p._id === String(x)) || products.find((p) => p.name.toLowerCase() === String(x).toLowerCase().trim());
+  let wanted = (Array.isArray(answer.photos) ? answer.photos : []).map(find).filter(Boolean);
+  if (!wanted.length && (asked || promised)) wanted = [...(draft.items || []).map((i) => i.productId), ...(conv.lastProductIds || [])].map(find).filter(Boolean);
+  wanted = [...new Map(wanted.map((p) => [p._id, p])).values()].slice(0, 3);
+  if (wanted.length) conv.lastProductIds = wanted.map((p) => p._id);
+
   const recent = new Set(conv.messages.filter((m) => m.image && m.from !== "customer" && Date.now() - new Date(m.at || 0) < 3600e3).map((m) => m.image));
-  const list = [...new Set(ids)].map((id) => products.find((p) => p._id === id)).filter((p) => p?.imageUrl && (asked || !recent.has(p.imageUrl))).slice(0, 3);
-  for (const p of list) await messenger.replyPhoto(org, conv, "ai", { image: p.imageUrl, publicUrl: photos.publicPhotoUrl(p.imageUrl), caption: `📷 ${p.name}` });
+  const toSend = wanted.filter((p) => p.imageUrl && (asked || !recent.has(p.imageUrl)));
+  for (const p of toSend) await messenger.replyPhoto(org, conv, "ai", { image: p.imageUrl, publicUrl: photos.publicPhotoUrl(p.imageUrl), caption: `📷 ${p.name}` });
+  if (toSend.length || !(asked || promised)) return;
+
+  const noPhoto = wanted.filter((p) => !p.imageUrl);
+  if (noPhoto.length) {
+    const names = noPhoto.map((p) => p.name).join(", ");
+    await messenger.reply(org, conv, "ai", `দুঃখিত, ${names}-এর ছবি এই মুহূর্তে আমার কাছে নেই। আমাদের টিম শিগগিরই ছবি পাঠিয়ে দেবে 🙏`);
+    await notify(org, `${conv.customerName} wants a photo of ${names}`, "Send one from Chats now (📷). Add a photo in Products and the AI sends it by itself next time.", `inbox?open=${conv._id}`);
+  } else if (!wanted.length) {
+    await messenger.reply(org, conv, "ai", "কোন প্রোডাক্টের ছবি দেখতে চান? নামটা লিখুন, এখনই পাঠিয়ে দিচ্ছি 🙏");
+  }
 }
 
 // The AI is asking which size/colour/option: offer the options that can be ordered as buttons (max 11)
@@ -406,7 +426,7 @@ async function sharedPost(org, conv, shared, captions) {
 
 async function lookAtPhoto(org, image) {
   if (!vision.visionReady()) return null;
-  const products = await Product.find({ organizationId: org, archived: { $ne: true } }).select("name info").limit(150).lean();
+  const products = await Product.find({ organizationId: org, archived: { $ne: true } }).select("name info imageUrl").sort({ updatedAt: -1 }).limit(150).lean();
   const seen = await vision.describePhoto(image, products);
   if (!seen?.text) return null;
   return { ...seen, productName: seen.productId ? products.find((p) => p._id === seen.productId)?.name : null };

@@ -41,8 +41,13 @@ module.exports = {
     BASE_URL: (env.AI_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, ""),
     API_KEY: env.AI_API_KEY || "",
     MODEL: env.AI_MODEL || "openai/gpt-oss-120b",
-    // A model that can look at photos (customer sends a product photo / screenshot). Empty = photos go to a person.
-    VISION_MODEL: env.AI_VISION_MODEL ?? (/groq\.com/.test(env.AI_BASE_URL || "https://api.groq.com") ? "meta-llama/llama-4-scout-17b-16e-instruct" : ""),
+    // A model that looks at photos customers send (product photo, screenshot). Groq has none since July 2026,
+    // so it can use another service, e.g. Google Gemini (free tier):
+    //   AI_VISION_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai  AI_VISION_API_KEY=<Gemini key>  AI_VISION_MODEL=gemini-3.6-flash
+    // Empty = the AI asks the customer which product it is.
+    VISION_MODEL: /llama-4-scout/.test(env.AI_VISION_MODEL || "") ? "" : env.AI_VISION_MODEL || "",
+    VISION_BASE_URL: (env.AI_VISION_BASE_URL || env.AI_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, ""),
+    VISION_API_KEY: env.AI_VISION_API_KEY || env.AI_API_KEY || "",
     // Turns customers' voice messages into text (Groq: whisper-large-v3). Empty = the AI asks them to type.
     VOICE_MODEL: env.AI_VOICE_MODEL ?? (/groq\.com/.test(env.AI_BASE_URL || "https://api.groq.com") ? "whisper-large-v3" : ""),
     VOICE_LANGUAGE: env.AI_VOICE_LANGUAGE ?? "bn", // most customers speak Bangla; empty = guess the language

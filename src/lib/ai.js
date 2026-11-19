@@ -15,16 +15,17 @@ function parseJSON(text) {
 }
 
 // images: data: URLs or https links, sent with the user message (needs a model that can see: AI.VISION_MODEL)
-async function askAI({ system, user, temperature = 0.5, maxTokens = 1500, images = [], model = AI.MODEL }) {
-  if (!aiReady()) throw fail(503, "AI is not set up. Add AI_API_KEY to .env");
+// baseUrl / apiKey: another AI service (the photo model can be on Gemini while chats run on Groq)
+async function askAI({ system, user, temperature = 0.5, maxTokens = 1500, images = [], model = AI.MODEL, baseUrl = AI.BASE_URL, apiKey = AI.API_KEY }) {
+  if (!apiKey && !/localhost|127\.0\.0\.1/.test(baseUrl)) throw fail(503, "AI is not set up. Add AI_API_KEY to .env");
   const content = images.length ? [{ type: "text", text: user }, ...images.map((url) => ({ type: "image_url", image_url: { url } }))] : user;
   const body = {
     model, temperature, max_tokens: maxTokens,
     response_format: { type: "json_object" },
     messages: [{ role: "system", content: system }, { role: "user", content }],
   };
-  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${AI.API_KEY}` };
-  const call = () => fetch(`${AI.BASE_URL}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(40000) })
+  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` };
+  const call = () => fetch(`${baseUrl}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(40000) })
     .catch((e) => { throw fail(502, e.name === "TimeoutError" ? "The AI took too long to answer" : "Could not reach the AI provider"); });
 
   let res = await call();

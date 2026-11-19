@@ -38,6 +38,7 @@ const conversationSchema = new Schema(
     //   name, phone, address, district, zone:{name, fee}, version, status: collecting | awaiting_confirm | placed }
     draft: { type: Mixed, default: () => ({ items: [], status: "collecting" }) },
     lastOrderNo: { type: String, default: null },
+    lastProductIds: { type: [String], default: undefined }, // products this chat is about (shared post, photo, AI reply): "ছবি দেন" sends these
   },
   options
 );
