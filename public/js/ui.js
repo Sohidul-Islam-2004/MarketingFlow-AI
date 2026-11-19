@@ -48,7 +48,7 @@ export function toast(message, isError = false) {
   t.className = "toast" + (isError ? " err" : "");
   t.textContent = message;
   $("#toasts").appendChild(t);
-  setTimeout(() => t.remove(), isError ? 7000 : 3500);
+  setTimeout(() => t.remove(), isError ? 7000 : Math.max(3500, String(message).length * 70)); // long messages stay longer
 }
 
 // Filter chips: chips([["", "All", 12], ["low", "Low stock", 2]], current, "filter") -> one row of round buttons

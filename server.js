@@ -37,6 +37,7 @@ app.use("/api", requireLogin);
 app.use("/api", require("./src/routes/overview"));
 app.use("/api/products", require("./src/routes/products"));
 app.use("/api/orders", require("./src/routes/orders"));
+app.use("/api/customers", require("./src/routes/customers"));
 app.use("/api/inbox", require("./src/routes/inbox"));
 app.use("/api/comments", require("./src/routes/comments"));
 app.use("/api/content", require("./src/routes/content"));

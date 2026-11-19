@@ -48,6 +48,8 @@ const orderSchema = new Schema(
     conversationId: { type: String, default: null },
     psid: { type: String, default: null },
     idemKey: { type: String, default: null }, // stops the same AI draft creating two orders
+    duplicateOf: { type: String, default: null }, // order no. of an active order with the same phone + products (maybe ordered twice)
+    duplicateOfId: { type: String, default: null },
 
 
     courierName: { type: String, default: "" }, // free text: Steadfast, Pathao, own rider...

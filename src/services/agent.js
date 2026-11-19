@@ -263,12 +263,13 @@ async function placeOrderFromDraft(org, conv, settings, by) {
   conv.draft = { ...d, status: "placed", orderNo: order.orderNo };
   conv.markModified("draft");
   conv.lastOrderNo = order.orderNo;
-  messenger.addMessage(conv, "system", `Order #${order.orderNo} created by ${by} · ${taka(order.total)}`);
+  messenger.addMessage(conv, "system", `Order #${order.orderNo} created by ${by} · ${taka(order.total)}${order.duplicateOf ? ` · ⚠️ maybe the same as #${order.duplicateOf}` : ""}`);
   return order;
 }
 
 function orderPlacedText(order, settings) {
-  if (order.status === "pending") return `✅ আপনার অর্ডার #${order.orderNo} (${taka(order.total)}) পেয়েছি। কনফার্ম করতে আমাদের টিম আপনাকে কল করবে। ধন্যবাদ 🙏`;
+  const twice = order.duplicateOf ? `\n(আপনার আগের অর্ডার #${order.duplicateOf} টাও আছে। কল করার সময় আমরা মিলিয়ে নেব, দুবার পাঠানো হবে না।)` : "";
+  if (order.status === "pending") return `✅ আপনার অর্ডার #${order.orderNo} (${taka(order.total)}) পেয়েছি। কনফার্ম করতে আমাদের টিম আপনাকে কল করবে। ধন্যবাদ 🙏${twice}`;
   return `✅ আপনার অর্ডার #${order.orderNo} কনফার্ম হয়েছে! মোট ${taka(order.total)}, ক্যাশ অন ডেলিভারি।${settings.ai.deliveryTime ? ` ডেলিভারি: ${settings.ai.deliveryTime}।` : ""} ধন্যবাদ 🙏`;
 }
 

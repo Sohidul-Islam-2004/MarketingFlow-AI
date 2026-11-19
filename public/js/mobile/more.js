@@ -20,6 +20,7 @@ export async function render(root) {
     ${title("Shop")}
     <div class="m-list">
       ${link("#content", "content", "accent", "Posts", "Write with AI, publish to Facebook & Instagram")}
+      ${link("#customers", "user", "green", "Customers", "Everyone who ordered, with their orders")}
       ${link("#comments", "comments", "blue", "Comments", "Replies to your post comments")}
     </div>
 
@@ -32,7 +33,7 @@ export async function render(root) {
     </div>
 
     ${me.user.isAdmin ? `${title("Super Admin")}<div class="m-list">
-      ${link("#admin-customers", "admin-customers", "grey", "Customers")}
+      ${link("#admin-customers", "admin-customers", "grey", "Shops")}
       ${link("#admin-pages", "admin-pages", "grey", "All Pages")}</div>` : ""}
 
     <div class="m-list mt">${row({ action: "logout", lead: leadIcon("logout", "red"), title: "Log out", chevron: false, cls: "danger" })}</div>

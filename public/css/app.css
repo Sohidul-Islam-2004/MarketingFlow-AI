@@ -537,3 +537,11 @@ input.switch:focus-visible { box-shadow: 0 0 0 4px var(--accent-soft); }
 @media (min-width: 1100px) { .steps { grid-template-columns: 1fr 1fr; } }
 .filters input[data-filter="q"] { flex: 0 1 380px; min-width: 260px; }
 .st-amber { color: var(--amber); } .st-blue { color: var(--blue); } .st-green { color: var(--green); } .st-red { color: var(--red); } .st-grey { color: var(--faint); }
+
+/* Orders / Customers: "ordered twice?", returns and cancels */
+.warn-text { color: var(--red); font-weight: 600; }
+.cust-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.cust-stats div { padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
+.cust-stats b { display: block; font-size: 18px; font-weight: 700; }
+.cust-stats span { font-size: 12px; color: var(--muted); }
+@media (max-width: 700px) { .cust-stats { grid-template-columns: 1fr 1fr; } }

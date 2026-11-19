@@ -54,7 +54,11 @@ router.post("/quote", handle(async (req, res) => {
 router.get("/:id", handle(async (req, res) => {
   const o = await Order.findOne({ _id: req.params.id, organizationId: req.org }).lean();
   if (!o) throw fail(404, "Order not found");
-  res.json({ ...o, next: orders.NEXT[o.status] || [], labels: orders.STATUS_LABEL });
+  // The customer's other orders (same phone): good to know before the call
+  const others = (await Order.find({ organizationId: req.org, phone: o.phone }).select("status").lean()).filter((x) => x._id !== o._id);
+  const count = (s) => others.filter((x) => x.status === s).length;
+  const customer = { orders: others.length, delivered: count("delivered"), returned: count("returned"), cancelled: count("cancelled") };
+  res.json({ ...o, customer, next: orders.NEXT[o.status] || [], labels: orders.STATUS_LABEL });
 }));
 
 router.post("/", handle(async (req, res) => {

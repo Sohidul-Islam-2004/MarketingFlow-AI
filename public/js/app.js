@@ -15,12 +15,12 @@ applyTheme(); // the shop's colours (Setup → Look), before anything is drawn
 const MENU = [
   ["overview", "Home", [["overview", "Home"]]],
   ["inbox", "Inbox", [["inbox", "Chats"], ["comments", "Comments"]]],
-  ["orders", "Orders", [["orders", "Orders"]]],
+  ["orders", "Orders", [["orders", "Orders"], ["customers", "Customers"]]],
   ["inventory", "Products", [["inventory", "Products"]]],
   ["content", "Posts", [["content", "Posts"], ["calendar", "Calendar"]]],
   ["setup", "Setup", [["accounts", "Facebook & Instagram"], ["train", "AI Training"], ["settings", "Settings"], ["look", "Look"]]],
 ];
-const ADMIN_MENU = [["admin-customers", "Customers", [["admin-customers", "Customers"]]], ["admin-pages", "All Pages", [["admin-pages", "All Pages"]]]]; // SUPER_ADMIN_EMAILS only
+const ADMIN_MENU = [["admin-customers", "Shops", [["admin-customers", "Shops"]]], ["admin-pages", "All Pages", [["admin-pages", "All Pages"]]]]; // SUPER_ADMIN_EMAILS only
 let SHOW_ADMIN = false;
 const allMenu = () => (SHOW_ADMIN ? [...MENU, ...ADMIN_MENU] : MENU);
 const sectionOf = (page) => allMenu().find(([, , pages]) => pages.some(([id]) => id === page)) || MENU[0];

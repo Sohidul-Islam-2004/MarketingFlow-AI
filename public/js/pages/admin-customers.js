@@ -37,7 +37,7 @@ async function draw(root) {
   const rows = data.rows.filter((c) => (!filters.state || c.state === filters.state) && (!q || `${c.name} ${c.owner?.email || ""} ${c.owner?.name || ""} ${c.phone}`.toLowerCase().includes(q)));
   const t = data.totals;
   root.innerHTML = `
-    <div class="page-head"><div><h1>Customers</h1><p>Every shop that uses MarketingFlow. Create accounts here and send the owner the password link.</p></div>
+    <div class="page-head"><div><h1>Shops</h1><p>Every shop that uses MarketingFlow. Create accounts here and send the owner the password link.</p></div>
       <button class="btn" data-action="create">+ New customer</button></div>
     <div class="kpis">
       ${[["", "All shops", t.all], ["active", "Active", t.active], ["expired", "Plan ended", t.expired], ["suspended", "Suspended", t.suspended]]

@@ -10,7 +10,7 @@ export async function api(url, { method = "GET", body } = {}) {
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && data.code === "LOGIN_REQUIRED") window.dispatchEvent(new Event("logged-out"));
   if (res.status === 403 && data.code === "ACCOUNT_BLOCKED") location.reload(); // suspended or plan ended: show that screen
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  if (!res.ok) throw Object.assign(new Error(data.error || `Request failed (${res.status})`), { code: data.code });
   return data;
 }
 

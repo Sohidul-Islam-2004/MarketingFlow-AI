@@ -1,7 +1,7 @@
 // Orders: creating, pricing and moving through statuses. All money maths happens here, never in the AI.
 const { Order, Product, Organization, Counter, Conversation } = require("../models");
 const { fail } = require("../lib/errors");
-const { normalizePhone, isValidPhone, taka } = require("../lib/utils");
+const { normalizePhone, isValidPhone, taka, DAY } = require("../lib/utils");
 const { findZone, canonicalDistrict } = require("../lib/places");
 const { notify } = require("../lib/notify");
 const stock = require("./stock");
@@ -21,12 +21,27 @@ const NEXT = {
 };
 const HOLDS_STOCK = ["pending", "confirmed", "packed"]; // stock is reserved in these statuses
 
-// Messages the customer gets on Messenger when the order moves (only inside the 24h window)
+// Messages the customer gets on Messenger / Instagram when the order moves.
+// Meta only allows them within 24 hours of the customer's last message (message tags for later updates were
+// switched off by Meta in 2026), so the order history says whether the customer got it.
+const itemsText = (o) => o.items.map((i) => `• ${i.name}${i.variantName ? ` (${i.variantName})` : ""} × ${i.qty}`).join("\n");
+const toPay = (o) => o.paymentMethod === "COD" && !o.paid;
 const CUSTOMER_MESSAGE = {
-  confirmed: (o) => `✅ আপনার অর্ডার #${o.orderNo} কনফার্ম হয়েছে। মোট ${taka(o.total)}। ধন্যবাদ 🙏`,
-  shipped: (o) => `🚚 আপনার অর্ডার #${o.orderNo} পাঠানো হয়েছে${o.trackingNo ? ` (ট্র্যাকিং: ${o.trackingNo})` : ""}।`,
-  delivered: (o) => `📦 আপনার অর্ডার #${o.orderNo} ডেলিভারি হয়েছে। আমাদের সাথে কেনাকাটার জন্য ধন্যবাদ!`,
+  confirmed: (o, shop) => `✅ আপনার অর্ডার #${o.orderNo} কনফার্ম হয়েছে!\n${itemsText(o)}\nমোট: ${taka(o.total)}${toPay(o) ? " (ক্যাশ অন ডেলিভারি)" : ""}${shop.deliveryTime ? `\nডেলিভারি: ${shop.deliveryTime}` : ""}\nধন্যবাদ 🙏`,
+  shipped: (o) => `🚚 আপনার অর্ডার #${o.orderNo} পাঠানো হয়েছে${o.courierName ? ` (${o.courierName})` : ""}।${o.trackingNo ? `\nট্র্যাকিং নম্বর: ${o.trackingNo}` : ""}${toPay(o) ? `\nপার্সেল নেওয়ার সময় ${taka(o.total)} দিতে হবে।` : ""}`,
+  delivered: (o) => `📦 আপনার অর্ডার #${o.orderNo} ডেলিভারি হয়েছে। আমাদের সাথে কেনাকাটার জন্য ধন্যবাদ! কোনো সমস্যা হলে এখানেই জানাবেন 🙏`,
 };
+
+// Same phone + same products in an order that is still going (last 2 days) = probably ordered twice
+// (asked again in another chat or comment, or the shop typed in an order the AI already took)
+const ACTIVE = ["pending", "confirmed", "packed", "shipped"];
+const itemsKey = (items) => items.map((i) => `${i.productId}:${i.variantId || ""}`).sort().join("|");
+async function findDouble(org, phone, lines) {
+  const recent = await Order.find({ organizationId: org, phone, status: { $in: ACTIVE }, createdAt: { $gte: new Date(Date.now() - 2 * DAY) } })
+    .select("orderNo items createdAt").sort({ createdAt: -1 }).lean();
+  return recent.find((o) => itemsKey(o.items) === itemsKey(lines)) || null;
+}
+const dhakaTime = (d) => new Date(d).toLocaleString("en-GB", { timeZone: "Asia/Dhaka", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 async function nextOrderNo(org) {
   const c = await Counter.findOneAndUpdate({ _id: `order:${org}` }, { $inc: { seq: 1 } }, { upsert: true, new: true });
@@ -47,7 +62,7 @@ async function priceOrder(org, { items = [], address, district, discount = 0 }) 
 }
 
 // input: { customerName, phone, address, district, items:[{productId, variantId, qty}], paymentMethod, discount, notes,
-//          source, conversationId, psid, idemKey }
+//          source, conversationId, psid, idemKey, allowDouble }
 async function createOrder(org, input, by) {
   if (input.idemKey) {
     const existing = await Order.findOne({ organizationId: org, idemKey: input.idemKey });
@@ -64,6 +79,12 @@ async function createOrder(org, input, by) {
   // The AI may never give discounts; only a person creating the order by hand can
   const discount = input.source === "manual" ? input.discount : 0;
   const price = await priceOrder(org, { items: input.items, address, district: input.district, discount });
+
+  // Ordered twice? The shop is asked first ("create anyway?"); orders from chats are only marked, the shop sees it on the call
+  const double = await findDouble(org, phone, price.lines);
+  if (double && input.source === "manual" && !input.allowDouble) {
+    throw fail(409, `${customerName} (${phone}) already has an order with the same products: #${double.orderNo} (${dhakaTime(double.createdAt)}).`, "DOUBLE_ORDER");
+  }
 
   const orderNo = await nextOrderNo(org);
   const reserved = [];
@@ -85,8 +106,9 @@ async function createOrder(org, input, by) {
       paymentMethod: ["COD", "bKash", "Nagad"].includes(input.paymentMethod) ? input.paymentMethod : "COD",
       paid: !!input.paid,
       source: input.source || "manual", conversationId: input.conversationId || null, psid: input.psid || null, idemKey: input.idemKey || null,
+      duplicateOf: double?.orderNo || null, duplicateOfId: double?._id || null,
       notes: String(input.notes || "").slice(0, 1000),
-      history: [{ status, by, note: "Order created" }],
+      history: [{ status, by, note: double ? `Order created · ⚠️ maybe the same as #${double.orderNo}` : "Order created" }],
     });
     return order;
   } catch (e) {
@@ -121,16 +143,26 @@ async function changeStatus(org, orderId, to, options = {}) {
   const note = [options.note, to === "returned" ? (options.restock === false ? "not restocked" : "restocked") : ""].filter(Boolean).join(" · ");
   order.history.push({ status: to, by: options.by || "system", note });
   await order.save();
-  await tellCustomer(org, order, to);
-  return order;
+  // Message the customer, and write in the history whether it reached them
+  const told = await tellCustomer(org, order, to);
+  if (told) {
+    order.history[order.history.length - 1].note = [note, told.note].filter(Boolean).join(" · ");
+    order.markModified("history");
+    await order.save();
+  }
+  return { ...order.toObject(), told };
 }
 
+// Returns null when there is nothing to send (no chat with this customer), otherwise { sent, note }
 async function tellCustomer(org, order, status) {
-  if (!CUSTOMER_MESSAGE[status] || !order.conversationId) return;
+  if (!CUSTOMER_MESSAGE[status] || !order.conversationId) return null;
   const conv = await Conversation.findOne({ _id: order.conversationId, organizationId: org });
-  if (!conv || !messenger.canReply(conv)) return;
-  await messenger.reply(org, conv, "system", CUSTOMER_MESSAGE[status](order));
+  if (!conv) return null;
+  if (!messenger.canReply(conv)) return { sent: false, note: "customer not messaged: no message from them in the last 24 hours" };
+  const shop = (await Organization.findById(org).select("ai").lean())?.ai || {};
+  const msg = await messenger.reply(org, conv, "ai", CUSTOMER_MESSAGE[status](order, shop));
   await conv.save();
+  return msg.error ? { sent: false, note: `customer not messaged: ${msg.error}` } : { sent: true, note: `💬 customer told on ${conv.channel === "Instagram" ? "Instagram" : "Messenger"}` };
 }
 
 // Change customer details / notes. Address change recalculates the delivery fee (only before packing).

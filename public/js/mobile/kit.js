@@ -33,7 +33,8 @@ export function orderRow(o, { action = "open", call = false } = {}) {
   const items = (o.items || []).map((i) => `${i.name}${i.variantName ? ` (${i.variantName})` : ""} ×${i.qty}`).join(", ");
   const tel = String(o.phone || "").replace(/[^0-9+]/g, "");
   const callBtn = call && o.status === "pending" && tel ? `<span class="m-call" role="button" data-action="call" data-tel="${esc(tel)}" aria-label="Call">${icon("phone")}</span>` : "";
-  return row({ action, id: o._id, lead: letter(o.customerName), title: esc(o.customerName), sub: esc(items || o.orderNo), side: `<b>${taka(o.total)}</b>${status(o.status)}`, extra: callBtn, chevron: !callBtn });
+  const twice = o.duplicateOf && ["pending", "confirmed"].includes(o.status) ? `<span class="warn-text">⚠️ Ordered twice?</span> · ` : "";
+  return row({ action, id: o._id, lead: letter(o.customerName), title: esc(o.customerName), sub: twice + esc(items || o.orderNo), side: `<b>${taka(o.total)}</b>${status(o.status)}`, extra: callBtn, chevron: !callBtn });
 }
 
 // Bottom sheet with big choices: actionSheet("Cotton Panjabi", [["Edit", fn], ["Archive", fn, "danger"]])

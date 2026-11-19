@@ -1,6 +1,6 @@
 // Orders: list with filters, order details pop-up, new order form.
 import { get, post, put } from "../api.js";
-import { esc, taka, table, orderPill, dateTime, shortTime, onAction, openModal, closeModal, toast, options, ORDER_STATUS, readForm, $, liveSearch, moreMenu } from "../ui.js";
+import { esc, taka, table, orderPill, dateTime, shortTime, onAction, openModal, closeModal, toast, options, ORDER_STATUS, readForm, $, liveSearch, moreMenu, confirmBox } from "../ui.js";
 import { itemRow, readItems, districtList } from "../shared.js";
 import { updateCounts } from "../app.js";
 
@@ -38,7 +38,7 @@ async function draw(root) {
         ["Customer", (o) => `${esc(o.customerName)}<div class="small muted">${esc(o.phone)}${o.district ? ` · ${esc(o.district)}` : ""}</div>`],
         ["Items", (o) => o.items.map((i) => `${esc(i.name)}${i.variantName ? ` (${esc(i.variantName)})` : ""} ×${i.qty}`).join("<br>")],
         ["Total", (o) => `<b>${taka(o.total)}</b><div class="small muted">${o.paymentMethod}${o.paid ? " · paid" : ""}</div>`],
-        ["Status", (o) => `${orderPill(o.status)}${o.status === "pending" && o.callTries ? `<div class="small muted">No answer ×${o.callTries}</div>` : ""}`],
+        ["Status", (o) => `${orderPill(o.status)}${o.status === "pending" && o.callTries ? `<div class="small muted">No answer ×${o.callTries}</div>` : ""}${o.duplicateOf && ["pending", "confirmed"].includes(o.status) ? `<div class="small warn-text">⚠️ Ordered twice?</div>` : ""}`],
       ], data.rows, { emptyText: filters.q ? "No orders match your search" : !count("") ? "No orders yet. Orders from the AI and the ones you add show up here." : filters.status === "pending" ? "No orders to call. New AI orders show up here." : "No orders here", rowAttrs: (o) => `class="click" data-action="open" data-id="${o._id}"` })}
       ${data.pages > 1 ? `<div class="row between mt"><span class="small muted">${data.total} orders</span>
         <div class="row">${data.page > 1 ? `<button class="btn sm light" data-action="page" data-page="${data.page - 1}">‹ Previous</button>` : ""}
@@ -55,10 +55,13 @@ export async function openOrder(id, refresh) {
     title: `Order ${o.orderNo}`, wide: true, buttons: [],
     body: `
       <div class="row">${orderPill(o.status)} <span class="small muted">${dateTime(o.createdAt)}</span></div>
+      ${o.duplicateOf && ["pending", "confirmed"].includes(o.status) ? `<div class="note mt">⚠️ <b>Ordered twice?</b> The same phone has another order with the same products: <a href="#" data-action="openOther">#${esc(o.duplicateOf)}</a>. Ask on the call and cancel one if it is the same order.</div>` : ""}
       ${o.status === "pending" ? callBox(o) : ""}
       <div class="grid2 mt">
         <div class="box"><h4>Customer</h4><b>${esc(o.customerName)}</b><div>${esc(o.phone)}</div><div class="small">${esc(o.address)}</div><div class="small muted">${esc(o.district || "")} · ${esc(o.zone || "")}</div>
-          ${o.conversationId ? `<button type="button" class="btn sm light mt" data-action="openChat">Open chat</button>` : ""}</div>
+          <div class="mt">${customerLine(o.customer)}</div>
+          <div class="row mt">${o.customer.orders ? `<a class="btn sm light" href="#customers?open=${encodeURIComponent(o.phone)}">All their orders</a>` : ""}
+          ${o.conversationId ? `<button type="button" class="btn sm light" data-action="openChat">Open chat</button>` : ""}</div></div>
         <div class="box"><h4>Items</h4>${o.items.map((i) => `<div class="line"><span>${esc(i.name)}${i.variantName ? ` (${esc(i.variantName)})` : ""} × ${i.qty}${i.fullPrice > i.price ? ` <span class="pill p-pink">offer</span>` : ""}</span><b>${i.fullPrice > i.price ? `<s class="small muted">${taka(i.fullPrice * i.qty)}</s> ` : ""}${taka(i.price * i.qty)}</b></div>`).join("")}
           <div class="line"><span>Delivery</span><b>${taka(o.deliveryFee)}</b></div>${o.discount ? `<div class="line"><span>Discount</span><b>−${taka(o.discount)}</b></div>` : ""}
           <div class="line"><span><b>Total</b></span><b>${taka(o.total)}</b></div><div class="small muted">${o.paymentMethod} · ${o.paid ? "paid" : "not paid yet"}</div></div>
@@ -76,12 +79,20 @@ export async function openOrder(id, refresh) {
   const done = async (msg) => { toast(msg); closeModal(); refresh(); updateCounts(); };
   onAction(body, {
     openChat: () => { closeModal(); location.hash = `inbox?open=${o.conversationId}`; },
+    openOther: () => openOrder(o.duplicateOfId, refresh),
     status: (el) => changeStatus(o, el.dataset.to, done),
     saveNotes: async () => { await put(`/api/orders/${o._id}`, { notes: $("#orderNotes").value }); toast("Notes saved"); },
     togglePaid: async () => { await put(`/api/orders/${o._id}`, { paid: !o.paid }); done("Payment updated"); },
     edit: () => editDetails(o, done),
     noAnswer: async () => { await post(`/api/orders/${o._id}/no-answer`); done("Saved. Try again later"); },
   });
+}
+
+// "New customer" or what happened to their other orders (returns and cancels in red: think before sending)
+function customerLine(c) {
+  if (!c?.orders) return `<span class="pill p-blue">New customer</span>`;
+  const bad = c.returned + c.cancelled;
+  return `<div class="small">${c.orders} other order${c.orders > 1 ? "s" : ""} · ${c.delivered} delivered${bad ? ` · <b class="warn-text">${c.returned} returned, ${c.cancelled} cancelled</b>` : ""}</div>`;
 }
 
 // Orders the AI takes wait here until the shop calls the customer and presses Confirm
@@ -101,7 +112,12 @@ function callBox(o) {
 
 // Some statuses need extra information first
 function changeStatus(o, to, done) {
-  const send = async (extra = {}) => { await post(`/api/orders/${o._id}/status`, { status: to, ...extra }); done(`Order is now ${ORDER_STATUS[to][0]}`); };
+  const send = async (extra = {}) => {
+    const r = await post(`/api/orders/${o._id}/status`, { status: to, ...extra });
+    // r.told: did the customer get a message on Messenger / Instagram?
+    const told = !r.told ? "" : r.told.sent ? " · the customer got a message" : " · the customer was NOT messaged (no chat from them in 24 hours). Tell them on the phone.";
+    done(`Order is now ${ORDER_STATUS[to][0]}${told}`);
+  };
   if (to === "shipped") {
     return openModal({ title: "Ship order", buttons: [["ok", "Mark as shipped"]],
       body: `<div class="f2"><div><label>Courier</label><input name="courierName" placeholder="Steadfast, Pathao, own rider…"></div><div><label>Tracking number</label><input name="trackingNo"></div></div>`,
@@ -145,7 +161,15 @@ export async function orderForm(refresh) {
       <div class="mt"><label>Notes</label><input name="notes"></div>
       <div class="box mt" id="price"><span class="muted small">Choose products to see the total.</span></div>`,
     onSubmit: async (d) => {
-      const order = await post("/api/orders", { ...d, items: readItems(d), confirmed: !!d.confirmed });
+      const data = { ...d, items: readItems(d), confirmed: !!d.confirmed };
+      let order;
+      try { order = await post("/api/orders", data); }
+      catch (e) {
+        if (e.code !== "DOUBLE_ORDER") throw e;
+        // the same customer already has this order: ask before making a second one
+        if (!(await confirmBox(`${e.message} Create a second order anyway?`, "Create anyway", false))) return true; // keep the form open
+        order = await post("/api/orders", { ...data, allowDouble: true });
+      }
       toast(`Order ${order.orderNo} created`);
       refresh();
       updateCounts();
