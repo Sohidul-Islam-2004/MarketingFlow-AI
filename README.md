@@ -46,16 +46,20 @@ src/
   routes/                 the /api URLs (one file per page)
 public/
   index.html              the page shell
-  css/app.css             all styles
-  js/app.js               login, menu, page switching
-  js/ui.js                helpers: esc, table, openModal, toast, onAction
+  manifest.webmanifest    phone: "Add to Home screen" opens it like an app (icons/ has the app icons)
+  css/app.css             all styles (computer + the parts both use)
+  css/phone.css           the phone look (loaded only on screens up to 800px)
+  js/app.js               login, menu, page switching (computer: side menu, phone: bottom bar)
+  js/ui.js                helpers: esc, table, chips, moreMenu, openModal, toast, onAction
   js/api.js               get/post/put/del to the server
   js/shared.js            product picker used by Orders and Inbox
-  js/postEditor.js        post editor used by Content Studio and Calendar
+  js/postEditor.js        post editor used by Posts and Calendar
   js/pages/*.js           one file per page
+  js/mobile/*.js          the phone's own screens: Home, Orders, Products, More (+ kit.js: list rows, switch, "+" button)
 ```
 
 **To fix something on a page**, open `public/js/pages/<page>.js` for the screen and `src/routes/<page>.js` for its API.
+On a phone, Home, Orders and Products come from `public/js/mobile/` instead; every other page is shared.
 The rules (prices, stock, statuses) are in `src/services/`.
 
 ### How a page file works

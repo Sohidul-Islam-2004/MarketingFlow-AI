@@ -28,6 +28,21 @@ const HUMAN_WORDS = /(human|real person|agent|manush|মানুষ|complain|�
 const ATTACHMENT_ONLY = /^\[(image|audio|video|file|fallback|template|sticker|share|story_mention|reel|ig_reel)(, \w+)*\]$/i;
 const BUTTONS = ["✅ Confirm", "✏️ Change"];
 
+// Shares, reels, stories, stickers, voice… the AI can't open these. It answers from the caption when there is one,
+// otherwise it politely asks which product the customer means (no hand-over to a person for this).
+const ATTACHMENT_NOTE = {
+  share: "shared a post", ig_reel: "shared a reel", reel: "shared a reel", story_mention: "mentioned the shop in a story",
+  fallback: "shared a link", template: "shared a post", sticker: "sent a sticker (like 👍)", audio: "sent a voice message",
+  video: "sent a video", file: "sent a file", image: "sent a photo",
+};
+function attachmentText(text, captions = []) {
+  const what = [...new Set(String(text).slice(1, -1).split(/,\s*/))].map((k) => ATTACHMENT_NOTE[k.toLowerCase()] || "sent an attachment").join(" and ");
+  const caption = captions.find((c) => String(c || "").trim());
+  if (caption) return `[Customer ${what}. Its caption says: "${String(caption).slice(0, 300)}". If it is about one of our products, answer about that product; if you are not sure, ask which product they want]`;
+  if (what.includes("sticker")) return `[Customer ${what}]`;
+  return `[Customer ${what} that you cannot open. Do not guess what it shows. Politely ask which product they want: the name, or a photo/screenshot of it${what.includes("voice") ? ". Also ask them to type their message" : ""}]`;
+}
+
 async function aiSettings(org) {
   const o = await Organization.findById(org).select("ai zones name suspended expiresAt").lean();
   return { ...o, blocked: !!blockedReason(o), ai: { enabled: true, autoConfirm: true, tone: "friendly", handoffBelow: 60, knowledge: "", deliveryTime: "", handoffMessage: "", ...(o?.ai || {}) } };
@@ -268,7 +283,7 @@ async function confirmOrder(org, conv, settings) {
 
 // Main entry: the customer's message is already added to conv.messages. Caller saves conv.
 // options = { images: [photo links / data URLs] } when the customer sent photos
-async function handleCustomerMessage(org, conv, text, { images = [] } = {}) {
+async function handleCustomerMessage(org, conv, text, { images = [], captions = [] } = {}) {
   const settings = await aiSettings(org);
   conv.lastCustomerAt = new Date();
   conv.unread = (conv.unread || 0) + 1;
@@ -284,12 +299,13 @@ async function handleCustomerMessage(org, conv, text, { images = [] } = {}) {
     return messenger.reply(org, conv, "ai", "অবশ্যই! কী পরিবর্তন করতে চান? পণ্য, সাইজ, পরিমাণ, নাম, ফোন নাকি ঠিকানা?");
   }
   // A photo: a vision model says what it shows, then the AI answers as if the customer had typed it.
-  // Voice, video, files (or a photo when no vision model is set): a person has to look.
+  // A shared post / reel / story, a sticker or a voice message: see attachmentText() above.
   if (ATTACHMENT_ONLY.test(String(text || "").trim())) {
     const seen = images.length ? await lookAtPhoto(org, images[0]).catch(() => null) : null;
-    if (!seen) return handToHuman(org, conv, `Customer sent ${text} (the AI can't open it)`, settings.ai.handoffMessage);
-    messenger.addMessage(conv, "system", `📷 AI saw: ${seen.text}${seen.productName ? ` (looks like ${seen.productName})` : ""}`);
-    text = `[Customer sent a photo: ${seen.text}${seen.productName ? `. It looks like our product "${seen.productName}"` : ""}]`;
+    if (seen) {
+      messenger.addMessage(conv, "system", `📷 AI saw: ${seen.text}${seen.productName ? ` (looks like ${seen.productName})` : ""}`);
+      text = `[Customer sent a photo: ${seen.text}${seen.productName ? `. It looks like our product "${seen.productName}"` : ""}]`;
+    } else text = attachmentText(String(text).trim(), captions);
   }
   if (HUMAN_WORDS.test(text)) return handToHuman(org, conv, `Customer said: "${text.slice(0, 80)}"`, settings.ai.handoffMessage);
   if (!aiReady()) return handToHuman(org, conv, "AI is not set up (AI_API_KEY missing)", settings.ai.handoffMessage);
@@ -357,4 +373,4 @@ async function suggestReply(org, conv) {
   });
 }
 
-module.exports = { aiSettings, updateDraft, draftTotal, draftMissing, placeOrderFromDraft, orderPlacedText, handleCustomerMessage, suggestReply };
+module.exports = { aiSettings, updateDraft, draftTotal, draftMissing, placeOrderFromDraft, orderPlacedText, handleCustomerMessage, suggestReply, attachmentText };

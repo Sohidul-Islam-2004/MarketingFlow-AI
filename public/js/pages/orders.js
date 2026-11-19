@@ -1,11 +1,13 @@
 // Orders: list with filters, order details pop-up, new order form.
 import { get, post, put } from "../api.js";
-import { esc, taka, table, orderPill, dateTime, onAction, openModal, closeModal, toast, options, ORDER_STATUS, readForm, $, liveSearch } from "../ui.js";
+import { esc, taka, table, orderPill, dateTime, shortTime, onAction, openModal, closeModal, toast, options, ORDER_STATUS, readForm, $, liveSearch, moreMenu } from "../ui.js";
 import { itemRow, readItems, districtList } from "../shared.js";
 import { updateCounts } from "../app.js";
 
-const TABS = [["", "All"], ["pending", "📞 To call"], ["confirmed", "Confirmed"], ["packed", "Packed"], ["shipped", "Shipped"], ["delivered", "Delivered"], ["returned", "Returned"], ["cancelled", "Cancelled"]];
-let filters = { status: "", q: "", from: "", to: "", page: 1 };
+// Tabs follow the work: call -> confirm -> pack -> ship. Finished orders are together under "Done".
+const TABS = [["", "All"], ["pending", "📞 To call"], ["confirmed", "Confirmed"], ["packed", "Packed"], ["shipped", "Shipped"], ["delivered,returned,cancelled", "Done"]];
+const SOURCE = { manual: "added by you", ai_chat: "AI chat", comment: "comment" };
+let filters = { status: "", q: "", page: 1 };
 let places = null;
 
 export async function render(root, params) {
@@ -16,12 +18,6 @@ export async function render(root, params) {
     open: (el) => openOrder(el.dataset.id, () => draw(root)),
     newOrder: () => orderForm(() => draw(root)),
   });
-  root.addEventListener("change", (e) => {
-    if (!e.target.dataset.filter || e.target.dataset.filter === "q") return; // the search box is handled by liveSearch
-    filters[e.target.dataset.filter] = e.target.value;
-    filters.page = 1;
-    draw(root);
-  });
   liveSearch(root, filters, () => draw(root));
   await draw(root);
   if (params.open) openOrder(params.open, () => draw(root));
@@ -30,34 +26,29 @@ export async function render(root, params) {
 async function draw(root) {
   const qs = new URLSearchParams(Object.entries(filters).filter(([, v]) => v !== "")).toString();
   const data = await get(`/api/orders?${qs}`);
-  const total = Object.values(data.counts).reduce((a, b) => a + b, 0);
+  const count = (k) => (k ? k.split(",").reduce((n, s) => n + (data.counts[s] || 0), 0) : Object.values(data.counts).reduce((a, b) => a + b, 0));
   root.innerHTML = `
-    <div class="page-head"><div><h1>Orders</h1><p>Every order from chats, comments and the ones you add by hand.</p></div>
-      <div class="row"><a class="btn light" href="/api/orders/export.csv?${qs}">Download CSV</a><button class="btn" data-action="newOrder">+ New order</button></div></div>
-    <div class="tabs">${TABS.map(([k, l]) => `<button class="tab ${filters.status === k ? "on" : ""}" data-action="tab" data-status="${k}">${l}<span class="n">${k ? data.counts[k] || 0 : total}</span></button>`).join("")}</div>
+    <div class="page-head"><div><h1>Orders</h1><p>Orders from chats, comments and the ones you add. Call the customer, then confirm.</p></div>
+      <div class="row">${moreMenu(`<a class="menu-item" href="/api/orders/export.csv?${qs}">Download as Excel (CSV)</a>`)}<button class="btn" data-action="newOrder">+ New order</button></div></div>
+    <div class="tabs">${TABS.map(([k, l]) => `<button class="tab ${filters.status === k ? "on" : ""}" data-action="tab" data-status="${k}">${l}${count(k) ? `<span class="n">${count(k)}</span>` : ""}</button>`).join("")}</div>
     <div class="card">
-      <div class="filters">
-        <input data-filter="q" placeholder="Search order no, name, phone, tracking…" value="${esc(filters.q)}" style="min-width:280px">
-        <label class="small">From <input type="date" data-filter="from" value="${filters.from}"></label>
-        <label class="small">To <input type="date" data-filter="to" value="${filters.to}"></label>
-      </div>
+      <div class="filters"><input data-filter="q" placeholder="Search name, phone, order no or tracking…" value="${esc(filters.q)}"></div>
       ${table([
-        ["Order", (o) => `<b>${esc(o.orderNo)}</b><div class="small muted">${{ manual: "Added by you", ai_chat: "AI chat", comment: "Comment" }[o.source] || o.source}</div>`],
-        ["Customer", (o) => `${esc(o.customerName)}<div class="small muted">${esc(o.phone)} · ${esc(o.district || "")}</div>`],
+        ["Order", (o) => `<b>${esc(o.orderNo)}</b><div class="small muted">${shortTime(o.createdAt)} · ${SOURCE[o.source] || esc(o.source)}</div>`],
+        ["Customer", (o) => `${esc(o.customerName)}<div class="small muted">${esc(o.phone)}${o.district ? ` · ${esc(o.district)}` : ""}</div>`],
         ["Items", (o) => o.items.map((i) => `${esc(i.name)}${i.variantName ? ` (${esc(i.variantName)})` : ""} ×${i.qty}`).join("<br>")],
         ["Total", (o) => `<b>${taka(o.total)}</b><div class="small muted">${o.paymentMethod}${o.paid ? " · paid" : ""}</div>`],
         ["Status", (o) => `${orderPill(o.status)}${o.status === "pending" && o.callTries ? `<div class="small muted">No answer ×${o.callTries}</div>` : ""}`],
-        ["Date", (o) => dateTime(o.createdAt)],
-      ], data.rows, { emptyText: "No orders here", rowAttrs: (o) => `class="click" data-action="open" data-id="${o._id}"` })}
-      <div class="row between mt"><span class="small muted">${data.total} order(s)</span>
+      ], data.rows, { emptyText: filters.q ? "No orders match your search" : !count("") ? "No orders yet. Orders from the AI and the ones you add show up here." : filters.status === "pending" ? "No orders to call. New AI orders show up here." : "No orders here", rowAttrs: (o) => `class="click" data-action="open" data-id="${o._id}"` })}
+      ${data.pages > 1 ? `<div class="row between mt"><span class="small muted">${data.total} orders</span>
         <div class="row">${data.page > 1 ? `<button class="btn sm light" data-action="page" data-page="${data.page - 1}">‹ Previous</button>` : ""}
         <span class="small">Page ${data.page} of ${data.pages}</span>
-        ${data.page < data.pages ? `<button class="btn sm light" data-action="page" data-page="${data.page + 1}">Next ›</button>` : ""}</div></div>
+        ${data.page < data.pages ? `<button class="btn sm light" data-action="page" data-page="${data.page + 1}">Next ›</button>` : ""}</div></div>` : ""}
     </div>`;
 }
 
 /* ---------- order details ---------- */
-async function openOrder(id, refresh) {
+export async function openOrder(id, refresh) {
   const o = await get(`/api/orders/${id}`);
   const early = ["pending", "confirmed"].includes(o.status);
   const body = openModal({
@@ -139,7 +130,7 @@ function editDetails(o, done) {
 }
 
 /* ---------- new order ---------- */
-async function orderForm(refresh) {
+export async function orderForm(refresh) {
   const [products, settings] = await Promise.all([get("/api/products"), places || get("/api/settings")]);
   places = settings;
   const body = openModal({

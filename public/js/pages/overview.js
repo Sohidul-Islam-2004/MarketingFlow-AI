@@ -1,6 +1,8 @@
-// Home: sales, what the AI did for you, the last 7 days, what needs your attention, recent orders.
+// Home: what to do now, sales, what the AI did for you, the last 7 days, the latest orders.
 import { get } from "../api.js";
-import { esc, taka, num, table, orderPill, dateTime, onAction } from "../ui.js";
+import { esc, taka, num, onAction, greeting, icon } from "../ui.js";
+import { session } from "../app.js";
+import { row, leadIcon, orderRow } from "../mobile/kit.js";
 
 let period = "today";
 
@@ -62,38 +64,39 @@ function weekCard(week) {
   </div>`;
 }
 
+// The things waiting for you; only the ones with a number are shown
+function doNow(todo, pageConnected) {
+  const items = [
+    ["#orders?status=pending", "phone", "amber", "Call to confirm", todo.toCall, "AI orders wait for your call"],
+    ["#inbox?tab=needs_human", "chats", "red", "Chats need you", todo.needsHuman, "the AI handed them to you"],
+    ["#comments", "comments", "blue", "Comments to answer", todo.newComments, "complaints and questions"],
+    ["#orders?status=confirmed", "box", "purple", "Orders to pack", Math.max(0, (todo.toPack || 0) - (todo.toCall || 0)), "confirmed, not packed yet"],
+    ["#inventory?low=1", "inventory", "pink", "Running low", todo.lowStock, "products almost sold out"],
+  ].filter((t) => t[4] > 0);
+  return `<div class="card"><h3>Do now</h3><p class="small muted">${items.length ? "Open one to get it done." : "Nothing is waiting for you."}</p>
+    ${items.length ? `<div class="m-list">${items.map(([href, ic, tone, label, n, hint]) => row({ href, lead: leadIcon(ic, tone), title: label, sub: hint, side: `<span class="m-count tone-${tone}">${n}</span>` })).join("")}</div>`
+      : pageConnected ? `<div class="all-clear">${icon("check")} All caught up. The AI is answering your customers.</div>`
+      : `<p class="muted mt">When your Facebook Page is connected, chats to answer and orders to call show up here.</p>`}</div>`;
+}
+
 async function draw(root) {
   const o = await get(`/api/overview?period=${period}`);
   const label = { today: "today", "7d": "in the last 7 days", "30d": "in the last 30 days" }[period];
+  const first = String(session.me?.user?.name || "").split(" ")[0];
+  const setup = gettingStarted(o.setup);
   root.innerHTML = `
-    <div class="hero">
-      <div><h2>Your shop at a glance</h2><p>Numbers in Bangladesh time. Cancelled orders are not counted.</p></div>
-      <div class="row">${[["today", "Today"], ["7d", "7 days"], ["30d", "30 days"]].map(([k, l]) => `<button class="tab ${k === period ? "on" : ""}" data-action="period" data-p="${k}">${l}</button>`).join("")}</div>
-    </div>
-    ${gettingStarted(o.setup)}
-    <div class="kpis mt">
+    <div class="page-head home-head"><div><h1>${greeting()}${first ? `, ${esc(first)}` : ""} 👋</h1><p>Here is your shop ${label}. Cancelled orders are not counted.</p></div>
+      <div class="tabs">${[["today", "Today"], ["7d", "7 days"], ["30d", "30 days"]].map(([k, l]) => `<button class="tab ${k === period ? "on" : ""}" data-action="period" data-p="${k}">${l}</button>`).join("")}</div></div>
+    ${setup}
+    <div class="kpis ${setup ? "mt" : ""}">
       <div class="kpi"><div class="label">Sales</div><div class="value">${taka(o.sales.revenue)}</div><p>${label} ${changeText(o.sales.revenueChange)}</p></div>
       <div class="kpi"><div class="label">Orders</div><div class="value">${num(o.sales.orders)}</div><p>${label} ${changeText(o.sales.ordersChange)}</p></div>
-      <div class="kpi"><div class="label">From chats & comments</div><div class="value">${num(o.sales.aiOrders)}</div><p>orders created by the AI</p></div>
-      <div class="kpi"><div class="label">Open chats</div><div class="value">${num(o.openChats)}</div><p>in the inbox</p></div>
+      <div class="kpi"><div class="label">Taken by the AI</div><div class="value">${num(o.sales.aiOrders)}</div><p>orders from chats & comments</p></div>
+      <div class="kpi"><div class="label">Open chats</div><div class="value">${num(o.openChats)}</div><p>the AI is answering</p></div>
     </div>
-    <div class="grid2 home-grid">${aiCard(o.ai, label[0].toUpperCase() + label.slice(1))}${weekCard(o.week)}</div>
-    <div class="card">
-      <h3>Needs your attention</h3><p class="sub">${Object.values(o.todo).some(Boolean) ? "Click a box to open the list." : "Nothing is waiting for you. 🎉"}</p>
-      <div class="todo">
-        ${[["#inbox?tab=needs_human", o.todo.needsHuman, "chats need a person"], ["#comments", o.todo.newComments, "comments to answer"],
-          ["#orders?status=pending,confirmed", o.todo.toPack, "orders to call / pack"], ["#inventory?low=1", o.todo.lowStock, "products low on stock"]]
-          .map(([link, n, text]) => `<a href="${link}" class="${n ? "has" : ""}"><b>${n}</b>${text}</a>`).join("")}
-      </div>
-    </div>
-    <div class="card">
-      <div class="row between"><h3>Latest orders</h3><a class="btn sm light" href="#orders">All orders</a></div>
-      ${table([
-        ["Order", (r) => `<b>${esc(r.orderNo)}</b>`],
-        ["Customer", (r) => `${esc(r.customerName)}<div class="small muted">${esc(r.phone)}</div>`],
-        ["Total", (r) => taka(r.total)],
-        ["Status", (r) => orderPill(r.status)],
-        ["Date", (r) => dateTime(r.createdAt)],
-      ], o.recentOrders, { emptyText: "No orders yet. They appear here when the AI or you create one.", rowAttrs: (r) => `class="click" data-action="open" data-id="${r._id}"` })}
+    <div class="grid2 home-grid">${doNow(o.todo, o.setup.page)}${aiCard(o.ai, label[0].toUpperCase() + label.slice(1))}</div>
+    <div class="grid2 home-grid">${weekCard(o.week)}
+      <div class="card"><div class="row between"><h3>Latest orders</h3><a class="btn sm light" href="#orders">All orders</a></div>
+        ${o.recentOrders.length ? `<div class="m-list">${o.recentOrders.slice(0, 5).map((r) => orderRow(r)).join("")}</div>` : `<div class="empty"><b>No orders yet</b>They appear here when the AI or you create one.</div>`}</div>
     </div>`;
 }

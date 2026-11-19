@@ -2,7 +2,7 @@
 // Refreshes every 5 seconds while the page is open (the server answers "nothing new" when nothing changed).
 // On a phone you see one part at a time: chat list -> chat -> order.
 import { get, post, put, del } from "../api.js";
-import { esc, taka, dateTime, onAction, openModal, toast, orderPill, $, confirmBox, debounce, icon, loading, options } from "../ui.js";
+import { esc, taka, dateTime, shortTime, onAction, openModal, toast, orderPill, $, confirmBox, debounce, icon, loading, options } from "../ui.js";
 import { itemRow, readItems, districtList } from "../shared.js";
 import { updateCounts } from "../app.js";
 
@@ -13,8 +13,8 @@ export async function render(root, params) {
   if (params.tab) state.tab = params.tab;
   if (params.open) state.openId = params.open;
   root.innerHTML = `
-    <div class="page-head"><div><h1>Chats</h1><p>Messenger and Instagram chats. The AI answers and takes orders; you can take over any time.</p></div>
-      <button class="btn light" data-action="simulate">Test the AI (simulator)</button></div>
+    <div class="page-head"><div><h1>Chats</h1><p>The AI answers Messenger and Instagram and takes orders. You can take over any time.</p></div>
+      <button class="btn light" data-action="simulate">✨ Test the AI</button></div>
     <div class="inbox ${state.openId ? "show-chat" : ""}" id="inbox">
       <div class="chats"><div class="filters"><div class="tabs" id="tabs" style="margin:0"></div><input id="search" placeholder="Search name, message, phone…" value="${esc(state.q)}"></div><div class="chat-list" id="chatList">${loading()}</div></div>
       <div class="thread" id="thread"></div>
@@ -65,21 +65,25 @@ export async function render(root, params) {
 
 async function refreshAll(quiet = false) {
   // the open chat first: opening it marks it as read, so the list shows the right unread count
-  try { await drawChat(quiet); await drawList(); } catch (e) { if (!quiet) toast(e.message, true); }
+  // (stop quietly if you already left this page while it was loading)
+  try { await drawChat(quiet); await drawList(); } catch (e) { if (!quiet && $("#inbox")) toast(e.message, true); }
 }
 
 /* ---------- left: chat list ---------- */
 async function drawList() {
   const data = await get(`/api/inbox?tab=${state.tab}&q=${encodeURIComponent(state.q)}`);
+  if (!$("#chatList")) return; // you left the page
   $("#tabs").innerHTML = [["open", "Open"], ["needs_human", `Needs you (${data.needsHuman})`], ["closed", "Closed"]]
     .map(([k, l]) => `<button class="tab ${state.tab === k ? "on" : ""}" data-action="tab" data-tab="${k}">${l}</button>`).join("");
+  // like a messaging app: name and time, the last message, then who is answering
   $("#chatList").innerHTML = data.rows.map((c) => `
-    <div class="chat-row ${c._id === state.openId ? "on" : ""}" data-action="openChat" data-id="${c._id}">
+    <div class="chat-row ${c._id === state.openId ? "on" : ""} ${c.unread ? "unread" : ""}" data-action="openChat" data-id="${c._id}">
       <div class="face">${c.avatar ? `<img src="${esc(c.avatar)}" alt="">` : esc(c.customerName[0] || "?")}</div>
-      <div class="who"><b>${esc(c.customerName)} ${c.unread ? `<span class="pill p-red">${c.unread}</span>` : ""}</b>
-        <small>${esc(c.lastMessage)}</small>
-        <small>${channelTag(c.channel)} ${dateTime(c.updatedAt)} ${c.status === "needs_human" ? "· 🙋 needs you" : c.aiPaused ? "· AI off" : "· 🤖 AI"}${c.draftStatus === "placed" ? " · ✅ ordered" : ""}</small></div>
-    </div>`).join("") || `<div class="empty"><b>No chats</b>New Messenger messages appear here.</div>`;
+      <div class="who">
+        <div class="who-top"><b>${esc(c.customerName)}</b><time>${shortTime(c.updatedAt)}</time></div>
+        <div class="who-msg"><small>${esc(c.lastMessage)}</small>${c.unread ? `<span class="dot-count">${c.unread}</span>` : ""}</div>
+        <div class="who-tags"><span class="ch ch-${esc(String(c.channel).toLowerCase())}">${esc(c.channel === "Simulator" ? "Test chat" : c.channel)}</span>${c.status === "needs_human" ? `<span class="tag-red">Needs you</span>` : c.aiPaused ? `<span>AI off</span>` : `<span class="tag-ai">AI answering</span>`}${c.draftStatus === "placed" ? `<span class="tag-green">Ordered</span>` : ""}</div></div>
+    </div>`).join("") || `<div class="empty"><b>No chats here</b>New Messenger and Instagram messages appear here.</div>`;
 }
 
 /* ---------- middle + right: one chat ---------- */
@@ -92,7 +96,7 @@ async function drawChat(quiet = false) {
   const id = state.openId;
   const same = state.chat?._id === id;
   const c = await get(`/api/inbox/${id}${quiet && same ? `?since=${encodeURIComponent(state.chat.updatedAt)}` : ""}`);
-  if (c.unchanged || id !== state.openId) return; // nothing new (keeps what you are typing)
+  if (c.unchanged || id !== state.openId || !$("#thread")) return; // nothing new (keeps what you are typing), or you left the page
   state.chat = c;
   const typing = same ? $("#replyBox")?.value || "" : "";
   const atBottom = !same || !$("#messages") || $("#messages").scrollHeight - $("#messages").scrollTop - $("#messages").clientHeight < 80;

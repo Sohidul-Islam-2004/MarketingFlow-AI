@@ -3,7 +3,7 @@ import { get, put, post } from "../api.js";
 import { esc, onAction, toast, options, readForm, confirmBox } from "../ui.js";
 
 let tab = "ai";
-const TABS = [["ai", "AI agent"], ["comments", "Comments"], ["zones", "Delivery fees"], ["profile", "Business"], ["password", "Password"]];
+const TABS = [["ai", "AI"], ["comments", "Comments"], ["zones", "Delivery fees"], ["profile", "Business"], ["password", "Password"]];
 
 export async function render(root) {
   onAction(root, {
@@ -43,23 +43,25 @@ const readZones = (form) => [...form.querySelectorAll(".zone")].map((box) => {
 
 async function draw(root) {
   const s = await get("/api/settings");
-  const check = (name, on, text) => `<label class="check"><input type="checkbox" name="${name}" ${on ? "checked" : ""}> ${text}</label>`;
+  // An on/off switch with a short explanation under it
+  const toggle = (name, on, title, hint) => `<label class="switch-row"><span><b>${title}</b><small>${hint}</small></span><input type="checkbox" class="switch" name="${name}" ${on ? "checked" : ""}></label>`;
+  const advanced = (inner) => `<details class="advanced"><summary>More settings</summary><div class="stack">${inner}</div></details>`;
   const forms = {
     ai: `${s.ai.ready ? "" : `<div class="note">AI is not set up: add AI_API_KEY to .env and restart the server.</div>`}
-      ${check("enabled", s.ai.enabled, "AI answers customers in Messenger and Instagram")}
-      ${check("followUp", s.ai.followUp !== false, "Remind customers once who stopped in the middle of an order (3 hours later)")}
-      <div class="f2"><div><label>Tone</label><select name="tone">${options([["friendly", "Friendly"], ["professional", "Professional"], ["formal", "Formal"]], s.ai.tone)}</select></div>
+      <div>${toggle("enabled", s.ai.enabled, "AI answers your customers", "Messenger and Instagram chats, day and night")}
+      ${toggle("followUp", s.ai.followUp !== false, "Remind unfinished orders", "One friendly message 3 hours after a customer stopped in the middle of an order")}</div>
+      <div><label>Delivery time (the AI tells customers this)</label><input name="deliveryTime" value="${esc(s.ai.deliveryTime)}" placeholder="Dhaka 1-2 days, outside Dhaka 3-5 days"></div>
+      <div><label>Shop knowledge</label><p class="small muted" style="margin:-2px 0 8px">Return policy, size chart, opening hours, address, common questions. The AI only uses what is written here and your products. Answers you teach from a chat (🧠 Teach AI) are added here.</p><textarea name="knowledge" rows="10">${esc(s.ai.knowledge)}</textarea></div>
+      ${advanced(`<div class="f2"><div><label>How the AI talks</label><select name="tone">${options([["friendly", "Friendly"], ["professional", "Professional"], ["formal", "Formal"]], s.ai.tone)}</select></div>
         <div><label>Hand the chat to you when the AI is less sure than (%)</label><input type="number" name="handoffBelow" min="0" max="100" value="${s.ai.handoffBelow}"></div></div>
-      <div><label>Delivery time (the AI tells customers this)</label><input name="deliveryTime" value="${esc(s.ai.deliveryTime)}"></div>
-      <div><label>Shop knowledge: return policy, size chart, opening hours, address, FAQ. The AI only uses what is written here + your products. Answers you teach from a chat (🧠 Teach AI) are added here.</label><textarea name="knowledge" rows="10">${esc(s.ai.knowledge)}</textarea></div>
-      <div><label>Message when the AI hands the chat to you</label><input name="handoffMessage" value="${esc(s.ai.handoffMessage)}"></div>`,
-    comments: `${check("sendDm", s.comments.sendDm, "Send a private Messenger message to people who ask about price / stock / ordering")}
-      ${check("autoReply", s.comments.autoReply, "Post a public reply under the comment (template with your real prices)")}
-      ${check("needApproval", s.comments.needApproval, "Don't post public replies until I approve them")}
-      ${check("hideSpam", s.comments.hideSpam, "Hide spam comments (links, blocked words) on Facebook")}
-      <div class="f2"><div><label>Wait before replying (seconds, looks more natural)</label><input type="number" name="delaySec" min="0" max="600" value="${s.comments.delaySec}"></div>
-        <div><label>Blocked words (comma separated, treated as spam)</label><input name="blockedWords" value="${esc((s.comments.blockedWords || []).join(", "))}"></div></div>
-      <p class="small muted">Complaints ("fake", "refund", "পাইনি"...) are never answered automatically. They wait for you in FB Comments.</p>`,
+        <div><label>Message when the AI hands the chat to you</label><input name="handoffMessage" value="${esc(s.ai.handoffMessage)}"></div>`)}`,
+    comments: `<div>${toggle("sendDm", s.comments.sendDm, "Message buyers privately", "People who ask about price, stock or ordering get a Messenger message")}
+      ${toggle("autoReply", s.comments.autoReply, "Reply under the comment", "A short public reply with your real prices")}
+      ${toggle("needApproval", s.comments.needApproval, "Let me approve public replies first", "Replies wait in Comments until you press Approve")}
+      ${toggle("hideSpam", s.comments.hideSpam, "Hide spam", "Comments with links or blocked words are hidden on Facebook")}</div>
+      <p class="small muted">Complaints ("fake", "refund", "পাইনি"…) are never answered by the AI. They wait for you in Comments.</p>
+      ${advanced(`<div class="f2"><div><label>Wait before replying (seconds, looks more natural)</label><input type="number" name="delaySec" min="0" max="600" value="${s.comments.delaySec}"></div>
+        <div><label>Blocked words (comma separated, treated as spam)</label><input name="blockedWords" value="${esc((s.comments.blockedWords || []).join(", "))}"></div></div>`)}`,
     zones: `<p class="small muted">Every order's delivery fee comes from these zones. The address is matched by area first (e.g. "Savar" → suburbs), then by district. If nothing matches, the default zone is used.${s.usingDefaultZones ? " You are using the built-in zones." : ""}</p>
       <div id="zones">${s.zones.map(zoneRow).join("")}</div>
       <div class="row mt"><button type="button" class="btn sm light" data-action="addZone">+ Zone</button>${s.usingDefaultZones ? "" : `<button type="button" class="btn sm light" data-action="resetZones">Use built-in zones</button>`}</div>
@@ -72,5 +74,5 @@ async function draw(root) {
   root.innerHTML = `
     <div class="page-head"><div><h1>Settings</h1></div></div>
     <div class="tabs">${TABS.map(([k, l]) => `<button class="tab ${tab === k ? "on" : ""}" data-action="tab" data-tab="${k}">${l}</button>`).join("")}</div>
-    <div class="card" style="max-width:860px"><form class="stack" onsubmit="return false">${forms[tab]}<div><button class="btn" data-action="save">Save</button></div></form></div>`;
+    <div class="card settings-card"><form class="stack" onsubmit="return false">${forms[tab]}<div><button class="btn" data-action="save">Save changes</button></div></form></div>`;
 }

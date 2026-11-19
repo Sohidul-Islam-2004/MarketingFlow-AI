@@ -1,9 +1,9 @@
 // FB Comments: what the comment engine did, and the comments that need you.
 import { get, post } from "../api.js";
-import { esc, dateTime, onAction, openModal, toast, pill, confirmBox } from "../ui.js";
+import { esc, dateTime, onAction, openModal, toast, pill, confirmBox, chips, moreMenu } from "../ui.js";
 import { updateCounts } from "../app.js";
 
-const TABS = [["needs_you", "Needs you"], ["waiting", "Replying soon"], ["replied", "Replied"], ["spam", "Spam"], ["all", "All"]];
+const TABS = [["needs_you", "Needs you"], ["waiting", "Replying soon"], ["replied", "Replied"], ["all", "All"]];
 const CATEGORY = { price: ["Price", "blue"], stock: ["In stock?", "blue"], size: ["Size/colour", "blue"], delivery: ["Delivery", "purple"], order: ["Wants to order", "green"], complaint: ["Complaint", "red"], praise: ["Praise", "green"], spam: ["Spam", "grey"], other: ["Other", "grey"] };
 const STATUS = { new: "New", waiting: "Reply scheduled", approval: "Waiting for your OK", replied: "Replied", needs_human: "Needs you", spam: "Spam", ignored: "Skipped", failed: "Failed" };
 let tab = "needs_you";
@@ -11,7 +11,7 @@ let rows = [];
 
 export async function render(root) {
   onAction(root, {
-    tab: (el) => { tab = el.dataset.tab; draw(root); },
+    tab: (el) => { tab = el.dataset.value; return draw(root); },
     reply: (el) => {
       const c = rows.find((x) => x._id === el.dataset.id);
       openModal({
@@ -36,9 +36,9 @@ async function draw(root) {
   const data = await get(`/api/comments?tab=${tab}`);
   rows = data.rows;
   root.innerHTML = `
-    <div class="page-head"><div><h1>Comments</h1><p>Buying questions get a private message and a public reply with your real prices. Complaints wait for you. Change the rules in Settings.</p></div>
-      <button class="btn light" data-action="simulate">Test a comment</button></div>
-    <div class="tabs">${TABS.map(([k, l]) => `<button class="tab ${tab === k ? "on" : ""}" data-action="tab" data-tab="${k}">${l}${k === "needs_you" ? `<span class="n">${data.needsYou}</span>` : ""}</button>`).join("")}</div>
+    <div class="page-head"><div><h1>Comments</h1><p>The AI answers buying questions with your real prices. Complaints wait for you here.</p></div>
+      <button class="btn light" data-action="simulate">✨ Test a comment</button></div>
+    <div class="mb">${chips(TABS.map(([k, l]) => [k, l, k === "needs_you" ? data.needsYou : null]), tab, "tab")}</div>
     <div class="stack">${rows.map(card).join("") || `<div class="card"><div class="empty"><b>Nothing here</b>New comments on your Page posts show up within seconds.</div></div>`}</div>`;
 }
 
@@ -55,8 +55,7 @@ function card(c) {
     ${c.error ? `<p class="small mt" style="color:var(--red)">${esc(c.error)}</p>` : ""}
     <div class="row mt">
       ${open ? `<button class="btn sm" data-action="reply" data-id="${c._id}">${c.reply ? "Check & send reply" : "Write reply"}</button>` : ""}
-      ${!c.dmSent && c.status !== "spam" ? `<button class="btn sm light" data-action="dm" data-id="${c._id}">Send private message</button>` : ""}
       ${open ? `<button class="btn sm light" data-action="skip" data-id="${c._id}">Don't reply</button>` : ""}
-      ${c.status !== "spam" ? `<button class="btn sm light" data-action="hide" data-id="${c._id}">Hide</button>` : ""}
+      ${c.status !== "spam" ? moreMenu(`${!c.dmSent ? `<button type="button" class="menu-item" data-action="dm" data-id="${c._id}">Send a private message</button>` : ""}<button type="button" class="menu-item" data-action="hide" data-id="${c._id}">Hide on Facebook</button>`) : ""}
     </div></div>`;
 }

@@ -98,6 +98,7 @@ async function onMessage(page, event, { channel = "Messenger", ownId = page.acco
   if (!text) return;
   if (!(await firstTime(`msg:${msg?.mid || `${event.timestamp}:${psid}`}`))) return;
   const images = (msg?.attachments || []).filter((a) => a.type === "image" && a.payload?.url).map((a) => a.payload.url); // the AI can look at photos
+  const captions = (msg?.attachments || []).map((a) => a.payload?.title || a.title).filter(Boolean); // caption of a shared post / reel
 
   await messenger.oneAtATime(`${org}:${psid}`, async () => {
     let conv = await Conversation.findOne({ organizationId: org, psid });
@@ -106,7 +107,7 @@ async function onMessage(page, event, { channel = "Messenger", ownId = page.acco
       conv = new Conversation({ organizationId: org, psid, channel, pageId: page.accountId, customerName: profile.name, avatar: profile.avatar });
     }
     messenger.addMessage(conv, "customer", text, { mid: msg?.mid || null, image: images[0] || null });
-    await agent.handleCustomerMessage(org, conv, text, { images });
+    await agent.handleCustomerMessage(org, conv, text, { images, captions });
     await conv.save();
   });
 }

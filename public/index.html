@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>MarketingFlow AI</title>
     <meta name="theme-color" content="#0f1424" />
+    <!-- Phone: "Add to Home screen" opens MarketingFlow full screen, like an app -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="MarketingFlow" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%234f46e5'/%3E%3Cpath d='M24 8 17.5 25l-3.2-7.3L7 14.5z' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;600&display=swap" />
     <link rel="stylesheet" href="/css/app.css" />
@@ -16,15 +22,14 @@
 
     <!-- The dashboard -->
     <div id="app" class="hidden">
-      <!-- Phone only: top bar with the menu button -->
+      <!-- Phone only: top bar (back arrow on inner pages, page name, notifications) -->
       <header class="topbar">
+        <button class="top-back" id="topBack" hidden aria-label="Back"></button>
         <div class="logo" id="topLogo"></div>
         <b id="topTitle">MarketingFlow AI</b>
         <button class="bell" id="topBell" aria-label="Notifications"></button>
       </header>
-      <div class="shade" id="shade"></div>
-      <aside id="side">
-        <div class="sheet-grip"></div>
+      <aside id="side"><!-- computer: the side menu (a phone shows the bottom bar instead) -->
         <div class="brand">
           <div class="logo" id="logo"></div>
           <span>MarketingFlow AI</span>
@@ -38,7 +43,7 @@
         </div>
       </aside>
       <main id="page"></main>
-      <!-- Phone only: bottom bar with the main pages (filled by js/app.js) -->
+      <!-- Phone only: bottom bar Home · Chats · Orders · Products · More (filled by js/app.js) -->
       <nav class="tabbar" id="tabbar"></nav>
     </div>
 

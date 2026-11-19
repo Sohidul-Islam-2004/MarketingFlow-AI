@@ -63,7 +63,7 @@ async function setupSteps(org, productCount) {
 
 async function overview(org, period = "today") {
   const r = periodRange(period);
-  const [now, before, toPack, openChats, needsHuman, newComments, products, recent, ai, week] = await Promise.all([
+  const [now, before, toPack, openChats, needsHuman, newComments, products, recent, ai, week, toCall] = await Promise.all([
     orderTotals(org, r.from, r.to),
     orderTotals(org, r.prevFrom, r.prevTo),
     Order.countDocuments({ organizationId: org, status: { $in: ["pending", "confirmed"] } }),
@@ -74,13 +74,14 @@ async function overview(org, period = "today") {
     Order.find({ organizationId: org }).sort({ createdAt: -1 }).limit(8).lean(),
     aiWork(org, r.from, r.to),
     last7Days(org),
+    Order.countDocuments({ organizationId: org, status: "pending" }),
   ]);
   const lowStock = products.filter((p) => !p.alwaysAvailable && p.variants.reduce((s, v) => s + v.available, 0) <= (p.lowStockAt ?? 5));
   return {
     period,
     setup: await setupSteps(org, products.length),
     sales: { revenue: now.revenue, revenueChange: change(now.revenue, before.revenue), orders: now.count, ordersChange: change(now.count, before.count), aiOrders: now.ai },
-    todo: { toPack, needsHuman, newComments, lowStock: lowStock.length },
+    todo: { toPack, toCall, needsHuman, newComments, lowStock: lowStock.length },
     openChats,
     lowStock: lowStock.slice(0, 5).map((p) => ({ id: p._id, name: p.name, available: p.variants.reduce((s, v) => s + v.available, 0) })),
     recentOrders: recent,

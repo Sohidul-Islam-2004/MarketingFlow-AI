@@ -4,27 +4,23 @@
 //   Offer    = "10% off" or "৳100 off" until a date: the AI quotes the sale price and orders use it
 
 import { get, post, put, del } from "../api.js";
-import { esc, taka, num, table, onAction, openModal, toast, options, dateTime, pill, confirmBox, liveSearch, empty } from "../ui.js";
+import { esc, taka, table, onAction, openModal, toast, options, dateTime, pill, confirmBox, liveSearch, empty, chips, moreMenu } from "../ui.js";
 
-let filters = { q: "", low: "", archived: "" };
+// show: "" all · "low" low stock · "offer" on offer · "archived"
+let filters = { q: "", show: "" };
 let products = [];
 
 export async function render(root, params) {
-  if (params.low) filters.low = "1";
+  if (params.low) filters.show = "low";
   onAction(root, {
     add: () => productForm(null, () => draw(root)),
     offerAll: () => offerForAll(() => draw(root)),
     edit: (el) => productForm(find(el), () => draw(root)),
     adjust: (el) => adjustForm(find(el), () => draw(root)),
     history: (el) => showHistory(find(el)),
-    archive: async (el) => { await post(`/api/products/${el.dataset.id}/archive`, { archived: filters.archived !== "1" }); toast(filters.archived === "1" ? "Product is back in the shop" : "Product archived"); draw(root); },
+    filter: (el) => { filters.show = el.dataset.value; return draw(root); },
+    archive: async (el) => { const back = filters.show === "archived"; await post(`/api/products/${el.dataset.id}/archive`, { archived: !back }); toast(back ? "Product is back in the shop" : "Product archived"); draw(root); },
     remove: async (el) => { if (!(await confirmBox("Delete this product for good?", "Delete"))) return; await del(`/api/products/${el.dataset.id}`); toast("Deleted"); draw(root); },
-  });
-  root.addEventListener("change", (e) => {
-    const key = e.target.dataset.filter;
-    if (!key || key === "q") return; // the search box is handled by liveSearch
-    filters[key] = e.target.type === "checkbox" ? (e.target.checked ? "1" : "") : e.target.value;
-    draw(root);
   });
   liveSearch(root, filters, () => draw(root));
   await draw(root);
@@ -34,36 +30,32 @@ export async function render(root, params) {
 const find = (el) => products.find((p) => p._id === el.dataset.id);
 
 async function draw(root) {
-  products = await get(`/api/products?${new URLSearchParams(filters)}`);
-  const units = products.reduce((s, p) => s + p.onHand, 0);
+  const archived = filters.show === "archived";
+  const q = filters.q ? `q=${encodeURIComponent(filters.q)}` : "";
+  const all = await get(`/api/products?${q}${archived ? "&archived=1" : ""}`);
+  const show = { low: (p) => p.lowStock, offer: (p) => p.offerOn };
+  products = show[filters.show] ? all.filter(show[filters.show]) : all;
+  const count = (k) => (archived ? null : all.filter(show[k]).length || null);
+  const nothingYet = !all.length && !filters.q && !archived;
   root.innerHTML = `
     <div class="page-head"><div><h1>Products</h1><p>Add what you sell, in your own words. The AI answers customers from here.</p></div>
-      <div class="row"><button class="btn light" data-action="offerAll">🏷️ Offer</button><button class="btn" data-action="add">+ Add product</button></div></div>
-    <div class="kpis">
-      <div class="kpi"><div class="label">Products</div><div class="value">${num(products.length)}</div></div>
-      <div class="kpi"><div class="label">Units in shop</div><div class="value">${num(units)}</div></div>
-      <div class="kpi"><div class="label">Low on stock</div><div class="value">${num(products.filter((p) => p.lowStock).length)}</div></div>
-    </div>
+      <div class="row"><button class="btn light" data-action="offerAll">🏷️ Offer for all</button><button class="btn" data-action="add">+ Add product</button></div></div>
     <div class="card">
-      <div class="filters">
-        <input data-filter="q" placeholder="Search products…" value="${esc(filters.q)}" style="min-width:260px">
-        <label class="check small"><input type="checkbox" data-filter="low" ${filters.low ? "checked" : ""}> Low stock only</label>
-        <label class="check small"><input type="checkbox" data-filter="archived" ${filters.archived ? "checked" : ""}> Show archived</label>
-      </div>
-      ${!products.length && !filters.q && !filters.low && !filters.archived ? empty("No products yet", "Add what you sell. The AI can only talk about products that are here.", `<button class="btn" data-action="add">+ Add your first product</button>`) : table([
+      <div class="filters"><input data-filter="q" placeholder="Search products…" value="${esc(filters.q)}">
+        ${chips([["", "All", archived ? null : all.length || null], ["low", "Low stock", count("low")], ["offer", "On offer", count("offer")], ["archived", "Archived"]], filters.show, "filter")}</div>
+      ${nothingYet ? empty("No products yet", "Add what you sell. The AI can only talk about products that are here.", `<button class="btn" data-action="add">+ Add your first product</button>`) : table([
         ["Product", (p) => `<b>${esc(p.name)}</b>${detailsLine(p) ? `<div class="small muted">${esc(detailsLine(p))}</div>` : ""}`],
         ["Price", (p) => (p.offerOn
           ? `<b>${taka(p.salePrice)}</b> <s class="small muted">${taka(p.price)}</s><div>${pill(offerText(p.offer), "pink")}</div>${p.offer.until ? `<div class="small muted">until ${untilText(p.offer.until)}</div>` : ""}`
           : taka(p.price) + (p.offerEnded ? `<div class="small muted">offer ended</div>` : ""))],
         ["Options", (p) => p.variants.map((v) => pill(optionText(p, v), p.alwaysAvailable ? "grey" : v.available <= 0 ? "red" : v.available <= p.lowStockAt ? "yellow" : "grey")).join(" ")],
         ["Stock", (p) => p.alwaysAvailable ? pill("Always available", "green") : `<b>${p.available}</b>${p.reserved ? `<div class="small muted">${p.reserved} in orders</div>` : ""}`],
-        ["", (p) => `<div class="row" style="flex-wrap:nowrap">
-          ${p.alwaysAvailable ? "" : `<button class="btn sm light" data-action="adjust" data-id="${p._id}">Stock +/−</button>`}
+        ["", (p) => `<div class="row" style="flex-wrap:nowrap;justify-content:flex-end">
+          ${archived ? `<button class="btn sm light" data-action="archive" data-id="${p._id}">Restore</button><button class="btn sm danger" data-action="remove" data-id="${p._id}">Delete</button>`
+            : `${p.alwaysAvailable ? "" : `<button class="btn sm light" data-action="adjust" data-id="${p._id}">Stock +/−</button>`}
           <button class="btn sm light" data-action="edit" data-id="${p._id}">Edit</button>
-          <button class="btn sm light" data-action="history" data-id="${p._id}">History</button>
-          <button class="btn sm light" data-action="archive" data-id="${p._id}">${filters.archived ? "Restore" : "Archive"}</button>
-          ${filters.archived ? `<button class="btn sm danger" data-action="remove" data-id="${p._id}">Delete</button>` : ""}</div>`],
-      ], products, { emptyText: "No products match" })}
+          ${moreMenu(`<button type="button" class="menu-item" data-action="history" data-id="${p._id}">Stock history</button><button type="button" class="menu-item" data-action="archive" data-id="${p._id}">Archive (hide from the AI)</button>`)}`}</div>`],
+      ], products, { emptyText: archived ? "No archived products" : filters.q ? "No products match your search" : "Nothing here" })}
     </div>`;
 }
 
@@ -102,7 +94,7 @@ const offerFields = (o) => `<div class="offer-row">
   </div>`;
 const offerFrom = (d) => ({ kind: d.offerKind, value: Number(d.offerValue) || 0, until: d.offerUntil || null });
 
-function offerForAll(refresh) {
+export function offerForAll(refresh) {
   openModal({
     title: "🏷️ Offer for all products",
     body: `<p class="muted">The same offer on every product. The AI tells customers the sale price, and orders are charged at that price. To give an offer on one product only, open it with Edit.</p>
@@ -123,7 +115,7 @@ function offerForAll(refresh) {
 // Label ideas for every kind of shop. They are only suggestions: the shop can type anything.
 const LABEL_IDEAS = ["Brand", "Model", "Warranty", "Fabric", "Size chart", "Colour", "Material", "RAM / Storage", "Battery", "Weight", "Ingredients", "Expiry", "Origin", "Delivery time", "In the box"];
 
-function productForm(p, refresh) {
+export function productForm(p, refresh) {
   const body = openModal({
     title: p ? `Edit ${p.name}` : "Add product", wide: true,
     body: `<div class="pf-main"><div><label>Product name</label><input name="name" required placeholder="e.g. Cotton Panjabi, Redmi 13, Honey" value="${esc(p?.name || "")}"></div>
@@ -174,7 +166,7 @@ function productForm(p, refresh) {
 }
 
 /* ---------- stock change ---------- */
-function adjustForm(p, refresh) {
+export function adjustForm(p, refresh) {
   openModal({
     title: `Stock +/− · ${p.name}`,
     body: `<div class="f2"><div><label>Option</label><select name="variantId">${options(p.variants.map((v) => [v._id, `${v.name === "Default" ? p.name : v.name} (in stock ${v.onHand}, free to sell ${v.available})`]))}</select></div>

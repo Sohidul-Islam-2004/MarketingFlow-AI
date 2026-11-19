@@ -1,5 +1,9 @@
-// App start: login screen, side menu, and switching pages.
+// App start: login screen, menu, and switching pages.
 // Each page lives in js/pages/<name>.js and exports render(root, params).
+// Two looks:
+//   - Computer: side menu with 6 places; pages from js/pages/.
+//   - Phone (≤ 800px wide): an app-like version. Bottom bar Home · Chats · Orders · Products · More.
+//     Home, Orders, Products and More have their own phone screens in js/mobile/; other pages are shared.
 import { get, post } from "./api.js";
 import { $, esc, icon, toast, openModal, dateTime, loading } from "./ui.js";
 import { applyTheme } from "./theme.js";
@@ -23,6 +27,20 @@ const sectionOf = (page) => allMenu().find(([, , pages]) => pages.some(([id]) =>
 const pageIds = () => allMenu().flatMap(([, , pages]) => pages.map(([id]) => id));
 const labelOf = (page) => { const s = sectionOf(page); return s[2].length > 1 ? s[1] : s[2].find(([id]) => id === page)?.[1] || s[1]; };
 const MENU_ICON = { setup: "settings" };
+
+/* ---------- phone version ---------- */
+const phoneMq = matchMedia("(max-width: 800px)");
+export const isPhone = () => phoneMq.matches;
+phoneMq.addEventListener?.("change", () => location.reload()); // computer <-> phone: start the right version
+// Bottom bar on a phone: [page, label, icon]
+const PHONE_TABS = [["overview", "Home", "overview"], ["inbox", "Chats", "chats"], ["orders", "Orders", "orders"], ["inventory", "Products", "inventory"], ["more", "More", "more"]];
+// Pages that have their own phone screen (js/mobile/<file>.js); the rest use the computer page
+const PHONE_SCREENS = { overview: "home", orders: "orders", inventory: "products", more: "more" };
+// Which bottom tab is lit for a page (Comments belongs to Chats, setup pages to More)
+const phoneTabOf = (page) => (["inbox", "comments"].includes(page) ? "inbox" : PHONE_TABS.some(([id]) => id === page) ? page : "more");
+
+// Who is logged in (pages can read session.me)
+export const session = { me: null };
 
 /* ---------- login / sign up ---------- */
 let loginOptions = null; // { signup: can people create accounts?, support: who to contact }
@@ -116,10 +134,7 @@ function showBlocked(me) {
   $("#blockedLogout").onclick = async () => { await post("/api/auth/logout"); location.reload(); };
 }
 
-/* ---------- side menu ---------- */
-// Phone bottom bar: the 4 pages used all day + "More" (opens the full menu as a sheet)
-const TABS = [["overview", "Home"], ["inbox", "Inbox"], ["orders", "Orders"], ["inventory", "Products"]];
-
+/* ---------- side menu (computer) and bottom bar (phone) ---------- */
 // counts are per page (inbox, comments…); a menu item shows the total of its pages
 const sectionCount = (pages, counts) => pages.reduce((n, [id]) => n + (counts[id] || 0), 0);
 
@@ -130,13 +145,11 @@ function drawMenu(page, counts = {}) {
     return `<a class="nav ${id === active ? "active" : ""}" href="#${pages[0][0]}">${icon(MENU_ICON[id] || id)}<span>${label}</span>${n ? `<span class="count">${n}</span>` : ""}</a>`;
   };
   $("#nav").innerHTML = MENU.map(item).join("") + (SHOW_ADMIN ? `<div class="nav-group">SUPER ADMIN</div>${ADMIN_MENU.map(item).join("")}` : "");
-  const inTabs = TABS.some(([id]) => id === active);
-  if ($("#tabbar")) $("#tabbar").innerHTML = TABS.map(([id, label]) => {
-    const n = sectionCount(sectionOf(id)[2], counts);
-    return `<a href="#${id}" class="${id === active ? "on" : ""}"><i>${icon(id)}${n ? `<b>${n}</b>` : ""}</i><span>${label}</span></a>`;
-  }).join("") +
-    `<button type="button" id="tabMore" class="${inTabs ? "" : "on"}"><i><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></i><span>More</span></button>`;
-  if ($("#tabMore")) $("#tabMore").onclick = () => document.body.classList.toggle("menu-open");
+  if (!$("#tabbar")) return;
+  const lit = phoneTabOf(page);
+  const badge = { inbox: (counts.inbox || 0) + (counts.comments || 0), orders: counts.orders || 0 };
+  $("#tabbar").innerHTML = PHONE_TABS.map(([id, label, ic]) =>
+    `<a href="#${id}" class="${id === lit ? "on" : ""}"><i>${icon(ic)}${badge[id] ? `<b>${badge[id]}</b>` : ""}</i><span>${label}</span></a>`).join("");
 }
 
 // Red counters in the menu (chats that need a person, comments to answer, orders on hold)
@@ -144,13 +157,13 @@ let menuCounts = {};
 async function refreshCounts() {
   try {
     const o = await get("/api/overview?period=today");
-    menuCounts = { inbox: o.todo.needsHuman, comments: o.todo.newComments };
+    menuCounts = { inbox: o.todo.needsHuman, comments: o.todo.newComments, orders: o.todo.toCall || 0 };
     drawMenu(currentPage(), menuCounts);
     // the same total on the phone top bar and in the browser tab
     const waiting = o.todo.needsHuman + o.todo.newComments;
     document.title = `${waiting ? `(${waiting}) ` : ""}MarketingFlow AI`;
     const n = await get("/api/notifications");
-    $("#bell").innerHTML = $("#topBell").innerHTML = icon("bell") + (n.unread ? `<span class="badge">${n.unread}</span>` : "");
+    for (const id of ["#bell", "#topBell"]) if ($(id)) $(id).innerHTML = icon("bell") + (n.unread ? `<span class="badge">${n.unread}</span>` : "");
   } catch {}
 }
 
@@ -171,6 +184,8 @@ async function showNotifications() {
 function currentPage() {
   const page = location.hash.slice(1).split("?")[0];
   if (page === "setup") return "accounts";
+  if (page === "more") return isPhone() ? "more" : "overview";
+  if (page === "calendar" && isPhone()) return "content"; // the month grid needs a big screen
   return pageIds().includes(page) ? page : "overview";
 }
 function currentParams() {
@@ -181,9 +196,9 @@ let renderId = 0;
 async function showPage() {
   const page = currentPage();
   const id = ++renderId;
+  document.querySelectorAll("dialog[open]").forEach((d) => d.close()); // a pop-up never stays open on another page
   drawMenu(page, menuCounts);
-  closeMenu();
-  if ($("#topTitle")) $("#topTitle").textContent = labelOf(page);
+  phoneTopBar(page);
   const root = document.createElement("div"); // a fresh element each time, so old click handlers disappear
   root.innerHTML = loading();
   const tabs = subTabs(page);
@@ -191,7 +206,7 @@ async function showPage() {
   tabs?.querySelector(".on")?.scrollIntoView({ inline: "center", block: "nearest" }); // phone: the open tab is visible
   window.scrollTo(0, 0);
   try {
-    const module = await import(`./pages/${page}.js`);
+    const module = await import(isPhone() && PHONE_SCREENS[page] ? `./mobile/${PHONE_SCREENS[page]}.js` : `./pages/${page}.js`);
     if (id === renderId) await module.render(root, currentParams());
   } catch (e) {
     if (id !== renderId) return;
@@ -200,9 +215,22 @@ async function showPage() {
   }
 }
 
+// Phone top bar: the screen's name, and a back arrow on pages opened from "More"
+function phoneTopBar(page) {
+  if (!$("#topTitle")) return;
+  const sub = phoneTabOf(page) === "more" && page !== "more";
+  const pageName = sectionOf(page)[2].find(([id]) => id === page)?.[1];
+  $("#topTitle").textContent = page === "overview" ? session.me?.business || "Home" : page === "more" ? "More" : pageName || labelOf(page);
+  document.body.classList.toggle("sub-page", sub);
+  const back = $("#topBack");
+  if (back) { back.hidden = !sub; back.innerHTML = icon("back"); back.onclick = () => (location.hash = "more"); }
+}
+
 // Tabs at the top of pages that share one menu item, e.g. Inbox: Chats | Comments
+// (on a phone only Chats | Comments: the other pages are opened from "More")
 function subTabs(page) {
-  const pages = sectionOf(page)[2];
+  let pages = sectionOf(page)[2];
+  if (isPhone()) pages = sectionOf(page)[0] === "inbox" ? pages : [];
   if (pages.length < 2) return null;
   const nav = document.createElement("nav");
   nav.className = "subtabs";
@@ -210,9 +238,6 @@ function subTabs(page) {
   return nav;
 }
 
-/* ---------- phone: slide-in menu ---------- */
-const closeMenu = () => document.body.classList.remove("menu-open");
-if ($("#shade")) $("#shade").onclick = closeMenu;
 window.addEventListener("hashchange", showPage);
 
 /* ---------- start ---------- */
@@ -222,6 +247,7 @@ window.addEventListener("hashchange", showPage);
   try { me = await get("/api/auth/me"); } catch { return showLogin(); }
   if (me.blocked) return showBlocked(me);
   if (me.user.isAdmin) SHOW_ADMIN = true;
+  session.me = me;
   $("#auth").classList.add("hidden");
   $("#app").classList.remove("hidden");
   $("#logo").innerHTML = icon("send");

@@ -30,7 +30,7 @@ export async function render(root) {
           <label class="look-choice ${custom ? "on" : ""}"><input type="color" id="ownColour" value="${esc(theme.accent)}"><span>Your own</span></label>
         </div>
       </div>
-      <div class="card mt">
+      <div class="card mt side-menu-card">
         <h3>Side menu</h3>
         <div class="look-grid mt">
           ${MENUS.map(([m, name]) => choice("menu", m, name, theme.menu === m, `<i class="menu-sample ${m}"></i>`)).join("")}
@@ -41,10 +41,6 @@ export async function render(root) {
         <div class="look-grid mt">
           ${SIZES.map(([s, name]) => choice("size", s, name, theme.size === s, `<i class="size-sample ${s}">Aa</i>`)).join("")}
         </div>
-      </div>
-      <div class="card mt">
-        <h3>Preview</h3>
-        <div class="row mt"><button type="button" class="btn">Main button</button><button type="button" class="btn light">Light button</button><span class="pill p-green">Working</span></div>
       </div>`;
   }
   draw();

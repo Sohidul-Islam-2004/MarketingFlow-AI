@@ -1,73 +1,153 @@
 /* =====================================================================
    MarketingFlow AI on a phone (screens up to 800px wide).
    index.html loads this file only on small screens, so nothing here
-   touches the desktop look. Sections:
-     1. page frame: top bar, bottom bar, "More" sheet
-     2. building blocks: cards, buttons, forms, tabs
-     3. lists (tables become cards)
-     4. pop-ups (bottom sheets)
-     5. pages: overview, inbox, calendar, Facebook Page
+   touches the computer look. The phone version works like an app:
+   a top bar, a bottom bar with 5 tabs, and simple lists you tap.
+   Sections:
+     1. frame: top bar, bottom bar
+     2. phone screens (js/mobile/*): lists, hero, switch, "+" button, sheets
+     3. shared building blocks: cards, buttons, forms, tabs
+     4. lists from the computer pages (tables become cards)
+     5. pop-ups open as bottom sheets
+     6. shared pages: chats, comments, posts, setup pages
    ===================================================================== */
 
-/* ---------- 1. page frame ---------- */
-body { font-size: 15px; background: var(--bg); -webkit-tap-highlight-color: transparent; }
+/* ---------- 1. frame ---------- */
+body { font-size: 15px; background: var(--bg); -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
 #app { display: block; }
-main { padding: 14px 14px calc(92px + env(safe-area-inset-bottom)); }
+aside { display: none !important; } /* everything from the side menu lives under "More" */
+main { padding: 6px 16px calc(96px + env(safe-area-inset-bottom)); }
+#page > div { animation: fade .18s ease-out; }
+@keyframes fade { from { opacity: 0; } }
 
 .topbar {
   display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 30;
-  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
-  background: rgba(244,245,247,.86); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  min-height: calc(58px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 12px 0 16px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: saturate(1.6) blur(16px); -webkit-backdrop-filter: saturate(1.6) blur(16px);
 }
-.topbar .logo { width: 34px; height: 34px; border-radius: 11px; }
-.topbar b { font-size: 20px; font-weight: 800; letter-spacing: -.02em; flex: 1; }
-.topbar .bell { margin: 0; width: 40px; height: 40px; border-radius: 50%; border: 0; background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(16,24,40,.08); }
+.topbar .logo { width: 32px; height: 32px; border-radius: 10px; flex: none; }
+.topbar .logo .i { width: 17px; height: 17px; }
+.topbar b { flex: 1; min-width: 0; font-size: 19px; font-weight: 750; letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar .bell { margin: 0; width: 42px; height: 42px; border-radius: 50%; border: 0; background: transparent; color: var(--ink); }
+.topbar .bell:active { background: rgba(16,24,40,.06); }
+.topbar .bell .i { width: 22px; height: 22px; }
+.topbar .badge { top: 3px; right: 3px; box-shadow: 0 0 0 2px var(--bg); }
+.top-back { display: grid; place-items: center; width: 40px; height: 40px; margin-left: -8px; border: 0; border-radius: 50%; background: none; color: var(--ink); cursor: pointer; }
+.top-back[hidden] { display: none; }
+.top-back .i { width: 24px; height: 24px; stroke-width: 2.2; }
+.sub-page .topbar .logo { display: none; }
 
-/* bottom bar */
+/* bottom bar: 5 tabs, the open one has a soft pill behind its icon */
 .tabbar {
-  display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 12px; right: 12px; z-index: 35;
-  bottom: calc(10px + env(safe-area-inset-bottom)); padding: 7px 6px;
-  background: var(--dark); border-radius: 22px; box-shadow: 0 12px 32px rgba(13,27,42,.28);
+  display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 35;
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--card) 94%, transparent); backdrop-filter: saturate(1.6) blur(16px); -webkit-backdrop-filter: saturate(1.6) blur(16px);
+  border-top: 1px solid var(--line);
 }
-.tabbar a, .tabbar button {
-  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 3px 0;
-  border: 0; background: none; color: #8fa0b1; text-decoration: none; font: 600 10.5px/1.2 var(--font); cursor: pointer;
+.tabbar a { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 2px 0; color: var(--muted); text-decoration: none; font: 600 11px/1.2 var(--font); }
+.tabbar i { position: relative; display: grid; place-items: center; width: 58px; height: 30px; border-radius: 99px; font-style: normal; transition: background .2s; }
+.tabbar .i { width: 22px; height: 22px; }
+.tabbar .i-more circle { fill: currentColor; stroke: none; }
+.tabbar .on { color: var(--ink); }
+.tabbar .on i { background: var(--accent-soft); color: var(--accent-text); }
+.tabbar .on .i { stroke-width: 2.1; }
+.tabbar i b { position: absolute; top: -2px; left: 34px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--red); color: #fff; font-size: 10.5px; line-height: 18px; text-align: center; box-shadow: 0 0 0 2px var(--card); }
+body:has(dialog[open]) .tabbar { display: none; }
+
+/* ---------- 2. phone screens ---------- */
+.m-screen { padding-bottom: 8px; }
+.m-hello { padding: 6px 2px 14px; }
+.m-hello p { font-size: 14px; color: var(--muted); font-weight: 500; }
+.m-hello h1 { font-size: 26px; font-weight: 800; letter-spacing: -.03em; line-height: 1.2; }
+
+/* Home: today's sales */
+.m-hero {
+  position: relative; display: block; overflow: hidden; padding: 20px 20px 18px; border-radius: 24px; text-decoration: none;
+  background: radial-gradient(420px 220px at 110% -20%, rgba(255,255,255,.28), transparent 60%), linear-gradient(140deg, var(--accent), var(--accent-d));
+  color: var(--on-accent); box-shadow: 0 14px 30px -12px var(--accent);
 }
-.tabbar i { position: relative; display: grid; place-items: center; width: 46px; height: 30px; border-radius: 99px; font-style: normal; transition: background .15s; }
-.tabbar .i { width: 21px; height: 21px; }
-.tabbar .on { color: #fff; }
-.tabbar .on i { background: var(--accent); color: var(--on-accent); }
-.tabbar #tabMore .i circle { fill: currentColor; stroke: none; }
-.tabbar i b { position: absolute; top: -3px; right: 2px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 99px; background: var(--red); color: #fff; font-size: 10px; line-height: 17px; text-align: center; border: 2px solid var(--dark); box-sizing: content-box; }
-body:has(.inbox.show-chat) .tabbar, body:has(dialog[open]) .tabbar { display: none; }
+.m-hero-label { display: block; font-size: 13.5px; font-weight: 600; opacity: .82; }
+.m-hero-num { display: block; margin: 2px 0 16px; font-size: 36px; font-weight: 800; letter-spacing: -.035em; line-height: 1.15; }
+.m-hero-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding-top: 14px; border-top: 1px solid color-mix(in srgb, var(--on-accent) 22%, transparent); }
+.m-hero-stats span { font-size: 12px; font-weight: 500; opacity: .85; }
+.m-hero-stats b { display: block; font-size: 18px; font-weight: 750; opacity: 1; letter-spacing: -.01em; }
 
-/* "More": the menu comes up from the bottom as a sheet of tiles */
-aside {
-  position: fixed; left: 0; right: 0; bottom: 0; top: auto; height: auto; max-height: 86dvh; z-index: 50;
-  border-radius: 26px 26px 0 0; padding: 10px 16px calc(18px + env(safe-area-inset-bottom));
-  transform: translateY(105%); transition: transform .25s cubic-bezier(.2,.8,.2,1);
+/* Home: finish setup */
+.m-setup { display: block; margin-top: 12px; padding: 14px 16px; border-radius: 18px; background: var(--card); color: var(--ink); text-decoration: none; box-shadow: var(--shadow-xs); border: 1px solid var(--line); }
+.m-setup-top { display: flex; justify-content: space-between; font-size: 14.5px; }
+.m-setup-top span { color: var(--muted); font-size: 13px; font-weight: 600; }
+.m-progress { display: block; height: 7px; margin: 10px 0; border-radius: 99px; background: var(--line); overflow: hidden; }
+.m-progress i { display: block; height: 100%; border-radius: 99px; background: var(--accent); }
+.m-setup-next { display: block; font-size: 13.5px; font-weight: 600; color: var(--accent-text); }
+
+/* section title above a list */
+.m-h2 { display: flex; align-items: baseline; justify-content: space-between; margin: 22px 4px 8px; font-size: 16px; font-weight: 750; letter-spacing: -.01em; }
+.m-h2 a { font-size: 14px; font-weight: 600; text-decoration: none; }
+
+/* list rows (.m-list, .m-row…) are in app.css: the computer uses them too. Phone sizes: */
+.m-row { min-height: 64px; }
+.m-main b { font-size: 15.5px; }
+/* green "call" button on orders that wait for your call */
+.m-call { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 50%; background: var(--green); color: #fff; box-shadow: 0 4px 12px -4px var(--green); }
+.m-call .i { width: 19px; height: 19px; stroke-width: 2.1; }
+.m-call:active { transform: scale(.94); }
+
+/* search box and the To call · Active · Done switch */
+.m-search { display: flex; align-items: center; gap: 10px; height: 48px; margin: 0 0 12px; padding: 0 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); color: var(--faint); font-weight: 400; box-shadow: var(--shadow-xs); }
+.m-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.m-search .i { width: 19px; height: 19px; }
+.m-search input { flex: 1; min-width: 0; height: 100%; min-height: 0; padding: 0; border: 0; background: none !important; box-shadow: none !important; font-size: 16px; color: var(--ink); }
+.m-search input::-webkit-search-cancel-button { display: none; }
+.m-seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; margin-bottom: 14px; padding: 4px; border-radius: 14px; background: #e8eaee; }
+.m-seg button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; border: 0; border-radius: 11px; background: none; color: var(--muted); font-size: 14.5px; font-weight: 650; cursor: pointer; }
+.m-seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(16,24,40,.12); }
+.m-seg span { min-width: 20px; padding: 0 6px; border-radius: 99px; background: rgba(16,24,40,.08); font-size: 12px; line-height: 20px; }
+.m-seg .on span { background: var(--accent); color: var(--on-accent); }
+.m-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.m-toolbar .chips { flex: 1; min-width: 0; margin: 0; }
+.m-icon-btn { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 13px; border: 1px solid var(--line); background: var(--card); color: var(--ink-2); cursor: pointer; }
+.m-icon-btn .i { width: 20px; height: 20px; }
+
+/* the round "+" button above the bottom bar */
+.m-fab {
+  position: fixed; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 34;
+  display: inline-flex; align-items: center; gap: 8px; height: 54px; padding: 0 20px 0 16px; border: 0; border-radius: 18px;
+  background: var(--accent); color: var(--on-accent); font: 700 15px/1 var(--font); cursor: pointer;
+  box-shadow: 0 10px 24px -8px var(--accent), 0 2px 6px rgba(16,24,40,.12);
 }
-.menu-open aside { transform: none; }
-.menu-open .shade { display: block; position: fixed; inset: 0; background: rgba(13,27,42,.5); z-index: 40; }
-.sheet-grip { display: block; width: 42px; height: 5px; border-radius: 99px; background: var(--side-line); margin: 0 auto 12px; }
-aside .brand { display: none; }
-#nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.nav-group { grid-column: 1 / -1; padding: 10px 4px 2px; }
-.nav-group:first-child { padding-top: 0; }
-.nav { position: relative; flex-direction: column; justify-content: center; gap: 7px; padding: 14px 6px; border-radius: 16px; background: var(--side-tile); text-align: center; font-size: 12.5px; line-height: 1.2; }
-.nav svg { width: 22px; height: 22px; }
-.nav.active { background: var(--accent-soft); }
-.nav .count { position: absolute; top: 8px; right: 10px; margin: 0; }
-.me { margin-top: 14px; }
+.m-fab .i { width: 22px; height: 22px; stroke-width: 2.4; }
+.m-fab:active { transform: scale(.96); }
+.m-fab.busy { color: transparent; }
 
-/* ---------- 2. building blocks ---------- */
-.page-head { display: block; margin-bottom: 14px; }
-.page-head h1 { display: none; } /* the top bar shows the page name */
-.page-head p { font-size: 13.5px; color: var(--muted); margin-bottom: 12px; }
-.page-head > .btn, .page-head > .row { width: 100%; }
-.page-head .btn { justify-content: center; flex: 1; }
+.m-empty { padding: 28px 18px; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.m-list > .m-empty { display: block; }
 
-.card { padding: 16px; border: 0; border-radius: 20px; box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 6px 20px rgba(16,24,40,.04); }
+/* More: profile card */
+.m-profile { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 20px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow-xs); }
+.m-avatar { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; flex: none; background: var(--accent); color: var(--on-accent); font-size: 22px; font-weight: 750; }
+.m-profile b { font-size: 17px; }
+.m-foot { margin-top: 20px; text-align: center; color: var(--faint); font-size: 12px; }
+
+/* action sheet (tap a product) */
+.m-sheet { display: grid; gap: 8px; padding-bottom: 6px; }
+.m-sheet-btn { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 54px; padding: 0 16px; border: 0; border-radius: 14px; background: var(--soft); color: var(--ink); font: 600 16px/1.2 var(--font); text-align: left; cursor: pointer; }
+.m-sheet-btn:active { background: var(--line); }
+.m-sheet-btn.danger { color: var(--red); }
+
+/* filter chips (app.css): one row you can swipe on a phone */
+.chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -16px; padding-right: 16px; }
+.chips::-webkit-scrollbar { display: none; }
+.m-toolbar .chips { margin-right: 0; padding-right: 0; }
+.chip { min-height: 38px; padding: 0 15px; font-size: 14px; }
+
+/* ---------- 3. shared building blocks ---------- */
+.page-head { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
+.page-head h1, .page-head p { display: none; } /* the top bar shows the page name */
+.page-head:not(:has(button, a.btn, select, input)) { display: none; }
+.page-head > div:not(:has(button, a.btn, select, input)) { display: none; }
+.page-head .btn { min-height: 38px; padding: 0 14px; border-radius: 99px; font-size: 14px; }
+
+.card { padding: 16px; border-radius: 20px; box-shadow: var(--shadow-xs); }
 .card + .card { margin-top: 12px; }
 .card h3 { font-size: 17px; }
 .box { border-radius: 16px; }
@@ -76,39 +156,43 @@ aside .brand { display: none; }
 img, video { max-width: 100%; }
 
 .btn { min-height: 46px; padding: 0 18px; border-radius: 14px; font-size: 15px; }
-.btn.sm { min-height: 38px; padding: 0 14px; border-radius: 11px; font-size: 13px; }
+.btn.sm { min-height: 38px; padding: 0 14px; border-radius: 11px; font-size: 13.5px; }
 .btn:active { transform: scale(.97); }
 
-label { font-size: 13px; margin-bottom: 6px; }
-input, select, textarea { font-size: 16px; min-height: 48px; padding: 11px 14px; border-radius: 13px; background: #fff; } /* 16px stops iPhone zoom */
-input[type=checkbox], input[type=radio] { min-height: 0; width: 20px; height: 20px; padding: 0; accent-color: var(--accent); flex: none; }
+label { font-size: 13.5px; margin-bottom: 6px; }
+input, select, textarea { font-size: 16px; min-height: 48px; padding: 11px 14px; border-radius: 13px; } /* 16px stops the phone zooming in */
+input[type=checkbox], input[type=radio] { min-height: 0; width: 20px; height: 20px; padding: 0; flex: none; }
 .check { font-size: 15px; gap: 10px; padding: 4px 0; align-items: flex-start; }
-.card input, .card select, .card textarea, dialog input, dialog select, dialog textarea { background: var(--bg); }
+.card input, .card select, .card textarea, dialog input, dialog select, dialog textarea { background: var(--soft); }
+.card input:focus, .card textarea:focus, dialog input:focus, dialog textarea:focus { background: var(--card); }
 
 .filters { gap: 8px; }
 .filters > input:not([type=checkbox]), .filters > select { flex: 1 1 100%; min-width: 0 !important; }
-.filters label.small { flex: 1 1 40%; font-size: 12px; }
-.filters label.small input { min-width: 0; }
+.filters input[data-filter="q"] { min-width: 0; }
 
 .tabs { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 2px; margin: 0 0 14px; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
 .tab { flex: none; padding: 9px 14px; font-size: 14px; }
 
 .kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
-.kpi { padding: 14px; border: 0; border-radius: 18px; box-shadow: 0 1px 2px rgba(16,24,40,.05); }
+.kpi { padding: 14px; border-radius: 18px; }
 .kpi .value { font-size: 24px; }
 .kpi .label { font-size: 12px; }
-.empty { padding: 40px 12px; }
+.empty { padding: 36px 12px; }
 
-/* ---------- 3. lists: every table row becomes a card ----------
+/* "⋯" menus open as a full-width list */
+.more-menu .menu { min-width: 220px; }
+.more-menu .menu-item { min-height: 46px; font-size: 15px; }
+
+/* ---------- 4. lists from the computer pages: every table row becomes a card ----------
    first cell = title, last cell without a name = buttons,
    the cells in between sit two per row with their column name above */
 .table { overflow: visible; margin: 0; border-top: 0; }
 .card > .row.between.mt:last-child { margin: 14px 0 0; padding: 0; border: 0; }
 .table thead { display: none; }
 .table table, .table tbody { display: block; }
-.table tr { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; padding: 14px; margin-bottom: 10px; background: #fff; border: 1px solid var(--line); border-radius: 18px; }
-.card .table tr { background: var(--soft); border: 1px solid var(--line); }
+.table tr { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; padding: 14px; margin-bottom: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; }
+.card .table tr { background: var(--soft); }
 .table tr:last-child { margin-bottom: 0; }
 .table td { display: block; padding: 0; border: 0; min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
 .table td::before { content: attr(data-label); display: block; margin-bottom: 3px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
@@ -118,99 +202,88 @@ input[type=checkbox], input[type=radio] { min-height: 0; width: 20px; height: 20
 .table td[data-label=""] { grid-column: 1 / -1; padding-top: 12px; border-top: 1px solid var(--line); }
 .table td[data-label=""]:empty { display: none; }
 .table td .row { flex-wrap: wrap !important; gap: 8px; }
-.table td[data-label=""] .btn { flex: 1; justify-content: center; }
+.table td[data-label=""] .btn { flex: 1 1 28%; justify-content: center; }
 .table td .pill { margin: 1px 0; }
 tr.click:active { transform: scale(.985); }
 tr.click:hover td { background: none; }
 .pill { padding: 3px 11px; font-size: 12.5px; }
 
-/* ---------- 4. pop-ups open as bottom sheets ---------- */
-dialog, dialog.wide { width: 100vw; max-width: 100vw; max-height: 94dvh; margin: auto 0 0; border-radius: 26px 26px 0 0; animation: sheet .25s cubic-bezier(.2,.8,.2,1); }
-@keyframes sheet { from { transform: translateY(40%); opacity: .4; } }
-dialog form { display: flex; flex-direction: column; max-height: 94dvh; }
-.dlg-head { padding: 18px 18px 12px; border: 0; }
+/* ---------- 5. pop-ups open as bottom sheets ---------- */
+dialog, dialog.wide { width: 100vw; max-width: 100vw; max-height: 92dvh; margin: auto 0 0; border-radius: 26px 26px 0 0; }
+dialog[open] { animation: sheet .28s cubic-bezier(.2,.85,.25,1); }
+@keyframes sheet { from { transform: translateY(100%); } }
+dialog::before { content: ""; display: block; width: 40px; height: 5px; margin: 8px auto 0; border-radius: 99px; background: var(--line-2); }
+dialog form { display: flex; flex-direction: column; max-height: calc(92dvh - 13px); }
+.dlg-head { padding: 10px 18px 10px; border: 0; }
 .dlg-head h3 { font-size: 19px; }
-.dlg-head button { width: 36px; height: 36px; border-radius: 50%; background: var(--bg); font-size: 20px; line-height: 1; }
+.dlg-head button { width: 34px; height: 34px; border-radius: 50%; background: var(--soft); font-size: 20px; line-height: 1; }
 .dlg-body { padding: 4px 18px 18px; max-height: none; flex: 1; }
-.dlg-foot { padding: 12px 18px calc(14px + env(safe-area-inset-bottom)); }
+.dlg-foot { padding: 12px 18px calc(14px + env(safe-area-inset-bottom)); border-radius: 0; background: var(--card); }
 .dlg-foot:empty { display: none; }
+.dlg-body:has(+ .dlg-foot:empty) { padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
 .dlg-foot .btn { flex: 1 1 40%; justify-content: center; }
-#confirm { margin: auto; width: 90vw; border-radius: 22px; animation: none; }
+#confirm { margin: auto; width: 90vw; border-radius: 22px; }
+#confirm::before { display: none; }
+#confirm[open] { animation: pop .18s ease-out; }
 #confirm .dlg-body { padding: 22px 20px 8px; }
-.toasts { left: 14px; right: 14px; bottom: calc(92px + env(safe-area-inset-bottom)); }
+#confirm .dlg-foot { border-radius: 0 0 22px 22px; padding-bottom: 14px; }
+.toasts { left: 14px; right: 14px; bottom: calc(88px + env(safe-area-inset-bottom)); }
 .toast { max-width: none; border-radius: 14px; padding: 14px 16px; font-size: 14px; }
 
 /* login */
 .auth { padding: 16px; align-items: center; }
-.auth-card { padding: 24px 20px; border-radius: 24px; border: 0; }
+.auth-card { padding: 26px 20px; border-radius: 24px; border: 0; }
 
-/* ---------- 5. pages ---------- */
-/* overview */
-.hero { padding: 20px; border-radius: 22px; margin-bottom: 12px; }
-.hero h2 { font-size: 21px; }
-.hero .row { width: 100%; flex-wrap: nowrap; }
-.hero .tab { flex: 1; justify-content: center; padding: 8px 0; }
-.hero .tabs { width: 100%; }
-.todo { grid-template-columns: 1fr 1fr; }
-.todo a { border-radius: 16px; padding: 14px; }
-.step { border-radius: 16px; padding: 14px; }
+/* ---------- 6. shared pages ---------- */
+/* section tabs (Chats | Comments) look like the switch on Orders */
+.subtabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; margin: 0 0 12px; padding: 4px; border: 0; border-radius: 14px; background: #e8eaee; }
+.subtabs a { justify-content: center; min-height: 38px; padding: 0 8px; border-radius: 11px; font-size: 14.5px; }
+.subtabs a.on { background: var(--card); box-shadow: 0 1px 3px rgba(16,24,40,.12); }
+.subtabs a.on::after { display: none; }
 
-/* inbox: one part at a time (list -> chat -> order) */
-.inbox { display: block; position: relative; height: calc(100dvh - 300px); min-height: 380px; border: 0; border-radius: 20px; box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 6px 20px rgba(16,24,40,.04); }
-.inbox .chats, .inbox .thread { height: 100%; border: 0; }
-.inbox .thread { display: none; }
+/* Chats: the list scrolls with the page; an open chat fills the screen like a messaging app */
+.inbox { display: block; height: auto; min-height: 0; border-radius: 20px; box-shadow: var(--shadow-xs); }
+.inbox .chats { border: 0; }
+.chat-list { overflow: visible; }
+.inbox .thread, .inbox .side-panel { display: none; }
+.inbox.show-chat { position: fixed; inset: 0; z-index: 60; height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
 .inbox.show-chat .chats { display: none; }
-.inbox.show-chat .thread { display: flex; }
+.inbox.show-chat .thread { display: flex; height: 100%; }
+body:has(.inbox.show-chat) { overflow: hidden; }
+body:has(.inbox.show-chat) .tabbar { display: none; }
 .chats .filters { padding: 12px; }
-.chat-row { padding: 14px; gap: 12px; align-items: center; }
-.chat-row b { font-size: 15px; }
-.chat-row small { font-size: 13px; }
-.face { width: 46px; height: 46px; font-size: 16px; }
-/* an open chat takes the whole screen, like a messaging app */
-main:has(.inbox.show-chat) { padding: 0; }
-main:has(.inbox.show-chat) > div > :not(.inbox) { display: none; }
-body:has(.inbox.show-chat) .topbar { display: none; }
-main:has(.inbox.show-chat) .inbox { height: 100dvh; border-radius: 0; box-shadow: none; }
-.thread-head { padding: calc(10px + env(safe-area-inset-top)) 12px 10px; flex-wrap: nowrap; align-items: flex-start; }
-.thread-head .back { display: inline-flex; flex: none; padding: 0 10px; }
-.thread-head > .row:last-child { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
-.thread-head .btn.sm { min-height: 34px; padding: 0 10px; font-size: 12px; }
+.chat-row { padding: 13px 14px; gap: 12px; align-items: center; }
+.face { width: 48px; height: 48px; font-size: 17px; }
+.thread-head { padding: calc(8px + env(safe-area-inset-top)) 12px 8px; flex-wrap: wrap; align-items: center; gap: 8px; }
+.thread-head .back { display: inline-flex; flex: none; width: 40px; padding: 0; border: 0; box-shadow: none; }
+.thread-head > .row:last-child { flex: 1 1 100%; flex-wrap: nowrap; justify-content: flex-start; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.thread-head > .row:last-child .btn { flex: none; }
+.thread-head .btn.sm { min-height: 34px; padding: 0 12px; font-size: 12.5px; border-radius: 99px; }
 .messages { padding: 14px 12px; }
 .bubble { max-width: 84%; font-size: 15px; padding: 10px 14px; border-radius: 18px; }
-.composer { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
-.composer textarea { min-height: 46px; height: 46px; border-radius: 23px; }
-.inbox.show-order .side-panel { width: 100%; padding-top: calc(14px + env(safe-area-inset-top)); }
+.composer { padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); }
+.composer textarea { min-height: 46px; height: 46px; border-radius: 23px; padding: 11px 16px; }
+.composer .btn { min-height: 46px; border-radius: 23px; }
+.inbox.show-order .side-panel { display: flex; position: absolute; inset: 0; width: 100%; z-index: 5; padding-top: calc(14px + env(safe-area-inset-top)); }
 
-/* calendar: the whole week fits; posts are coloured bars (tap one to open it) */
+/* Posts */
 .calendar { gap: 4px; }
 .cal-head { text-align: center; padding: 0; font-size: 10px; }
 .cal-day { min-height: 64px; padding: 5px 3px; border-radius: 10px; }
-.cal-day .row { justify-content: center; }
 .cal-day .btn { display: none; }
-.cal-day > b, .cal-day b { font-size: 12px; }
 .cal-post { height: 10px; margin-top: 4px; padding: 0; font-size: 0; border-left: 0; border-radius: 4px; }
-.page-head .row b { flex: 2; min-width: 0 !important; }
 
-/* Facebook Page */
+/* Facebook & Instagram, AI Training, Look */
 .steps-list { padding-left: 20px; font-size: 14px; }
 .copy-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; margin: 8px 0; }
 .copy-row span { grid-column: 1 / -1; min-width: 0; font-size: 12px; }
 .found-row { flex-wrap: wrap; }
-
-/* small finishing touches */
-aside { visibility: hidden; }
-.menu-open aside { visibility: visible; }
-.thread-head { flex-wrap: wrap; }
-.thread-head > .row:last-child { flex: 1 1 100%; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
-.thread-head > .row:last-child .btn { flex: none; }
-.table td[data-label=""] .btn { flex: 1 1 28%; }
-
-/* section tabs and the Look page */
-.subtabs { margin: 0 0 14px; gap: 20px; }
-.subtabs a { padding: 8px 2px 11px; font-size: 14.5px; }
 .look-grid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .look-choice { padding: 10px 4px; font-size: 12px; border-radius: 12px; }
 .look-choice .swatch { width: 28px; height: 28px; }
-main:has(.inbox.show-chat) .subtabs { display: none; }
-.filters label.small:has(input[type=date]) { flex: 1 1 45%; display: flex; flex-direction: column; align-items: stretch; gap: 4px; font-weight: 600; }
-.filters label.small input[type=date] { width: 100%; min-width: 0; }
+
+/* Home on a computer-sized page that is opened on a phone (old links) */
+.hero { padding: 20px; border-radius: 22px; }
+.todo { grid-template-columns: 1fr 1fr; }
+.side-menu-card { display: none; } /* Look: a phone has no side menu */
+.m-screen:has(.m-fab) { padding-bottom: 76px; } /* the last row is not hidden behind the "+" button */

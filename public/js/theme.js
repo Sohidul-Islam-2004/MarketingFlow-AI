@@ -53,5 +53,7 @@ export function applyTheme(theme = loadTheme()) {
   root.classList.toggle("menu-light", t.menu === "light");
   root.style.fontSize = t.size === "large" ? "16.5px" : "";
   document.body?.classList.toggle("text-large", t.size === "large");
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t.menu === "light" ? "#ffffff" : v["--side"]);
+  // the browser bar matches the top of the screen: the light top bar on a phone, the menu colour on a computer
+  const phone = matchMedia("(max-width: 800px)").matches;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", phone ? "#f4f5f7" : t.menu === "light" ? "#ffffff" : v["--side"]);
 }
