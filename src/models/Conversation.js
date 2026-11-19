@@ -10,6 +10,7 @@ const messageSchema = new Schema(
     error: { type: String, default: null }, // why sending failed
     image: { type: String, default: null }, // photo the customer sent (Meta's link, shown in the inbox)
     buttons: { type: [String], default: undefined }, // quick-reply buttons sent with an AI message
+    reviewed: { type: Boolean, default: undefined }, // AI Training: the shop taught or skipped this question (services/stuck.js)
   },
   { _id: false }
 );

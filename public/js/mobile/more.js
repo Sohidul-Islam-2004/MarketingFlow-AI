@@ -30,7 +30,7 @@ export async function render(root) {
     ${title("Setup")}
     <div class="m-list">
       ${link("#accounts", "accounts", "blue", "Facebook & Instagram", "Connect your Page and Instagram")}
-      ${link("#train", "train", "purple", "AI Training", "Teach the AI about your shop")}
+      ${link("#train", "train", "purple", "AI Training", "Teach the AI what it didn't know")}
       ${link("#settings", "settings", "grey", "Settings", "AI, delivery fees, business, password")}
       ${link("#look", "look", "pink", "Look", "Colours and text size")}
     </div>

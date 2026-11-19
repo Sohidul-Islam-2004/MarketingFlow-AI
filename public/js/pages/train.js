@@ -5,10 +5,16 @@
 //   3. save   -> POST /api/learn/save-knowledge
 import { get, post } from "../api.js";
 import { esc, onAction, toast, $ } from "../ui.js";
+import { drawStuck } from "../stuck.js";
 
 let data = null; // last answer of GET /api/learn
 
-export async function render(root) {
+export async function render(page) {
+  // top: questions the AI got stuck on this week; below: reading the Page and website
+  page.innerHTML = `<div class="page-head"><div><h1>AI Training</h1><p>Teach the AI what it didn't know, and let it read your Facebook Page and website. You check everything before it is used.</p></div></div>
+    <div id="stuckBox"></div><div id="trainMain"></div>`;
+  const root = page.querySelector("#trainMain");
+  drawStuck(page.querySelector("#stuckBox")).catch(() => {});
   onAction(root, {
     start: async () => {
       await post("/api/learn/start", { website: $("#website").value });
@@ -27,7 +33,6 @@ async function draw(root) {
   data = await get("/api/learn");
   const scan = data.scan;
   root.innerHTML = `
-    <div class="page-head"><div><h1>AI Training</h1><p>The AI reads your Facebook Page and your website, and learns your delivery, payment and return rules, stores and common questions. You check everything before it is used.</p></div></div>
     ${!data.aiReady ? `<div class="note">The AI is not set up on this server yet (AI_API_KEY is missing).</div>` : ""}
     <div class="card">
       <h3>1. What should the AI read?</h3>

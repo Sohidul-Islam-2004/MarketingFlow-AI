@@ -5,6 +5,7 @@ const { ShopScan, Organization, SocialAccount } = require("../models");
 const { handle, fail } = require("../lib/errors");
 const { aiReady } = require("../lib/ai");
 const learn = require("../services/learn");
+const stuck = require("../services/stuck");
 
 router.get("/", handle(async (req, res) => {
   const [scan, shop, page] = await Promise.all([
@@ -15,6 +16,14 @@ router.get("/", handle(async (req, res) => {
   // "running" in the database but nothing is running: the server restarted in the middle
   if (scan?.status === "running" && !learn.isRunning(req.org)) Object.assign(scan, { status: "failed", error: "It was interrupted. Please start again." });
   res.json({ scan, website: scan?.website || shop?.website || "", pageName: page?.accountName || null, currentKnowledge: shop?.ai?.knowledge || "", aiReady: aiReady() });
+}));
+
+// Where the AI got stuck this week (questions to teach)
+router.get("/stuck", handle(async (req, res) => res.json(await stuck.stuckQuestions(req.org))));
+
+router.post("/stuck/done", handle(async (req, res) => {
+  if (!(await stuck.markReviewed(req.org, String(req.body.conversationId || ""), req.body.at))) throw fail(404, "That question was not found");
+  res.json({ ok: true });
 }));
 
 router.post("/start", handle(async (req, res) => {

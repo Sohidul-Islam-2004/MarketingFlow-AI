@@ -567,3 +567,10 @@ input.switch:focus-visible { box-shadow: 0 0 0 4px var(--accent-soft); }
 .alerts-box b { font-size: 14.5px; }
 .alerts-box p { margin-top: 2px; }
 .alerts-box:empty { display: none; }
+
+/* AI Training: where the AI got stuck */
+.stuck-card { margin-bottom: 16px; }
+.stuck-list { display: grid; gap: 10px; }
+.stuck-item { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
+.stuck-q { font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+.stuck-a { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--card); font-size: 13.5px; white-space: pre-wrap; }
