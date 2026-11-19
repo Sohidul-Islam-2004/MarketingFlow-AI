@@ -5,8 +5,13 @@
 //   2. Complaints, refunds, "talk to a human" -> hand the chat to a person.
 //   3. Otherwise ask the AI. It answers from your products + knowledge and fills the order "draft".
 //   4. When the draft is complete the bot sends a summary with Confirm / Change buttons.
+// Also: a returning customer's name/phone/address come from their last order (not asked again),
+// sizes/options are offered as buttons, the AI can tell the customer how their orders are doing,
+// and a photo the customer sends is described by a vision model (services/vision.js) before the AI answers.
 // The AI never decides prices, delivery fees or totals: those come from the database (services/orders.js).
-const { Product, Organization } = require("../models");
+const { Product, Organization, Order } = require("../models");
+const vision = require("./vision");
+const { STATUS_LABEL } = require("./orders");
 const { blockedReason } = require("./account");
 const { askAI, aiReady } = require("../lib/ai");
 const { findZone, canonicalDistrict, normalizeText, DEFAULT_ZONES } = require("../lib/places");
@@ -97,7 +102,25 @@ async function knowledgeFor(org, settings, recentText, draft) {
 
 const ANSWER_SHAPE = `{"reply":"","intent":"question|order|confirm|change|handoff|other","confidence":0,"needsHuman":false,"handoffReason":"","draft":{"items":[{"productId":"","variantId":"","qty":1}],"name":"","phone":"","address":"","district":""},"readyToConfirm":false}`;
 
-async function askAgent(org, settings, conv, latestText) {
+// The customer's recent orders (for "where is my order?") and the details of the last one (returning customer)
+async function customerHistory(org, conv) {
+  const orders = await Order.find({ organizationId: org, $or: [{ conversationId: conv._id }, ...(conv.psid ? [{ psid: conv.psid }] : [])] })
+    .sort({ createdAt: -1 }).limit(3).lean();
+  const last = orders.find((o) => o.customerName && o.phone && o.address);
+  return { orders, known: last ? { name: last.customerName, phone: last.phone, address: last.address, district: last.district } : null };
+}
+
+function ordersText(orders) {
+  if (!orders.length) return "";
+  return "CUSTOMER'S ORDERS (newest first):\n" + orders.map((o) => {
+    const items = (o.items || []).map((i) => `${i.name}${i.variantName ? ` (${i.variantName})` : ""} x${i.qty}`).join(", ");
+    const ship = o.trackingNo ? `, courier ${o.courierName || ""} tracking ${o.trackingNo}` : "";
+    const day = new Date(o.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Dhaka" });
+    return `#${o.orderNo} | ${day} | ${STATUS_LABEL[o.status] || o.status} | ${items} | ${taka(o.total)}${ship}`;
+  }).join("\n");
+}
+
+async function askAgent(org, settings, conv, latestText, history = { orders: [], known: null }) {
   const recent = conv.messages.filter((m) => m.from === "customer").slice(-6).map((m) => m.text).join(" ");
   const k = await knowledgeFor(org, settings, `${recent} ${latestText}`, conv.draft);
   const chat = conv.messages.slice(-16).filter((m) => m.from !== "system")
@@ -117,8 +140,13 @@ RULES
 - needsHuman=true for complaints, refunds, damaged items, angry customers, wholesale bargaining, or when unsure.
 - "draft" must always contain the FULL draft (keep known values, add new ones).
 - confidence: 0-100, how sure you are that your reply is correct.
+- When asking which size/colour/option, just ask: the system shows the options as buttons.
+- A message like "[Customer sent a photo: …]" is a photo described by the system: answer about that product as if they had asked about it.
+- If the customer asks about an order they already placed (status, when it arrives), answer from CUSTOMER'S ORDERS ("To call" means the shop will call to confirm it). Never invent dates or tracking. To cancel or change a placed order set needsHuman=true.
+- If RETURNING CUSTOMER details are given and the draft already has them, don't ask for name, phone or address again: say you'll send it to the same address and they can change it in the summary.
 Return JSON only: ${ANSWER_SHAPE}`;
-  const user = `${k.text}\n\nCURRENT DRAFT: ${JSON.stringify(currentDraft)}\n\nCHAT SO FAR:\n${chat || "(new chat)"}\n\nCUSTOMER (latest): ${latestText}`;
+  const known = history.known ? `RETURNING CUSTOMER (from their last order): ${history.known.name}, ${history.known.phone}, ${history.known.address}, ${history.known.district || ""}` : "";
+  const user = [k.text, ordersText(history.orders), known, `CURRENT DRAFT: ${JSON.stringify(currentDraft)}`, `CHAT SO FAR:\n${chat || "(new chat)"}`, `CUSTOMER (latest): ${latestText}`].filter(Boolean).join("\n\n");
   const answer = await askAI({ system, user, temperature: 0.3, maxTokens: 900 });
   return { answer, products: k.products };
 }
@@ -239,7 +267,8 @@ async function confirmOrder(org, conv, settings) {
 }
 
 // Main entry: the customer's message is already added to conv.messages. Caller saves conv.
-async function handleCustomerMessage(org, conv, text) {
+// options = { images: [photo links / data URLs] } when the customer sent photos
+async function handleCustomerMessage(org, conv, text, { images = [] } = {}) {
   const settings = await aiSettings(org);
   conv.lastCustomerAt = new Date();
   conv.unread = (conv.unread || 0) + 1;
@@ -254,14 +283,21 @@ async function handleCustomerMessage(org, conv, text) {
     conv.draft = { ...d, status: "collecting" }; conv.markModified("draft");
     return messenger.reply(org, conv, "ai", "অবশ্যই! কী পরিবর্তন করতে চান? পণ্য, সাইজ, পরিমাণ, নাম, ফোন নাকি ঠিকানা?");
   }
-  // The AI can't see photos or hear voice messages: a person has to look
-  if (ATTACHMENT_ONLY.test(String(text || "").trim())) return handToHuman(org, conv, `Customer sent ${text} (the AI can't open it)`, settings.ai.handoffMessage);
+  // A photo: a vision model says what it shows, then the AI answers as if the customer had typed it.
+  // Voice, video, files (or a photo when no vision model is set): a person has to look.
+  if (ATTACHMENT_ONLY.test(String(text || "").trim())) {
+    const seen = images.length ? await lookAtPhoto(org, images[0]).catch(() => null) : null;
+    if (!seen) return handToHuman(org, conv, `Customer sent ${text} (the AI can't open it)`, settings.ai.handoffMessage);
+    messenger.addMessage(conv, "system", `📷 AI saw: ${seen.text}${seen.productName ? ` (looks like ${seen.productName})` : ""}`);
+    text = `[Customer sent a photo: ${seen.text}${seen.productName ? `. It looks like our product "${seen.productName}"` : ""}]`;
+  }
   if (HUMAN_WORDS.test(text)) return handToHuman(org, conv, `Customer said: "${text.slice(0, 80)}"`, settings.ai.handoffMessage);
   if (!aiReady()) return handToHuman(org, conv, "AI is not set up (AI_API_KEY missing)", settings.ai.handoffMessage);
 
   messenger.showTyping(org, conv);
   let result;
-  try { result = await askAgent(org, settings, conv, text); }
+  const history = await customerHistory(org, conv);
+  try { result = await askAgent(org, settings, conv, text, history); }
   catch (e) { return handToHuman(org, conv, `AI error: ${e.message}`, settings.ai.handoffMessage); }
   const { answer, products } = result;
 
@@ -270,7 +306,12 @@ async function handleCustomerMessage(org, conv, text) {
   // A new order after one was already placed starts from an empty item list (customer details are kept)
   if (d.status === "placed") conv.draft = { name: d.name, phone: d.phone, address: d.address, district: d.district, zone: d.zone, version: d.version, items: [], status: "collecting" };
   else if (d.status === "awaiting_confirm") conv.draft = { ...d, status: "collecting" };
-  const draft = updateDraft(conv, settings, products, answer.draft || {});
+  let draft = updateDraft(conv, settings, products, answer.draft || {});
+  // Returning customer: once they want something, fill in the details from their last order
+  if (history.known && draft.items?.length && (!draft.name || !draft.phone || !draft.address)) {
+    const k = history.known;
+    draft = updateDraft(conv, settings, products, { name: draft.name || k.name, phone: draft.phone || k.phone, address: draft.address || k.address, district: draft.district || k.district });
+  }
 
   if (answer.needsHuman || (Number(answer.confidence) || 0) < settings.ai.handoffBelow) {
     return handToHuman(org, conv, answer.handoffReason || `AI was not sure (${answer.confidence ?? 0}%)`, answer.reply || settings.ai.handoffMessage);
@@ -285,7 +326,23 @@ async function handleCustomerMessage(org, conv, text) {
     const noStock = missing.find((m) => m.startsWith("stock for "));
     if (noStock) return messenger.reply(org, conv, "ai", `দুঃখিত, ${noStock.replace("stock for ", "")} এখন যথেষ্ট স্টকে নেই। অন্য কোনোটা দেখাব?`);
   }
-  await messenger.reply(org, conv, "ai", answer.reply || settings.ai.handoffMessage);
+  await messenger.reply(org, conv, "ai", answer.reply || settings.ai.handoffMessage, optionButtons(draft, products));
+}
+
+// The AI is asking which size/colour/option: offer the options that can be ordered as buttons (max 11)
+function optionButtons(draft, products) {
+  const item = (draft.items || []).find((i) => !i.variantId && i.variantCount > 1);
+  const p = item && products.find((x) => x._id === item.productId);
+  if (!p) return [];
+  return p.variants.filter((v) => v.name !== "Default" && (p.alwaysAvailable || v.available > 0)).map((v) => v.name).slice(0, 11);
+}
+
+async function lookAtPhoto(org, image) {
+  if (!vision.visionReady()) return null;
+  const products = await Product.find({ organizationId: org, archived: { $ne: true } }).select("name info").limit(150).lean();
+  const seen = await vision.describePhoto(image, products);
+  if (!seen?.text) return null;
+  return { ...seen, productName: seen.productId ? products.find((p) => p._id === seen.productId)?.name : null };
 }
 
 // "Suggest reply" button for staff

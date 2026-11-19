@@ -46,11 +46,12 @@ async function draw(root) {
   const check = (name, on, text) => `<label class="check"><input type="checkbox" name="${name}" ${on ? "checked" : ""}> ${text}</label>`;
   const forms = {
     ai: `${s.ai.ready ? "" : `<div class="note">AI is not set up: add AI_API_KEY to .env and restart the server.</div>`}
-      ${check("enabled", s.ai.enabled, "AI answers customers in Messenger")}
+      ${check("enabled", s.ai.enabled, "AI answers customers in Messenger and Instagram")}
+      ${check("followUp", s.ai.followUp !== false, "Remind customers once who stopped in the middle of an order (3 hours later)")}
       <div class="f2"><div><label>Tone</label><select name="tone">${options([["friendly", "Friendly"], ["professional", "Professional"], ["formal", "Formal"]], s.ai.tone)}</select></div>
         <div><label>Hand the chat to you when the AI is less sure than (%)</label><input type="number" name="handoffBelow" min="0" max="100" value="${s.ai.handoffBelow}"></div></div>
       <div><label>Delivery time (the AI tells customers this)</label><input name="deliveryTime" value="${esc(s.ai.deliveryTime)}"></div>
-      <div><label>Shop knowledge: return policy, size chart, opening hours, address, FAQ. The AI only uses what is written here + your products.</label><textarea name="knowledge" rows="10">${esc(s.ai.knowledge)}</textarea></div>
+      <div><label>Shop knowledge: return policy, size chart, opening hours, address, FAQ. The AI only uses what is written here + your products. Answers you teach from a chat (🧠 Teach AI) are added here.</label><textarea name="knowledge" rows="10">${esc(s.ai.knowledge)}</textarea></div>
       <div><label>Message when the AI hands the chat to you</label><input name="handoffMessage" value="${esc(s.ai.handoffMessage)}"></div>`,
     comments: `${check("sendDm", s.comments.sendDm, "Send a private Messenger message to people who ask about price / stock / ordering")}
       ${check("autoReply", s.comments.autoReply, "Post a public reply under the comment (template with your real prices)")}

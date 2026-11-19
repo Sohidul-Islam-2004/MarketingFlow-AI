@@ -48,7 +48,7 @@ function showTyping(org, conv) {
 
 // Bot/agent message: saved in the chat even if sending fails (the error is shown in the inbox)
 async function reply(org, conv, from, text, quickReplies = []) {
-  const msg = addMessage(conv, from, text);
+  const msg = addMessage(conv, from, text, quickReplies.length ? { buttons: quickReplies.slice(0, 13) } : {});
   try {
     const r = await sendText(org, conv, text, quickReplies);
     msg.mid = r.message_id || null;

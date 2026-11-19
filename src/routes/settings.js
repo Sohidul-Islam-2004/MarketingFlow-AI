@@ -10,7 +10,7 @@ router.get("/", handle(async (req, res) => {
   const o = await Organization.findById(req.org).lean();
   res.json({
     profile: { name: o.name, phone: o.phone, logoUrl: o.logoUrl, returnPolicy: o.returnPolicy, orderPrefix: o.orderPrefix },
-    ai: { enabled: true, autoConfirm: true, tone: "friendly", handoffBelow: 60, knowledge: "", deliveryTime: "", handoffMessage: "", ...(o.ai || {}), ready: aiReady() },
+    ai: { enabled: true, autoConfirm: true, tone: "friendly", handoffBelow: 60, knowledge: "", deliveryTime: "", handoffMessage: "", followUp: true, ...(o.ai || {}), ready: aiReady() },
     comments: { autoReply: true, sendDm: true, delaySec: 30, needApproval: false, hideSpam: false, blockedWords: [], ...(o.comments || {}) },
     zones: o.zones?.length ? o.zones : DEFAULT_ZONES,
     usingDefaultZones: !o.zones?.length,
@@ -35,8 +35,22 @@ router.put("/ai", handle(async (req, res) => {
       enabled: !!b.enabled, autoConfirm: !!b.autoConfirm, tone: String(b.tone || "friendly"),
       handoffBelow: Math.max(0, Math.min(100, Number(b.handoffBelow) || 0)),
       knowledge: String(b.knowledge || "").slice(0, 20000), deliveryTime: String(b.deliveryTime || ""), handoffMessage: String(b.handoffMessage || ""),
+      followUp: b.followUp === undefined ? true : !!b.followUp,
     },
   });
+  res.json({ ok: true });
+}));
+
+// "Teach the AI" from a chat: a question and the right answer go into the shop knowledge,
+// so next time the AI answers it by itself. { question, answer }
+router.post("/teach", handle(async (req, res) => {
+  const q = String(req.body.question || "").trim().slice(0, 300), a = String(req.body.answer || "").trim().slice(0, 1000);
+  if (!a) throw fail(400, "Write the answer the AI should give");
+  const org = await Organization.findById(req.org).select("ai").lean();
+  const old = org?.ai?.knowledge || "";
+  const entry = `${q ? `Q: ${q}\n` : ""}A: ${a}`;
+  if (old.length + entry.length > 20000) throw fail(400, "Shop knowledge is full. Remove some old lines in Setup → Settings first");
+  await Organization.updateOne({ _id: req.org }, { $set: { "ai.knowledge": `${old.trim()}\n\n${entry}`.trim() } });
   res.json({ ok: true });
 }));
 

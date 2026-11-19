@@ -36,6 +36,7 @@ const organizationSchema = new Schema(
       knowledge: { type: String, default: "" }, // policies, FAQ, size chart: the only facts the AI may use
       deliveryTime: { type: String, default: "24-48 hours inside Dhaka, 3-5 days outside" },
       handoffMessage: { type: String, default: "ধন্যবাদ! আমাদের টিমের একজন শীঘ্রই আপনাকে উত্তর দেবেন 🙏" },
+      followUp: { type: Boolean, default: true }, // remind a customer once who stopped in the middle of an order
     },
 
     // Facebook comment engine

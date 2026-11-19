@@ -41,6 +41,8 @@ module.exports = {
     BASE_URL: (env.AI_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, ""),
     API_KEY: env.AI_API_KEY || "",
     MODEL: env.AI_MODEL || "openai/gpt-oss-120b",
+    // A model that can look at photos (customer sends a product photo / screenshot). Empty = photos go to a person.
+    VISION_MODEL: env.AI_VISION_MODEL ?? (/groq\.com/.test(env.AI_BASE_URL || "https://api.groq.com") ? "meta-llama/llama-4-scout-17b-16e-instruct" : ""),
   },
 
   LEGAL: {

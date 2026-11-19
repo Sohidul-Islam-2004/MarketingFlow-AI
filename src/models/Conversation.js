@@ -8,6 +8,8 @@ const messageSchema = new Schema(
     at: { type: Date, default: Date.now },
     mid: { type: String, default: null }, // Meta message id
     error: { type: String, default: null }, // why sending failed
+    image: { type: String, default: null }, // photo the customer sent (Meta's link, shown in the inbox)
+    buttons: { type: [String], default: undefined }, // quick-reply buttons sent with an AI message
   },
   { _id: false }
 );
@@ -28,6 +30,7 @@ const conversationSchema = new Schema(
     unread: { type: Number, default: 0 },
     lastMessage: { type: String, default: "" },
     lastCustomerAt: { type: Date, default: null }, // Meta lets us reply for 24h after this
+    reminderAt: { type: Date, default: null }, // when the "you didn't finish your order" reminder was sent (services/followUp.js)
     messages: { type: [messageSchema], default: [] },
 
     // { items:[{productId, variantId, name, variantName, qty, price, available, variantCount}],

@@ -27,6 +27,9 @@ export async function render(root, params) {
     back: () => { state.openId = null; state.chat = null; $("#inbox").classList.remove("show-chat", "show-order"); return refreshAll(); },
     toggleOrder: () => $("#inbox").classList.toggle("show-order"),
     send: () => sendReply(),
+    // test chat: tap a quick-reply button the AI offered (sizes, Confirm…), like a customer would
+    teach: (el) => teachAI(Number(el.dataset.i)),
+    quick: (el) => { if (!state.chat?.simulator) return; $("#replyBox").value = el.dataset.text; return sendReply(); },
     aiToggle: async () => { await post(`/api/inbox/${state.openId}/ai`, { on: state.chat.aiPaused }); refreshAll(); },
     closeChat: async () => { await post(`/api/inbox/${state.openId}/status`, { status: state.chat.status === "closed" ? "open" : "closed" }); refreshAll(); },
     deleteChat: async () => { if (!(await confirmBox("Delete this test chat?", "Delete"))) return; await del(`/api/inbox/${state.openId}`); state.openId = null; state.chat = null; $("#inbox").classList.remove("show-chat", "show-order"); refreshAll(); },
@@ -45,6 +48,11 @@ export async function render(root, params) {
     simulate: () => startSimulator(),
   });
   $("#search").addEventListener("input", debounce((e) => { state.q = e.target.value; drawList(); }));
+  root.addEventListener("change", (e) => {
+    if (e.target.id !== "simPhoto" || !e.target.files[0]) return;
+    sendTestPhoto(e.target.files[0]).catch((err) => toast(err.message, true));
+    e.target.value = "";
+  });
   root.addEventListener("keydown", (e) => { if (e.target.id === "replyBox" && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply().catch((err) => toast(err.message, true)); } });
 
   await refreshAll();
@@ -98,16 +106,52 @@ async function drawChat(quiet = false) {
         <button class="btn sm ${c.aiPaused ? "" : "light"}" data-action="aiToggle">${c.aiPaused ? "🤖 Turn AI on" : "✋ Take over (AI off)"}</button>
         <button class="btn sm light" data-action="closeChat">${c.status === "closed" ? "Reopen" : "Close chat"}</button>
         ${c.simulator ? `<button class="btn sm danger" data-action="deleteChat">Delete</button>` : ""}</div></div>
-    <div class="messages" id="messages">${c.messages.map((m) => `<div class="bubble ${m.from}">${esc(m.text)}${m.error ? `<div class="error">Not delivered: ${esc(m.error)}</div>` : ""}<small>${{ customer: "Customer", ai: "AI", agent: "You", system: "" }[m.from]} ${dateTime(m.at)}</small></div>`).join("")}</div>
+    <div class="messages" id="messages">${c.messages.map((m, i) => bubble(m, c.simulator, i)).join("")}</div>
     <div class="composer">
       ${c.simulator
-        ? `<textarea id="replyBox" placeholder="Type as the CUSTOMER to test the AI… (Enter to send)"></textarea><button class="btn" data-action="send">Send</button>`
+        ? `<textarea id="replyBox" placeholder="Type as the CUSTOMER to test the AI… (Enter to send)"></textarea>
+           <label class="btn light" title="Send a photo as the customer">📷<input type="file" id="simPhoto" accept="image/*" hidden></label><button class="btn" data-action="send">Send</button>`
         : `<textarea id="replyBox" placeholder="${c.canReply ? "Write a reply… (Enter to send). The AI pauses while you reply." : "The 24-hour reply window is closed. Wait for the customer to message again."}" ${c.canReply ? "" : "disabled"}></textarea>
            <button class="btn light" data-action="suggest" title="AI writes a reply for you">✨</button><button class="btn" data-action="send" ${c.canReply ? "" : "disabled"}>Send</button>`}
     </div>`;
   $("#replyBox").value = typing;
   $("#messages").scrollTop = atBottom ? 1e9 : oldScroll; // stay where you were reading unless you were at the end
   drawSidePanel(c);
+}
+
+// One chat message. Photos from the customer are shown; quick-reply buttons appear under the AI message.
+function bubble(m, simulator, i) {
+  const who = { customer: "Customer", ai: "AI", agent: "You", system: "" }[m.from];
+  const photo = m.image ? `<a href="${esc(m.image)}" target="_blank" rel="noopener"><img class="msg-photo" src="${esc(m.image)}" alt="photo" onerror="this.replaceWith('📷 photo (link expired)')"></a>` : "";
+  const buttons = m.buttons?.length ? `<div class="quick">${m.buttons.map((b) => `<button type="button" class="quick-btn" ${simulator ? `data-action="quick" data-text="${esc(b)}"` : "disabled"}>${esc(b)}</button>`).join("")}</div>` : "";
+  return `<div class="bubble ${m.from}">${photo}${m.image && /^\[image/.test(m.text) ? "" : esc(m.text)}${m.error ? `<div class="error">Not delivered: ${esc(m.error)}</div>` : ""}${buttons}<small>${who} ${dateTime(m.at)}${m.from === "agent" ? ` · <a href="#" class="teach-link" data-action="teach" data-i="${i}">🧠 Teach AI</a>` : ""}</small></div>`;
+}
+
+// The shop answered something the AI didn't know: save the question + answer so the AI answers it next time
+function teachAI(i) {
+  const msgs = state.chat.messages;
+  const answer = msgs[i]?.text || "";
+  const question = [...msgs.slice(0, i)].reverse().find((m) => m.from === "customer")?.text || "";
+  openModal({
+    title: "🧠 Teach the AI",
+    buttons: [["save", "Teach"]],
+    body: `<p class="muted">Next time a customer asks this, the AI answers by itself. Write it so it works for every customer.</p>
+      <div class="mt"><label>Customer's question</label><input name="question" value="${esc(question)}"></div>
+      <div class="mt"><label>The right answer</label><textarea name="answer" rows="4">${esc(answer)}</textarea></div>`,
+    onSubmit: async (f) => { await post("/api/settings/teach", f); toast("The AI learned it ✅"); },
+  });
+}
+
+// Test chat: send a photo as the customer. Made smaller first (max 1024 px) so it uploads fast.
+async function sendTestPhoto(file) {
+  const img = await createImageBitmap(file);
+  const scale = Math.min(1, 1024 / Math.max(img.width, img.height));
+  const canvas = Object.assign(document.createElement("canvas"), { width: Math.round(img.width * scale), height: Math.round(img.height * scale) });
+  canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+  $("#messages").insertAdjacentHTML("beforeend", `<div class="bubble customer">📷 [photo]</div><div class="bubble ai typing"><i></i><i></i><i></i></div>`);
+  $("#messages").scrollTop = 1e9;
+  try { await post("/api/inbox/simulate", { conversationId: state.openId, image: canvas.toDataURL("image/jpeg", 0.85) }); }
+  finally { state.chat = null; await refreshAll(); }
 }
 
 function drawSidePanel(c) {

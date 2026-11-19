@@ -114,8 +114,10 @@ router.delete("/:id", handle(async (req, res) => {
 }));
 
 // Simulator: chat with your own AI agent without Facebook. Nothing is sent to Meta.
+// Test chat. { text } or { image: "data:image/jpeg;base64,…" } to test what the AI does with a photo
 router.post("/simulate", handle(async (req, res) => {
-  const text = String(req.body.text || "").trim();
+  const image = /^data:image\/(jpeg|png|webp);base64,/.test(String(req.body.image || "")) ? String(req.body.image) : null;
+  const text = image ? "[image]" : String(req.body.text || "").trim();
   if (!text) throw fail(400, "Write a message");
   let id = req.body.conversationId;
   if (!id) {
@@ -125,8 +127,8 @@ router.post("/simulate", handle(async (req, res) => {
   await messenger.oneAtATime(`${req.org}:conv:${id}`, async () => {
     const c = await Conversation.findOne({ _id: id, organizationId: req.org });
     if (!c || !messenger.isSimulator(c)) throw fail(404, "Simulator chat not found");
-    messenger.addMessage(c, "customer", text);
-    await agent.handleCustomerMessage(req.org, c, text);
+    messenger.addMessage(c, "customer", image ? "📷 [photo]" : text);
+    await agent.handleCustomerMessage(req.org, c, text, { images: image ? [image] : [] });
     await c.save();
   });
   res.json({ ok: true, conversationId: id });

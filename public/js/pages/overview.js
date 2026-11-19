@@ -1,4 +1,4 @@
-// Overview: today's sales, what needs your attention, recent orders.
+// Home: sales, what the AI did for you, the last 7 days, what needs your attention, recent orders.
 import { get } from "../api.js";
 import { esc, taka, num, table, orderPill, dateTime, onAction } from "../ui.js";
 
@@ -32,6 +32,36 @@ function gettingStarted(setup) {
       : `<a class="step" href="${link}"><span class="dot">${i + 1}</span><div><b>${title}</b><small>${hint}</small></div><span class="go">${go} →</span></a>`).join("")}</div></div>`;
 }
 
+// "2 h 15 min" from minutes
+const timeText = (min) => (min >= 60 ? `${Math.floor(min / 60)} h ${min % 60 ? `${min % 60} min` : ""}` : `${min} min`);
+
+// What the AI did: the reason a shop pays for MarketingFlow
+function aiCard(ai, label) {
+  return `<div class="card ai-card">
+    <div class="ai-card-head"><span class="ai-badge">🤖</span><div><h3>Your AI worked for you</h3><p class="small muted">${label}</p></div></div>
+    ${ai.minutesSaved ? `<div class="ai-saved"><b>≈ ${timeText(ai.minutesSaved)}</b><span>of typing saved</span></div>`
+      : `<div class="ai-saved"><span>No customer chats yet in this period. The AI's work shows here as soon as customers message your Page.</span></div>`}
+    <div class="ai-stats">
+      <div><b>${num(ai.chats)}</b><span>chats answered</span></div>
+      <div><b>${num(ai.replies)}</b><span>messages sent</span></div>
+      <div><b>${num(ai.orders)}</b><span>orders taken</span></div>
+      <div><b>${num(ai.comments)}</b><span>comments replied</span></div>
+    </div></div>`;
+}
+
+// Bars for the last 7 days (sales in taka)
+function weekCard(week) {
+  const max = Math.max(1, ...week.map((d) => d.revenue));
+  const total = week.reduce((s, d) => s + d.revenue, 0);
+  const dayName = (ymd, i) => (i === 6 ? "Today" : new Date(`${ymd}T12:00:00+06:00`).toLocaleDateString("en-GB", { weekday: "short", timeZone: "Asia/Dhaka" }));
+  return `<div class="card">
+    <div class="row between"><div><h3>Last 7 days</h3><p class="small muted">${taka(total)} · ${num(week.reduce((s, d) => s + d.orders, 0))} orders</p></div></div>
+    <div class="bars">${week.map((d, i) => `<div class="bar ${i === 6 ? "today" : ""}" title="${taka(d.revenue)} · ${d.orders} orders">
+        <span class="bar-val">${d.revenue ? taka(d.revenue).replace(/,\d{3}$/, "k") : ""}</span>
+        <i style="height:${Math.max(3, Math.round((d.revenue / max) * 100))}%"></i><span class="bar-day">${dayName(d.day, i)}</span></div>`).join("")}</div>
+  </div>`;
+}
+
 async function draw(root) {
   const o = await get(`/api/overview?period=${period}`);
   const label = { today: "today", "7d": "in the last 7 days", "30d": "in the last 30 days" }[period];
@@ -47,6 +77,7 @@ async function draw(root) {
       <div class="kpi"><div class="label">From chats & comments</div><div class="value">${num(o.sales.aiOrders)}</div><p>orders created by the AI</p></div>
       <div class="kpi"><div class="label">Open chats</div><div class="value">${num(o.openChats)}</div><p>in the inbox</p></div>
     </div>
+    <div class="grid2 home-grid">${aiCard(o.ai, label[0].toUpperCase() + label.slice(1))}${weekCard(o.week)}</div>
     <div class="card">
       <h3>Needs your attention</h3><p class="sub">${Object.values(o.todo).some(Boolean) ? "Click a box to open the list." : "Nothing is waiting for you. 🎉"}</p>
       <div class="todo">
