@@ -130,7 +130,7 @@ async function runScan(org, website) {
   if (page) {
     const i = page;
     const text = [`Name: ${i.name || ""}`, i.category && `Category: ${i.category}`, i.about && `About: ${i.about}`, i.description && `Description: ${i.description}`, i.phone && `Phone: ${i.phone}`,
-    i.emails?.length && `Email: ${i.emails.join(", ")}`, i.website && `Website: ${i.website}`, i.single_line_address && `Address: ${i.single_line_address}`].filter(Boolean).join("\n");
+      i.emails?.length && `Email: ${i.emails.join(", ")}`, i.website && `Website: ${i.website}`, i.single_line_address && `Address: ${i.single_line_address}`].filter(Boolean).join("\n");
     if (text.length > 40) sources.push({ kind: "page", title: `Facebook Page: ${i.name || ""}`, url: "", text });
   }
   if (site) sources.push({ kind: "web", title: "Home page", url: site.home.url, text: site.home.text }, ...site.info.map((p) => ({ kind: "web", ...p })));

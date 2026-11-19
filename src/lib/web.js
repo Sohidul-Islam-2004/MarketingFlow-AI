@@ -2,7 +2,7 @@
 //   fetchPage(url)  -> { url, html }   safe: only public http(s) addresses, 1.5 MB max, 12 s max
 //   textOf(html)    -> readable text without tags, scripts and styles
 //   linksOf(html, pageUrl) -> absolute links on the same website
-//   metaOf(html)    -> { title, description, image, price, product } from <title>, og: tags and JSON-LD
+//   titleOf(html)   -> the page title
 const dns = require("dns").promises;
 const net = require("net");
 const { fail } = require("./errors");

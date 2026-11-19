@@ -2,30 +2,36 @@
 // A post can carry an offer: when the post goes live, the offer goes on all products or the chosen ones,
 // so the AI quotes the sale price and orders use it (see services/publisher.js → startPostOffer).
 import { get, post, put, del, uploadFiles } from "./api.js";
+
+// Photos are not kept by MarketingFlow: they are chosen from the device, uploaded only when you press
+// Publish now / Schedule, sent to Facebook / Instagram and then deleted (services/tempMedia.js).
 import { esc, onAction, openModal, toast, toLocalInput, confirmBox, options } from "./ui.js";
 
 const LOCKED = ["Publishing", "Published", "Partly published"];
 
 // openPostEditor(existingPost | { text, hashtags } | null, { date, onDone })
 export async function openPostEditor(item, { date = null, onDone = () => {} } = {}) {
-  const [accounts, media, products] = await Promise.all([get("/api/accounts"), get("/api/media"), get("/api/products")]);
+  const [accounts, products] = await Promise.all([get("/api/accounts"), get("/api/products")]);
   const saved = item?._id ? await get(`/api/content/${item._id}`) : null;
   const p = saved || { text: item?.text || "", hashtags: item?.hashtags || [], mediaIds: [], targets: [], status: "Draft" };
   const locked = LOCKED.includes(p.status);
-  let picked = [...(p.mediaIds || [])];
+  let files = []; // File objects chosen on this device, in order
+  const onFacebook = (p.targets || []).some((t) => t.status === "on_facebook");
   const chosenAccounts = new Set((p.targets || []).map((t) => t.accountId));
   const when = p.scheduledAt || date;
   const o = p.offer || null;
   const chosenProducts = new Set(o?.productIds || []);
 
-  const thumbs = () => media.map((m) => {
-    const n = picked.indexOf(m._id);
-    return `<div class="thumb ${n >= 0 ? "on" : ""}" data-action="pick" data-id="${m._id}">${n >= 0 ? `<span class="n">${n + 1}</span>` : ""}${m.kind === "video" ? `<video src="${esc(m.url)}" muted></video>` : `<img src="${esc(m.url)}" alt="">`}</div>`;
-  }).join("") || `<p class="small muted">No photos yet. Upload one.</p>`;
+  const thumbs = () => files.map((f, i) => {
+    const url = f._url || (f._url = URL.createObjectURL(f));
+    return `<div class="thumb on"><span class="n">${i + 1}</span>${f.type.startsWith("video") ? `<video src="${url}" muted></video>` : `<img src="${url}" alt="">`}
+      <button type="button" class="thumb-x" data-action="unpick" data-i="${i}" title="Remove">×</button></div>`;
+  }).join("");
 
   const body = openModal({
     title: saved ? `Post · ${p.status}` : "New post", wide: true,
-    buttons: locked ? [] : [["draft", "Save draft", "light"], ["schedule", "Schedule"], ["now", "Publish now", "dark"], ...(saved ? [["delete", "Delete", "danger"]] : [])],
+    buttons: locked ? [] : onFacebook ? [["unschedule", "Unschedule", "light"], ["delete", "Delete", "danger"]]
+      : [["draft", "Save draft", "light"], ["schedule", "Schedule"], ["now", "Publish now", "dark"], ...(saved ? [["delete", "Delete", "danger"]] : [])],
     body: `
       ${p.lastError ? `<div class="note">${esc(p.lastError)}</div>` : ""}
       ${(p.targets || []).some((t) => t.permalink) ? `<div class="good">${p.targets.filter((t) => t.permalink).map((t) => `<a target="_blank" href="${esc(t.permalink)}">View on ${esc(t.accountName)}</a>`).join(" · ")}</div>` : ""}
@@ -38,9 +44,7 @@ export async function openPostEditor(item, { date = null, onDone = () => {} } = 
         <div class="stack">
           <div><label>Post to</label>${accounts.map((a) => `<label class="check"><input type="checkbox" name="account[]" value="${a._id}" ${chosenAccounts.has(a._id) ? "checked" : ""} ${locked ? "disabled" : ""}> ${esc(a.accountName)} <span class="small muted">${a.platform === "Instagram" ? "Instagram" : "Facebook"}</span></label>`).join("") || `<p class="note small">No Page connected. Go to Facebook & Instagram first.</p>`}</div>
           <div><label>Date & time (for Schedule)</label><input type="datetime-local" name="when" value="${toLocalInput(when)}"></div>
-          <div><div class="row between"><label>Photos / video (click to choose, in order)</label><label class="btn sm light" style="margin:0">Upload<input type="file" id="upload" accept="image/*,video/*" multiple hidden></label></div>
-            <div class="thumbs" id="thumbs">${thumbs()}</div>
-            <p class="small muted mt">One video, or several photos.</p></div>
+          ${mediaBox(p, locked || onFacebook)}
         </div>
       </div>`,
     onSubmit: async (f, button) => {
@@ -50,17 +54,31 @@ export async function openPostEditor(item, { date = null, onDone = () => {} } = 
         toast("Post deleted");
         return onDone();
       }
-      const data = { text: f.text, hashtags: f.hashtags, mediaIds: picked, accountIds: f.account || [], offer: offerFromForm(f) };
-      const savedPost = saved ? await put(`/api/content/${p._id}`, data) : await post("/api/content", data);
-      if (button === "schedule") {
-        if (!f.when) { toast("Choose a date and time", true); return true; }
-        await post(`/api/content/${savedPost._id}/schedule`, { scheduledAt: new Date(f.when).toISOString() });
-        toast("Post scheduled");
-      } else if (button === "now") {
-        const r = await post(`/api/content/${savedPost._id}/publish`);
-        const offerOn = r.offer?.appliedAt ? " · offer started 🏷️" : "";
-        toast(r.status === "Published" ? `Published! 🎉${offerOn}` : `Status: ${r.status}${r.lastError ? " · " + r.lastError : ""}`, r.status === "Failed");
-      } else toast("Draft saved");
+      if (button === "unschedule") {
+        if (!(await confirmBox("Unschedule? Facebook removes the scheduled post. Its photos are not kept, so add them again before scheduling.", "Unschedule"))) return true;
+        await post(`/api/content/${p._id}/unschedule`);
+        toast("Back to draft. Add the photos again.");
+        return onDone();
+      }
+      if (button === "schedule" && !f.when) { toast("Choose a date and time", true); return true; }
+      // Photos go up only now, and only for Publish now / Schedule (drafts keep the text only)
+      let mediaIds = [];
+      if (files.length && button !== "draft") mediaIds = (await uploadFiles(files)).map((m) => m._id);
+      try {
+        const data = { text: f.text, hashtags: f.hashtags, mediaIds, accountIds: f.account || [], offer: offerFromForm(f) };
+        const savedPost = saved ? await put(`/api/content/${p._id}`, data) : await post("/api/content", data);
+        if (button === "schedule") {
+          await post(`/api/content/${savedPost._id}/schedule`, { scheduledAt: new Date(f.when).toISOString() });
+          toast(mediaIds.length ? "Scheduled on Facebook ✅" : "Post scheduled");
+        } else if (button === "now") {
+          const r = await post(`/api/content/${savedPost._id}/publish`);
+          const offerOn = r.offer?.appliedAt ? " · offer started 🏷️" : "";
+          toast(r.status === "Published" ? `Published! 🎉${offerOn}` : `Status: ${r.status}${r.lastError ? " · " + r.lastError : ""}`, r.status === "Failed");
+        } else toast(files.length ? "Draft saved (text only: photos are added when you publish)" : "Draft saved");
+      } catch (e) {
+        if (mediaIds.length) post("/api/media/discard", { ids: mediaIds }).catch(() => {}); // don't keep photos of a post that didn't go out
+        throw e;
+      }
       onDone();
     },
   });
@@ -72,21 +90,28 @@ export async function openPostEditor(item, { date = null, onDone = () => {} } = 
   showList();
 
   onAction(body, {
-    pick: (el) => {
-      if (locked) return;
-      const id = el.dataset.id;
-      picked = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id];
-      body.querySelector("#thumbs").innerHTML = thumbs();
-    },
+    unpick: (el) => { files.splice(Number(el.dataset.i), 1); body.querySelector("#thumbs").innerHTML = thumbs(); },
   });
-  body.querySelector("#upload").addEventListener("change", async (e) => {
-    try {
-      const added = await uploadFiles(e.target.files);
-      media.unshift(...added);
-      picked.push(...added.map((m) => m._id));
-      body.querySelector("#thumbs").innerHTML = thumbs();
-    } catch (err) { toast(err.message, true); }
+  body.querySelector("#choose")?.addEventListener("change", (e) => {
+    const chosen = [...e.target.files].filter((f) => /^(image|video)\//.test(f.type));
+    if (chosen.some((f) => f.size > 200 * 1024 * 1024)) toast("A file is bigger than 200 MB", true);
+    files = [...files, ...chosen.filter((f) => f.size <= 200 * 1024 * 1024)].slice(0, 10);
+    e.target.value = "";
+    body.querySelector("#thumbs").innerHTML = thumbs();
   });
+}
+
+// Photos: chosen from this device. Nothing is stored before Publish now / Schedule.
+function mediaBox(p, readOnly) {
+  if (readOnly) {
+    const n = p.mediaCount || p.mediaIds?.length || 0;
+    return n ? `<div><label>Photos / video</label><p class="small muted">${n} file(s) sent with this post.${(p.targets || []).some((t) => t.status === "on_facebook") ? " Facebook is keeping the post for its time." : ""}</p></div>` : "";
+  }
+  return `<div><div class="row between"><label style="margin:0">Photos / video</label>
+      <label class="btn sm light" style="margin:0">+ Choose from device<input type="file" id="choose" accept="image/*,video/*" multiple hidden></label></div>
+    <div class="thumbs mt" id="thumbs"></div>
+    <p class="small muted mt">One video, or up to 10 photos. They are sent when you publish and are not kept on MarketingFlow.
+      Instagram with photos: use Publish now. Facebook: Schedule works too (10 minutes to 30 days ahead).</p></div>`;
 }
 
 /* ---------- offer with this post ---------- */

@@ -1,4 +1,4 @@
-// Photo and video uploads (stored in /uploads)
+// Photo and video uploads for a post. Temporary: deleted once the post is sent (services/tempMedia.js).
 const router = require("express").Router();
 const fs = require("fs");
 const path = require("path");
@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const multer = require("multer");
 const { MediaAsset, ContentItem } = require("../models");
 const { handle, fail } = require("../lib/errors");
+const { removeMedia } = require("../services/tempMedia");
 
 const UPLOAD_DIR = path.join(__dirname, "..", "..", "uploads");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -22,10 +23,6 @@ const upload = multer({
   fileFilter: (_req, file, cb) => cb(null, /^(image|video)\//.test(file.mimetype)),
 });
 
-router.get("/", handle(async (req, res) => {
-  res.json(await MediaAsset.find({ organizationId: req.org }).sort({ createdAt: -1 }).limit(200).lean());
-}));
-
 router.post("/", upload.array("files", 10), handle(async (req, res) => {
   if (!req.files?.length) throw fail(400, "Choose a photo or video");
   const saved = [];
@@ -38,12 +35,12 @@ router.post("/", upload.array("files", 10), handle(async (req, res) => {
   res.json(saved);
 }));
 
-router.delete("/:id", handle(async (req, res) => {
-  const m = await MediaAsset.findOne({ _id: req.params.id, organizationId: req.org });
-  if (!m) throw fail(404, "File not found");
-  if (await ContentItem.exists({ organizationId: req.org, mediaIds: m._id, status: { $in: ["Scheduled", "Publishing"] } })) throw fail(400, "A scheduled post uses this file");
-  if (m.file) fs.promises.unlink(path.join(UPLOAD_DIR, m.file)).catch(() => {});
-  await m.deleteOne();
+// The browser calls this when publishing failed, so the files don't wait 24 hours: { ids: [...] }
+router.post("/discard", handle(async (req, res) => {
+  const ids = (Array.isArray(req.body.ids) ? req.body.ids : []).map(String);
+  const busy = await ContentItem.find({ organizationId: req.org, mediaIds: { $in: ids }, status: { $in: ["Scheduled", "Publishing"] } }).select("mediaIds").lean();
+  const inUse = new Set(busy.flatMap((b) => b.mediaIds));
+  await removeMedia(req.org, ids.filter((id) => !inUse.has(id)));
   res.json({ ok: true });
 }));
 

@@ -7,7 +7,7 @@ const targetSchema = new Schema(
     accountId: { type: String, required: true }, // SocialAccount id
     platform: String,
     accountName: String,
-    status: { type: String, default: "pending" }, // pending | processing | published | failed
+    status: { type: String, default: "pending" }, // pending | processing | on_facebook (scheduled there) | published | failed
     postId: { type: String, default: null },
     permalink: { type: String, default: null },
     error: { type: String, default: null },
@@ -37,7 +37,8 @@ const contentItemSchema = new Schema(
     title: { type: String, default: "" },
     text: { type: String, default: "" }, // caption
     hashtags: { type: [String], default: [] },
-    mediaIds: { type: [String], default: [] },
+    mediaIds: { type: [String], default: [] }, // files waiting to be sent (deleted once sent: see services/tempMedia.js)
+    mediaCount: { type: Number, default: 0 }, // how many photos/videos the post had, after the files are gone
     targets: { type: [targetSchema], default: [] },
     status: { type: String, default: "Draft" },
     scheduledAt: { type: Date, default: null },

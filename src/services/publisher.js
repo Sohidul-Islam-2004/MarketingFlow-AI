@@ -13,6 +13,7 @@ const { decrypt } = require("../lib/crypto");
 const { fail } = require("../lib/errors");
 const { notify } = require("../lib/notify");
 const { PUBLIC_BASE_URL } = require("../config");
+const { releasePostMedia, sweepOldMedia } = require("./tempMedia");
 
 const MAX_TRIES = 3;
 const UPLOAD_DIR = path.join(__dirname, "..", "..", "uploads");
@@ -31,7 +32,8 @@ async function mediaOf(item) {
 }
 
 // Problems that would make Meta reject the post. Shown before scheduling and stored on failure.
-function checkPost(item, platform, media) {
+// schedule = true when the post is being scheduled (photos are not kept, see services/tempMedia.js)
+function checkPost(item, platform, media, schedule = false) {
   const problems = [];
   const text = captionFor(item);
   const videos = media.filter((m) => m.kind === "video");
@@ -42,14 +44,15 @@ function checkPost(item, platform, media) {
     if (media.length > 10) problems.push("Instagram allows up to 10 photos");
     if (text.length > 2200) problems.push("Instagram caption is too long (max 2200 letters)");
     if (media.length && !media.every(publicUrl)) problems.push("Instagram can only post from the live website (https)");
+    if (schedule && media.length) problems.push("Instagram posts with photos can only use Publish now (photos are not kept for later)");
   }
   return problems;
 }
 
-async function checkItem(item) {
+async function checkItem(item, { schedule = false } = {}) {
   const media = await mediaOf(item);
   const problems = [];
-  for (const t of item.targets) problems.push(...checkPost(item, t.platform, media).map((p) => `${t.accountName}: ${p}`));
+  for (const t of item.targets) problems.push(...checkPost(item, t.platform, media, schedule).map((p) => `${t.accountName}: ${p}`));
   if (!item.targets.length) problems.push("Choose a Page or Instagram account to post to");
   return problems;
 }
@@ -70,20 +73,66 @@ async function uploadToFacebook(endpoint, token, media, fields, isVideo) {
   return json;
 }
 
-async function publishToFacebook(item, account, media) {
+// scheduleAt (Date) = Facebook keeps the post and publishes it itself at that time ("scheduled post")
+async function publishToFacebook(item, account, media, scheduleAt = null) {
   const token = decrypt(account.accessToken), page = account.accountId, text = captionFor(item);
+  const later = scheduleAt ? { published: false, scheduled_publish_time: Math.floor(scheduleAt.getTime() / 1000) } : {};
   const video = media.find((m) => m.kind === "video");
   const images = media.filter((m) => m.kind === "image");
   let postId;
-  if (video) postId = (await uploadToFacebook(`/${page}/videos`, token, video, { description: text }, true)).id;
-  else if (images.length === 1) { const r = await uploadToFacebook(`/${page}/photos`, token, images[0], { message: text }); postId = r.post_id || r.id; }
+  if (video) postId = (await uploadToFacebook(`/${page}/videos`, token, video, { description: text, ...later }, true)).id;
+  else if (images.length === 1) { const r = await uploadToFacebook(`/${page}/photos`, token, images[0], { message: text, ...later }); postId = r.post_id || r.id; }
   else if (images.length > 1) {
     const photoIds = [];
-    for (const img of images.slice(0, 10)) photoIds.push((await uploadToFacebook(`/${page}/photos`, token, img, { published: false })).id);
-    postId = (await graph(`/${page}/feed`, { token, method: "POST", body: { message: text, attached_media: photoIds.map((id) => ({ media_fbid: id })) } })).id;
-  } else postId = (await graph(`/${page}/feed`, { token, method: "POST", body: { message: text } })).id;
+    for (const img of images.slice(0, 10)) photoIds.push((await uploadToFacebook(`/${page}/photos`, token, img, { published: false, ...(scheduleAt ? { temporary: true } : {}) })).id);
+    postId = (await graph(`/${page}/feed`, { token, method: "POST", body: { message: text, attached_media: photoIds.map((id) => ({ media_fbid: id })), ...later, ...(scheduleAt ? { unpublished_content_type: "SCHEDULED" } : {}) } })).id;
+  } else postId = (await graph(`/${page}/feed`, { token, method: "POST", body: { message: text, ...later } })).id;
+  if (scheduleAt) return { postId, permalink: null };
   const info = await graph(`/${postId}`, { token, params: { fields: "permalink_url" } }).catch(() => ({}));
   return { postId, permalink: info.permalink_url || null };
+}
+
+// Schedule a post that has photos: Facebook keeps it (we don't keep photos), then the files are deleted.
+// Facebook accepts 10 minutes to 30 days ahead. Text-only posts are scheduled by our own job instead.
+async function scheduleOnFacebook(item, when) {
+  const media = await mediaOf(item);
+  if (!media.length) return false;
+  const soon = Date.now() + 10 * 60e3, far = Date.now() + 30 * 86400e3;
+  if (when < soon) throw fail(400, "Posts with photos must be scheduled at least 10 minutes ahead");
+  if (when > far) throw fail(400, "Facebook schedules posts up to 30 days ahead");
+  try {
+    for (const t of item.targets) {
+      const account = await SocialAccount.findOne({ _id: t.accountId, organizationId: item.organizationId }).select("+accessToken");
+      if (!account) throw fail(400, `${t.accountName}: account was disconnected`);
+      const r = await publishToFacebook(item, account, media, when);
+      Object.assign(t, { status: "on_facebook", postId: r.postId, permalink: null, error: null, attempts: 0 });
+    }
+  } catch (e) {
+    await cancelOnFacebook(item); // don't leave half of it scheduled
+    throw e;
+  }
+  item.markModified("targets");
+  await releasePostMedia(item);
+  return true;
+}
+
+// Unschedule / delete: remove the post Facebook is keeping for later
+async function cancelOnFacebook(item) {
+  for (const t of item.targets.filter((x) => x.status === "on_facebook" && x.postId)) {
+    const account = await SocialAccount.findOne({ _id: t.accountId, organizationId: item.organizationId }).select("+accessToken");
+    if (account) await graph(`/${t.postId}`, { token: decrypt(account.accessToken), method: "DELETE" }).catch(() => {});
+    Object.assign(t, { status: "pending", postId: null });
+  }
+  item.markModified("targets");
+}
+
+// At the scheduled time: Facebook published it by itself, we only fetch the link
+async function checkOnFacebook(item, t) {
+  const account = await SocialAccount.findOne({ _id: t.accountId, organizationId: item.organizationId }).select("+accessToken");
+  if (!account) throw fail(400, "Account was disconnected");
+  const info = await graph(`/${t.postId}`, { token: decrypt(account.accessToken), params: { fields: "permalink_url,is_published" } }).catch(() => ({}));
+  if (info.is_published === false && Date.now() < new Date(item.scheduledAt).getTime() + 60 * 60e3) return { processing: true };
+  return { postId: t.postId, permalink: info.permalink_url || null };
 }
 
 // Instagram: 1) make a "container" with the photo/video, 2) wait until Instagram has it ready, 3) publish.
@@ -115,6 +164,12 @@ async function publishItem(item) {
   for (const t of item.targets) {
     if (t.status === "published" || (t.status === "failed" && t.attempts >= MAX_TRIES)) continue;
     try {
+      if (t.status === "on_facebook") {
+        const r = await checkOnFacebook(item, t);
+        if (r.processing) { stillProcessing = true; continue; }
+        Object.assign(t, { status: "published", permalink: r.permalink, error: null });
+        continue;
+      }
       const account = await SocialAccount.findOne({ _id: t.accountId, organizationId: item.organizationId }).select("+accessToken");
       if (!account) throw fail(400, "Account was disconnected");
       const problems = checkPost(item, account.platform, media);
@@ -141,6 +196,7 @@ async function publishItem(item) {
     item.lastError = failed.map((t) => `${t.accountName}: ${t.error}`).join(" | ") || null;
     if (failed.length) await notify(item.organizationId, `Post failed: ${item.title || "untitled"}`, item.lastError, "content");
     if (ok) await startPostOffer(item);
+    await releasePostMedia(item); // the photos were sent (or can't be): delete them
   }
   item.lockedUntil = null;
   item.markModified("targets");
@@ -163,6 +219,7 @@ async function startPostOffer(item) {
 
 // Picks scheduled posts one by one. The lock stops two servers publishing the same post.
 async function publishDuePosts() {
+  await sweepOldMedia().catch((e) => console.error("media sweep:", e.message));
   const now = new Date();
   for (let i = 0; i < 20; i++) {
     const item = await ContentItem.findOneAndUpdate(
@@ -182,4 +239,4 @@ async function publishDuePosts() {
   }
 }
 
-module.exports = { checkItem, publishDuePosts, captionFor };
+module.exports = { checkItem, publishDuePosts, captionFor, scheduleOnFacebook, cancelOnFacebook };

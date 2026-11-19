@@ -1,4 +1,4 @@
-// An uploaded image or video (file in /uploads)
+// A photo or video for ONE post, kept only until it is sent to Facebook / Instagram (services/tempMedia.js)
 const { mongoose, Schema, newId, options } = require("./_base");
 
 const mediaAssetSchema = new Schema(
