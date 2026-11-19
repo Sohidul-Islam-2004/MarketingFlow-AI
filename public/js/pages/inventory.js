@@ -4,7 +4,9 @@
 //   Offer    = "10% off" or "৳100 off" until a date: the AI quotes the sale price and orders use it
 
 import { get, post, put, del } from "../api.js";
-import { esc, taka, table, onAction, openModal, toast, options, dateTime, pill, confirmBox, liveSearch, empty, chips, moreMenu } from "../ui.js";
+import { esc, taka, table, onAction, openModal, toast, options, dateTime, pill, confirmBox, liveSearch, empty, chips, moreMenu, icon } from "../ui.js";
+import { pickPhoto, shrinkPhoto } from "../photo.js";
+import { thumb } from "../mobile/kit.js";
 
 // show: "" all · "low" low stock · "offer" on offer · "archived"
 let filters = { q: "", show: "" };
@@ -44,7 +46,7 @@ async function draw(root) {
       <div class="filters"><input data-filter="q" placeholder="Search products…" value="${esc(filters.q)}">
         ${chips([["", "All", archived ? null : all.length || null], ["low", "Low stock", count("low")], ["offer", "On offer", count("offer")], ["archived", "Archived"]], filters.show, "filter")}</div>
       ${nothingYet ? empty("No products yet", "Add what you sell. The AI can only talk about products that are here.", `<button class="btn" data-action="add">+ Add your first product</button>`) : table([
-        ["Product", (p) => `<b>${esc(p.name)}</b>${detailsLine(p) ? `<div class="small muted">${esc(detailsLine(p))}</div>` : ""}`],
+        ["Product", (p) => `<div class="prod-cell">${thumb(p.imageUrl, p.name)}<div><b>${esc(p.name)}</b>${detailsLine(p) ? `<div class="small muted">${esc(detailsLine(p))}</div>` : ""}</div></div>`],
         ["Price", (p) => (p.offerOn
           ? `<b>${taka(p.salePrice)}</b> <s class="small muted">${taka(p.price)}</s><div>${pill(offerText(p.offer), "pink")}</div>${p.offer.until ? `<div class="small muted">until ${untilText(p.offer.until)}</div>` : ""}`
           : taka(p.price) + (p.offerEnded ? `<div class="small muted">offer ended</div>` : ""))],
@@ -115,10 +117,19 @@ export function offerForAll(refresh) {
 // Label ideas for every kind of shop. They are only suggestions: the shop can type anything.
 const LABEL_IDEAS = ["Brand", "Model", "Warranty", "Fabric", "Size chart", "Colour", "Material", "RAM / Storage", "Battery", "Weight", "Ingredients", "Expiry", "Origin", "Delivery time", "In the box"];
 
+// The photo box at the top of the product form
+const photoBox = (url) => (url ? `<img src="${esc(url)}" alt="">` : `<span>${icon("camera")}</span>`);
+
 export function productForm(p, refresh) {
+  let newPhoto = null; // "data:image/jpeg;base64,…" chosen in this form
+  let dropPhoto = false;
   const body = openModal({
     title: p ? `Edit ${p.name}` : "Add product", wide: true,
-    body: `<div class="pf-main"><div><label>Product name</label><input name="name" required placeholder="e.g. Cotton Panjabi, Redmi 13, Honey" value="${esc(p?.name || "")}"></div>
+    body: `<div class="pf-photo"><div class="photo-box" id="photoBox">${photoBox(p?.imageUrl)}</div>
+        <div><b>Photo</b><p class="small muted">The AI sends it when a customer asks "ছবি দেন". One clear photo is enough.</p>
+          <div class="row mt"><button type="button" class="btn sm light" data-action="choosePhoto">${p?.imageUrl ? "Change photo" : "+ Add photo"}</button>
+          <button type="button" class="btn sm light" data-action="dropPhoto" ${p?.imageUrl ? "" : "hidden"}>Remove</button></div></div></div>
+      <div class="pf-main mt"><div><label>Product name</label><input name="name" required placeholder="e.g. Cotton Panjabi, Redmi 13, Honey" value="${esc(p?.name || "")}"></div>
         <div><label>Price (৳)</label><input type="number" name="price" min="0" required value="${p?.price ?? ""}"></div></div>
 
       <h4 class="mt">Details <span class="small muted">(optional, write anything customers ask about)</span></h4>
@@ -145,7 +156,10 @@ export function productForm(p, refresh) {
       const labels = list(d.ilabel), values = list(d.ivalue);
       const info = labels.map((label, i) => ({ label, value: values[i] }));
       const product = { name: d.name, price: d.price, description: d.description, info, variants, alwaysAvailable: !!d.alwaysAvailable, offer: offerFrom(d) };
-      if (p) await put(`/api/products/${p._id}`, product); else await post("/api/products", product);
+      const saved = p ? await put(`/api/products/${p._id}`, product) : await post("/api/products", product);
+      const id = p?._id || saved._id;
+      if (newPhoto) await post(`/api/products/${id}/photo`, { image: newPhoto });
+      else if (dropPhoto && p?.imageUrl) await del(`/api/products/${id}/photo`);
       toast(p ? "Product saved" : "Product added");
       refresh();
     },
@@ -155,6 +169,21 @@ export function productForm(p, refresh) {
   always.onchange = showStock;
   showStock();
   onAction(body, {
+    choosePhoto: async (el) => {
+      const file = await pickPhoto();
+      if (!file) return;
+      newPhoto = await shrinkPhoto(file);
+      dropPhoto = false;
+      body.querySelector("#photoBox").innerHTML = photoBox(newPhoto);
+      el.textContent = "Change photo";
+      body.querySelector("[data-action=dropPhoto]").hidden = false;
+    },
+    dropPhoto: (el) => {
+      newPhoto = null; dropPhoto = true;
+      body.querySelector("#photoBox").innerHTML = photoBox(null);
+      body.querySelector("[data-action=choosePhoto]").textContent = "+ Add photo";
+      el.hidden = true;
+    },
     addInfo: () => body.querySelector("#infoRows").insertAdjacentHTML("beforeend", infoRow({}, body.querySelectorAll(".info-row").length)),
     addVariant: () => { body.querySelector("#variants").insertAdjacentHTML("beforeend", variantRow()); showStock(); },
     removeRow: (el) => {

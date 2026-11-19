@@ -43,6 +43,9 @@ module.exports = {
     MODEL: env.AI_MODEL || "openai/gpt-oss-120b",
     // A model that can look at photos (customer sends a product photo / screenshot). Empty = photos go to a person.
     VISION_MODEL: env.AI_VISION_MODEL ?? (/groq\.com/.test(env.AI_BASE_URL || "https://api.groq.com") ? "meta-llama/llama-4-scout-17b-16e-instruct" : ""),
+    // Turns customers' voice messages into text (Groq: whisper-large-v3). Empty = the AI asks them to type.
+    VOICE_MODEL: env.AI_VOICE_MODEL ?? (/groq\.com/.test(env.AI_BASE_URL || "https://api.groq.com") ? "whisper-large-v3" : ""),
+    VOICE_LANGUAGE: env.AI_VOICE_LANGUAGE ?? "bn", // most customers speak Bangla; empty = guess the language
   },
 
   LEGAL: {

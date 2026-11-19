@@ -7,10 +7,13 @@
 //   4. When the draft is complete the bot sends a summary with Confirm / Change buttons.
 // Also: a returning customer's name/phone/address come from their last order (not asked again),
 // sizes/options are offered as buttons, the AI can tell the customer how their orders are doing,
-// and a photo the customer sends is described by a vision model (services/vision.js) before the AI answers.
+// a photo the customer sends is described by a vision model (services/vision.js) before the AI answers,
+// a voice message is turned into text (lib/voice.js), and the AI can send product photos (services/photos.js).
 // The AI never decides prices, delivery fees or totals: those come from the database (services/orders.js).
 const { Product, Organization, Order } = require("../models");
 const vision = require("./vision");
+const voice = require("../lib/voice");
+const photos = require("./photos");
 const { STATUS_LABEL } = require("./orders");
 const { blockedReason } = require("./account");
 const { askAI, aiReady } = require("../lib/ai");
@@ -58,7 +61,7 @@ function productLines(products) {
     const offerText = offer ? ` | OFFER: ${offerLabel(offer)}${offer.until ? ` until ${new Date(offer.until).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Dhaka" })}` : ""}` : "";
     // the shop's own details, in its own words (warranty, fabric, RAM…)
     const details = [...(p.info || []).filter((i) => i.value).map((i) => (i.label ? `${i.label}: ${i.value}` : i.value)), p.description].filter(Boolean).join("; ").replace(/\s+/g, " ").slice(0, 600);
-    return `${p._id} | ${p.name}${p.nameBn ? " / " + p.nameBn : ""} | ${variants}${offerText}${details ? ` | details: ${details}` : ""}`;
+    return `${p._id} | ${p.name}${p.nameBn ? " / " + p.nameBn : ""} | ${variants}${offerText}${details ? ` | details: ${details}` : ""}${p.imageUrl ? " | photo: yes" : ""}`;
   }).join("\n");
 }
 
@@ -115,7 +118,7 @@ async function knowledgeFor(org, settings, recentText, draft) {
   return { text, products: all };
 }
 
-const ANSWER_SHAPE = `{"reply":"","intent":"question|order|confirm|change|handoff|other","confidence":0,"needsHuman":false,"handoffReason":"","draft":{"items":[{"productId":"","variantId":"","qty":1}],"name":"","phone":"","address":"","district":""},"readyToConfirm":false}`;
+const ANSWER_SHAPE = `{"reply":"","intent":"question|order|confirm|change|handoff|other","confidence":0,"needsHuman":false,"handoffReason":"","draft":{"items":[{"productId":"","variantId":"","qty":1}],"name":"","phone":"","address":"","district":""},"readyToConfirm":false,"photos":["productId"]}`;
 
 // The customer's recent orders (for "where is my order?") and the details of the last one (returning customer)
 async function customerHistory(org, conv) {
@@ -159,6 +162,7 @@ RULES
 - A message like "[Customer sent a photo: …]" is a photo described by the system: answer about that product as if they had asked about it.
 - If the customer asks about an order they already placed (status, when it arrives), answer from CUSTOMER'S ORDERS ("To call" means the shop will call to confirm it). Never invent dates or tracking. To cancel or change a placed order set needsHuman=true.
 - If RETURNING CUSTOMER details are given and the draft already has them, don't ask for name, phone or address again: say you'll send it to the same address and they can change it in the summary.
+- PHOTOS: products marked "photo: yes" have a photo the system can send. When the customer asks to see a product (ছবি, pic, photo, দেখান) or asks about one specific product for the first time, put its productId in "photos" (max 3) and say the photo is below (e.g. "ছবি নিচে দিলাম 👇"). Never send the same photo twice in a row. If they want a photo of a product without "photo: yes", say a team member will send it and set needsHuman=true with handoffReason "wants a photo of <product>".
 Return JSON only: ${ANSWER_SHAPE}`;
   const known = history.known ? `RETURNING CUSTOMER (from their last order): ${history.known.name}, ${history.known.phone}, ${history.known.address}, ${history.known.district || ""}` : "";
   const user = [k.text, ordersText(history.orders), known, `CURRENT DRAFT: ${JSON.stringify(currentDraft)}`, `CHAT SO FAR:\n${chat || "(new chat)"}`, `CUSTOMER (latest): ${latestText}`].filter(Boolean).join("\n\n");
@@ -284,7 +288,7 @@ async function confirmOrder(org, conv, settings) {
 
 // Main entry: the customer's message is already added to conv.messages. Caller saves conv.
 // options = { images: [photo links / data URLs] } when the customer sent photos
-async function handleCustomerMessage(org, conv, text, { images = [], captions = [] } = {}) {
+async function handleCustomerMessage(org, conv, text, { images = [], captions = [], audios = [] } = {}) {
   const settings = await aiSettings(org);
   conv.lastCustomerAt = new Date();
   conv.unread = (conv.unread || 0) + 1;
@@ -293,6 +297,7 @@ async function handleCustomerMessage(org, conv, text, { images = [], captions = 
 
   const d = conv.draft || { items: [], status: "collecting" };
   const plain = String(text || "").replace(/[^\p{L}\p{M}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim(); // drop emoji and dots
+  let ownWords = ATTACHMENT_ONLY.test(String(text || "").trim()) ? "" : String(text || ""); // what the customer said (not our note about an attachment)
 
   if (d.status === "awaiting_confirm" && (CONFIRM_WORDS.test(plain) || text === BUTTONS[0])) return confirmOrder(org, conv, settings);
   if (d.status === "awaiting_confirm" && (CHANGE_WORDS.test(plain) || text === BUTTONS[1])) {
@@ -302,8 +307,15 @@ async function handleCustomerMessage(org, conv, text, { images = [], captions = 
   // A photo: a vision model says what it shows, then the AI answers as if the customer had typed it.
   // A shared post / reel / story, a sticker or a voice message: see attachmentText() above.
   if (ATTACHMENT_ONLY.test(String(text || "").trim())) {
-    const seen = images.length ? await lookAtPhoto(org, images[0]).catch(() => null) : null;
-    if (seen) {
+    // A voice message: turned into text, then answered like a typed message (the chat shows "🎤 what they said")
+    const heard = audios.length ? await voice.transcribe(audios[0]).catch((e) => { console.warn("voice:", e.message); return null; }) : null;
+    const seen = !heard && images.length ? await lookAtPhoto(org, images[0]).catch(() => null) : null;
+    if (heard) {
+      const said = [...conv.messages].reverse().find((m) => m.from === "customer");
+      if (said) said.text = `🎤 ${heard}`;
+      conv.lastMessage = `🎤 ${heard}`.slice(0, 200);
+      text = ownWords = heard;
+    } else if (seen) {
       messenger.addMessage(conv, "system", `📷 AI saw: ${seen.text}${seen.productName ? ` (looks like ${seen.productName})` : ""}`);
       text = `[Customer sent a photo: ${seen.text}${seen.productName ? `. It looks like our product "${seen.productName}"` : ""}]`;
     } else text = attachmentText(String(text).trim(), captions);
@@ -344,6 +356,19 @@ async function handleCustomerMessage(org, conv, text, { images = [], captions = 
     if (noStock) return messenger.reply(org, conv, "ai", `দুঃখিত, ${noStock.replace("stock for ", "")} এখন যথেষ্ট স্টকে নেই। অন্য কোনোটা দেখাব?`);
   }
   await messenger.reply(org, conv, "ai", answer.reply || settings.ai.handoffMessage, optionButtons(draft, products));
+  await sendProductPhotos(org, conv, products, answer, ownWords, draft);
+}
+
+// Product photos after the reply: the ones the AI chose, or (customer asked for a photo) the products in the order so far.
+// Max 3, and not a photo that was sent in the last hour unless the customer asks again.
+const PHOTO_WORDS = /ছবি|ফটো|দেখান|দেখাও|chobi|chobe|\bpic|picture|photo|dekhan|dekhao/i;
+async function sendProductPhotos(org, conv, products, answer, text, draft) {
+  const asked = PHOTO_WORDS.test(text);
+  let ids = (Array.isArray(answer.photos) ? answer.photos : []).map(String).filter(Boolean);
+  if (!ids.length && asked) ids = (draft.items || []).map((i) => i.productId);
+  const recent = new Set(conv.messages.filter((m) => m.image && m.from !== "customer" && Date.now() - new Date(m.at || 0) < 3600e3).map((m) => m.image));
+  const list = [...new Set(ids)].map((id) => products.find((p) => p._id === id)).filter((p) => p?.imageUrl && (asked || !recent.has(p.imageUrl))).slice(0, 3);
+  for (const p of list) await messenger.replyPhoto(org, conv, "ai", { image: p.imageUrl, publicUrl: photos.publicPhotoUrl(p.imageUrl), caption: `📷 ${p.name}` });
 }
 
 // The AI is asking which size/colour/option: offer the options that can be ordered as buttons (max 11)

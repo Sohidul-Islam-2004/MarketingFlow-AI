@@ -3,7 +3,7 @@
 import { get, post } from "../api.js";
 import { esc, taka, onAction, liveSearch, chips, toast, icon } from "../ui.js";
 import { productForm, adjustForm, offerForAll } from "../pages/inventory.js";
-import { row, letter, fab, searchBox, actionSheet } from "./kit.js";
+import { row, thumb, fab, searchBox, actionSheet } from "./kit.js";
 
 const filters = { q: "", show: "" };
 let products = [];
@@ -47,7 +47,7 @@ async function draw(root) {
       <button type="button" class="m-icon-btn" data-action="offerAll" title="Offer for all products">${icon("tag")}</button>
     </div>
     <div class="m-list">${products.map((p) => row({
-      action: "open", id: p._id, lead: letter(p.name), title: esc(p.name), sub: stockText(p),
+      action: "open", id: p._id, lead: thumb(p.imageUrl, p.name), title: esc(p.name), sub: stockText(p),
       side: p.offerOn ? `<b>${taka(p.salePrice)}</b><small><s>${taka(p.price)}</s></small>` : `<b>${taka(p.price)}</b>${p.lowStock ? `<small class="st st-low">Low</small>` : ""}`,
     })).join("") || `<p class="m-empty">${all.length ? "Nothing here." : "No products yet. Add what you sell: the AI only talks about products that are here."}</p>`}</div>
     ${fab("add", "Add product")}

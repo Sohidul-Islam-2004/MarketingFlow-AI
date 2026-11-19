@@ -173,8 +173,9 @@ export function closeModal() {
 }
 document.addEventListener("DOMContentLoaded", () => {
   $("#modalClose").onclick = closeModal;
-  $("#modal").addEventListener("close", () => { if (history.state?.sheet) history.back(); }); // remove the "Back closes it" step
-  window.addEventListener("popstate", () => { if ($("#modal").open) closeModal(); });
+  // Remove the "Back closes it" step when the pop-up closes, unless another pop-up opened right away (e.g. action sheet -> form)
+  $("#modal").addEventListener("close", () => setTimeout(() => { if (!$("#modal").open && history.state?.sheet) history.back(); }, 0));
+  window.addEventListener("popstate", () => { if ($("#modal").open && !history.state?.sheet) closeModal(); });
   $("#modalForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!submitHandler) return closeModal();
@@ -214,6 +215,7 @@ const ICONS = {
   chats: '<path d="M21 11.5a8.4 8.4 0 0 1-12.2 7.5L3 21l2-5.6A8.4 8.4 0 1 1 21 11.5z"/><path d="M8 11h.01M12 11h.01M16 11h.01"/>',
   more: '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
   chevron: '<path d="m9 6 6 6-6 6"/>',
+  camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
   phone: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',

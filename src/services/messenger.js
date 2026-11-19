@@ -12,7 +12,7 @@ const canReply = (conv) => isSimulator(conv) || (!!conv.lastCustomerAt && Date.n
 
 // Adds a message to the conversation (keeps the last 300)
 function addMessage(conv, from, text, extra = {}) {
-  conv.messages.push({ from, text: String(text || "").slice(0, 4000) || "(empty)", ...extra });
+  conv.messages.push({ from, text: String(text || "").slice(0, 4000) || "(empty)", at: new Date(), ...extra });
   if (conv.messages.length > 300) conv.messages.splice(0, conv.messages.length - 300);
   if (from !== "system") conv.lastMessage = String(text).slice(0, 200);
   return conv.messages[conv.messages.length - 1];
@@ -31,6 +31,16 @@ async function sendText(org, conv, text, quickReplies = []) {
   const page = await pageOf(org, conv.pageId);
   const message = { text: String(text).slice(0, conv.channel === "Instagram" ? 1000 : 2000) };
   if (quickReplies.length) message.quick_replies = quickReplies.map((t) => ({ content_type: "text", title: t.slice(0, 20), payload: t }));
+  return graph(`/${page.accountId}/messages`, { token: decrypt(page.accessToken), method: "POST", body: { recipient: { id: conv.psid }, messaging_type: "RESPONSE", message } });
+}
+
+// Sends a photo. url must be a public https address (Facebook / Instagram download it from there).
+async function sendImage(org, conv, url) {
+  if (isSimulator(conv)) return {};
+  if (!canReply(conv)) throw fail(400, "The 24-hour reply window is closed. Meta only lets you answer after the customer messages again.");
+  if (!/^https:\/\//.test(url || "")) throw fail(400, "Photos can only be sent when the site has a public https address (PUBLIC_BASE_URL in .env)");
+  const page = await pageOf(org, conv.pageId);
+  const message = { attachment: { type: "image", payload: { url, ...(conv.channel === "Instagram" ? {} : { is_reusable: true }) } } };
   return graph(`/${page.accountId}/messages`, { token: decrypt(page.accessToken), method: "POST", body: { recipient: { id: conv.psid }, messaging_type: "RESPONSE", message } });
 }
 
@@ -58,6 +68,19 @@ async function reply(org, conv, from, text, quickReplies = []) {
   return msg;
 }
 
+// A photo from the AI or the shop: saved in the chat even if sending fails (the error is shown in the inbox).
+// image = the path the Inbox shows ("/photos/x"), publicUrl = the address Facebook downloads.
+async function replyPhoto(org, conv, from, { image, publicUrl, caption = "📷 Photo" }) {
+  const msg = addMessage(conv, from, caption, { image });
+  try {
+    const r = await sendImage(org, conv, publicUrl);
+    msg.mid = r.message_id || null;
+  } catch (e) {
+    msg.error = e.message;
+  }
+  return msg;
+}
+
 // Messages from the same customer are handled one at a time (no double replies)
 const queues = new Map();
 function oneAtATime(key, task) {
@@ -67,4 +90,4 @@ function oneAtATime(key, task) {
   return run;
 }
 
-module.exports = { isSimulator, canReply, addMessage, pageOf, sendText, reply, showTyping, oneAtATime };
+module.exports = { isSimulator, canReply, addMessage, pageOf, sendText, sendImage, reply, replyPhoto, showTyping, oneAtATime };

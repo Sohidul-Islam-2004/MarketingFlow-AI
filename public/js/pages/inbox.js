@@ -2,8 +2,9 @@
 // Refreshes every 5 seconds while the page is open (the server answers "nothing new" when nothing changed).
 // On a phone you see one part at a time: chat list -> chat -> order.
 import { get, post, put, del } from "../api.js";
-import { esc, taka, dateTime, shortTime, onAction, openModal, toast, orderPill, $, confirmBox, debounce, icon, loading, options } from "../ui.js";
+import { esc, taka, dateTime, shortTime, onAction, openModal, closeModal, toast, orderPill, $, confirmBox, debounce, icon, loading, options } from "../ui.js";
 import { itemRow, readItems, districtList } from "../shared.js";
+import { pickPhoto, shrinkPhoto } from "../photo.js";
 import { updateCounts } from "../app.js";
 
 const state = { tab: "open", q: "", openId: null, chat: null };
@@ -46,6 +47,7 @@ export async function render(root, params) {
       refreshAll();
     },
     simulate: () => startSimulator(),
+    photo: () => sendPhoto(state.openId),
   });
   $("#search").addEventListener("input", debounce((e) => { state.q = e.target.value; drawList(); }));
   root.addEventListener("change", (e) => {
@@ -116,7 +118,7 @@ async function drawChat(quiet = false) {
         ? `<textarea id="replyBox" placeholder="Type as the CUSTOMER to test the AI… (Enter to send)"></textarea>
            <label class="btn light" title="Send a photo as the customer">📷<input type="file" id="simPhoto" accept="image/*" hidden></label><button class="btn" data-action="send">Send</button>`
         : `<textarea id="replyBox" placeholder="${c.canReply ? "Write a reply… (Enter to send). The AI pauses while you reply." : "The 24-hour reply window is closed. Wait for the customer to message again."}" ${c.canReply ? "" : "disabled"}></textarea>
-           <button class="btn light" data-action="suggest" title="AI writes a reply for you">✨</button><button class="btn" data-action="send" ${c.canReply ? "" : "disabled"}>Send</button>`}
+           <button class="btn light" data-action="photo" title="Send a photo" ${c.canReply ? "" : "disabled"}>📷</button><button class="btn light" data-action="suggest" title="AI writes a reply for you">✨</button><button class="btn" data-action="send" ${c.canReply ? "" : "disabled"}>Send</button>`}
     </div>`;
   $("#replyBox").value = typing;
   $("#messages").scrollTop = atBottom ? 1e9 : oldScroll; // stay where you were reading unless you were at the end
@@ -128,7 +130,7 @@ function bubble(m, simulator, i) {
   const who = { customer: "Customer", ai: "AI", agent: "You", system: "" }[m.from];
   const photo = m.image ? `<a href="${esc(m.image)}" target="_blank" rel="noopener"><img class="msg-photo" src="${esc(m.image)}" alt="photo" onerror="this.replaceWith('📷 photo (link expired)')"></a>` : "";
   const buttons = m.buttons?.length ? `<div class="quick">${m.buttons.map((b) => `<button type="button" class="quick-btn" ${simulator ? `data-action="quick" data-text="${esc(b)}"` : "disabled"}>${esc(b)}</button>`).join("")}</div>` : "";
-  return `<div class="bubble ${m.from}">${photo}${m.image && /^\[image/.test(m.text) ? "" : esc(m.text)}${m.error ? `<div class="error">Not delivered: ${esc(m.error)}</div>` : ""}${buttons}<small>${who} ${dateTime(m.at)}${m.from === "agent" ? ` · <a href="#" class="teach-link" data-action="teach" data-i="${i}">🧠 Teach AI</a>` : ""}</small></div>`;
+  return `<div class="bubble ${m.from}">${photo}${m.image && /^\[image/.test(m.text) ? "" : esc(m.text)}${m.error ? `<div class="error">Not delivered: ${esc(m.error)}</div>` : ""}${buttons}<small>${who} ${dateTime(m.at)}${m.from === "agent" && !m.image ? ` · <a href="#" class="teach-link" data-action="teach" data-i="${i}">🧠 Teach AI</a>` : ""}</small></div>`;
 }
 
 // The shop answered something the AI didn't know: save the question + answer so the AI answers it next time
@@ -143,6 +145,23 @@ function teachAI(i) {
       <div class="mt"><label>Customer's question</label><input name="question" value="${esc(question)}"></div>
       <div class="mt"><label>The right answer</label><textarea name="answer" rows="4">${esc(answer)}</textarea></div>`,
     onSubmit: async (f) => { await post("/api/settings/teach", f); toast("The AI learned it ✅"); },
+  });
+}
+
+// The shop sends a photo: tap a product's photo, or upload one from this phone / computer
+async function sendPhoto(id) {
+  const products = (await get("/api/products")).filter((p) => p.imageUrl);
+  const body = openModal({
+    title: "Send a photo", buttons: [],
+    body: `${products.length ? `<p class="small muted">Tap a product to send its photo.</p>
+        <div class="photo-grid mt">${products.map((p) => `<button type="button" class="photo-pick" data-action="pick" data-id="${p._id}"><img src="${esc(p.imageUrl)}" alt="" loading="lazy"><span>${esc(p.name)}</span></button>`).join("")}</div>`
+        : `<p class="small muted">Add photos to your products (Products → Edit) to send them with one tap. The AI sends them too.</p>`}
+      <button type="button" class="btn light full mt" data-action="upload">📷 Upload a photo from this device</button>`,
+  });
+  const send = async (data) => { await post(`/api/inbox/${id}/photo`, data); closeModal(); toast("Photo sent"); state.chat = null; await refreshAll(); };
+  onAction(body, {
+    pick: (el) => send({ productId: el.dataset.id }),
+    upload: async () => { const file = await pickPhoto(); if (file) await send({ image: await shrinkPhoto(file) }); },
   });
 }
 

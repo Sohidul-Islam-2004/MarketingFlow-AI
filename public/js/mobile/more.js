@@ -3,6 +3,7 @@ import { post } from "../api.js";
 import { esc, onAction, confirmBox } from "../ui.js";
 import { session } from "../app.js";
 import { row, leadIcon, title } from "./kit.js";
+import { drawAlertsBox } from "../alerts.js";
 
 export async function render(root) {
   onAction(root, {
@@ -16,6 +17,8 @@ export async function render(root) {
       <span class="m-avatar">${esc((me.user.name || "?")[0].toUpperCase())}</span>
       <span class="m-main"><b>${esc(me.user.name)}</b><small>${esc(me.business || "")}${me.user.email ? ` · ${esc(me.user.email)}` : ""}</small></span>
     </div>
+
+    <div class="alerts-box mt" id="alertsBox"></div>
 
     ${title("Shop")}
     <div class="m-list">
@@ -39,4 +42,5 @@ export async function render(root) {
     <div class="m-list mt">${row({ action: "logout", lead: leadIcon("logout", "red"), title: "Log out", chevron: false, cls: "danger" })}</div>
     <p class="m-foot">MarketingFlow AI</p>
   </div>`;
+  drawAlertsBox(root.querySelector("#alertsBox"));
 }

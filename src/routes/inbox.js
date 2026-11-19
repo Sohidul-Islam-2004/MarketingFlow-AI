@@ -6,6 +6,7 @@ const { handle, fail } = require("../lib/errors");
 const { escapeRegex } = require("../lib/utils");
 const messenger = require("../services/messenger");
 const agent = require("../services/agent");
+const photos = require("../services/photos");
 
 const listRow = (c) => ({
   _id: c._id, customerName: c.customerName, avatar: c.avatar, channel: c.channel, lastMessage: c.lastMessage, status: c.status,
@@ -60,6 +61,29 @@ router.post("/:id/reply", handle(async (req, res) => {
     if (fresh.status !== "open") fresh.status = "open";
     await fresh.save();
   });
+  res.json({ ok: true });
+}));
+
+// The shop sends a photo: { productId } = that product's photo, or { image: "data:image/jpeg;base64,..." } from the phone
+router.post("/:id/photo", handle(async (req, res) => {
+  const c = await findConversation(req);
+  let image, caption = "📷 Photo";
+  if (req.body.productId) {
+    const p = await Product.findOne({ _id: req.body.productId, organizationId: req.org }).select("name imageUrl").lean();
+    if (!p?.imageUrl) throw fail(400, "This product has no photo yet. Add one in Products.");
+    image = p.imageUrl; caption = `📷 ${p.name}`;
+  } else image = await photos.savePhoto(req.org, req.body.image, { kind: "chat" });
+  if (!messenger.isSimulator(c) && !photos.publicPhotoUrl(image)) throw fail(400, "Photos can only be sent when the site has a public https address (PUBLIC_BASE_URL in .env)");
+  let error = null;
+  await messenger.oneAtATime(`${req.org}:${c.psid}`, async () => {
+    const fresh = await Conversation.findById(c._id);
+    const msg = await messenger.replyPhoto(req.org, fresh, "agent", { image, publicUrl: photos.publicPhotoUrl(image), caption });
+    error = msg.error;
+    fresh.aiPaused = true;
+    if (fresh.status !== "open") fresh.status = "open";
+    await fresh.save();
+  });
+  if (error) throw fail(400, error);
   res.json({ ok: true });
 }));
 

@@ -7,6 +7,7 @@
 import { get, post } from "./api.js";
 import { $, esc, icon, toast, openModal, dateTime, loading } from "./ui.js";
 import { applyTheme } from "./theme.js";
+import { startAlerts, drawAlertsBox } from "./alerts.js";
 
 applyTheme(); // the shop's colours (Setup → Look), before anything is drawn
 
@@ -173,10 +174,12 @@ async function showNotifications() {
   const body = openModal({
     title: "Notifications",
     buttons: n.unread ? [["read", "Mark all as read"]] : [],
-    body: n.rows.length ? n.rows.map((x) => `<div class="notif ${x.read ? "" : "unread"}" data-view="${esc(x.view || "")}"><b>${esc(x.title)}</b><div class="small muted">${esc(x.message)} · ${dateTime(x.createdAt)}</div></div>`).join("") : `<p class="muted">No notifications yet.</p>`,
+    body: `<div class="alerts-box" id="alertsBox"></div>` +
+      (n.rows.length ? n.rows.map((x) => `<div class="notif ${x.read ? "" : "unread"}" data-view="${esc(x.view || "")}"><b>${esc(x.title)}</b><div class="small muted">${esc(x.message)} · ${dateTime(x.createdAt)}</div></div>`).join("") : `<p class="muted">No notifications yet.</p>`),
     onSubmit: async () => { await post("/api/notifications/read"); refreshCounts(); },
   });
   body.querySelectorAll("[data-view]").forEach((el) => (el.onclick = () => { if (el.dataset.view) location.hash = el.dataset.view; $("#modal").close(); }));
+  drawAlertsBox(body.querySelector("#alertsBox")); // "Turn on alerts" for this phone / computer
 }
 
 /* ---------- pages ---------- */
@@ -248,6 +251,7 @@ window.addEventListener("hashchange", showPage);
   if (me.blocked) return showBlocked(me);
   if (me.user.isAdmin) SHOW_ADMIN = true;
   session.me = me;
+  startAlerts();
   $("#auth").classList.add("hidden");
   $("#app").classList.remove("hidden");
   $("#logo").innerHTML = icon("send");

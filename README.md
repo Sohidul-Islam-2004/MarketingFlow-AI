@@ -87,6 +87,14 @@ Every change is saved in StockMovement ("History" on the Inventory page).
 2. The AI answers using only your products and the "Shop knowledge" text, and fills the order draft.
 3. When the draft is complete, the bot sends a summary with Confirm / Change buttons.
 4. "Confirm" creates the order. The AI never calculates prices and never gives discounts.
+5. Photos: products can have one photo (Products → Edit). The AI sends it when a customer asks ("ছবি দেন"), and the shop
+   can send product photos or a photo from the phone with 📷 in Chats (`src/services/photos.js`, served at `/photos/<id>`).
+   Sending photos needs `PUBLIC_BASE_URL` (Facebook downloads them from your site).
+6. Voice messages are turned into text with the AI service's speech model (`src/lib/voice.js`), then answered like typed ones.
+
+**Alerts on phones / computers** (`src/services/push.js`, `public/sw.js`, `public/js/alerts.js`): every bell notification
+(new AI order, chat needs a person, complaint, failed post) also goes to the devices that pressed "Turn on alerts"
+(bell → Turn on alerts, or More on a phone). iPhone: add MarketingFlow to the Home Screen first.
 
 **Comments** (`src/services/comments.js`):
 - Each comment gets a category: price, stock, size, delivery, order, complaint, praise, spam or other.

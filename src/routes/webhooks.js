@@ -99,6 +99,7 @@ async function onMessage(page, event, { channel = "Messenger", ownId = page.acco
   if (!(await firstTime(`msg:${msg?.mid || `${event.timestamp}:${psid}`}`))) return;
   const images = (msg?.attachments || []).filter((a) => a.type === "image" && a.payload?.url).map((a) => a.payload.url); // the AI can look at photos
   const captions = (msg?.attachments || []).map((a) => a.payload?.title || a.title).filter(Boolean); // caption of a shared post / reel
+  const audios = (msg?.attachments || []).filter((a) => a.type === "audio" && a.payload?.url).map((a) => a.payload.url); // voice messages: turned into text
 
   await messenger.oneAtATime(`${org}:${psid}`, async () => {
     let conv = await Conversation.findOne({ organizationId: org, psid });
@@ -107,7 +108,7 @@ async function onMessage(page, event, { channel = "Messenger", ownId = page.acco
       conv = new Conversation({ organizationId: org, psid, channel, pageId: page.accountId, customerName: profile.name, avatar: profile.avatar });
     }
     messenger.addMessage(conv, "customer", text, { mid: msg?.mid || null, image: images[0] || null });
-    await agent.handleCustomerMessage(org, conv, text, { images, captions });
+    await agent.handleCustomerMessage(org, conv, text, { images, captions, audios });
     await conv.save();
   });
 }

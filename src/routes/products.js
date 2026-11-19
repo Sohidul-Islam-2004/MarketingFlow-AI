@@ -6,6 +6,7 @@ const { escapeRegex } = require("../lib/utils");
 const { newId } = require("../models/_base");
 const stock = require("../services/stock");
 const { activeOffer, cleanOffer } = require("../lib/offer");
+const photos = require("../services/photos");
 
 const REASONS = ["restock", "damage", "correction", "return"];
 
@@ -100,8 +101,24 @@ router.post("/:id/archive", handle(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// The product's photo: { image: "data:image/jpeg;base64,..." } (made small in the browser). The AI sends it in chats.
+router.post("/:id/photo", handle(async (req, res) => {
+  res.json({ imageUrl: await photos.setProductPhoto(req.org, req.params.id, req.body.image) });
+}));
+
+router.delete("/:id/photo", handle(async (req, res) => {
+  const product = await Product.findOne({ _id: req.params.id, organizationId: req.org });
+  if (!product) throw fail(404, "Product not found");
+  await photos.removeProductPhoto(req.org, product);
+  product.imageUrl = "";
+  await product.save();
+  res.json({ ok: true });
+}));
+
 router.delete("/:id", handle(async (req, res) => {
   if (await Order.exists({ organizationId: req.org, "items.productId": req.params.id })) throw fail(400, "This product is on orders. Archive it instead.");
+  const product = await Product.findOne({ _id: req.params.id, organizationId: req.org });
+  if (product) await photos.removeProductPhoto(req.org, product);
   await Product.deleteOne({ _id: req.params.id, organizationId: req.org });
   await StockMovement.deleteMany({ organizationId: req.org, productId: req.params.id });
   res.json({ ok: true });

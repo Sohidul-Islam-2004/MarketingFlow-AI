@@ -214,7 +214,7 @@ async function startPostOffer(item) {
   o.appliedAt = new Date();
   item.markModified("offer");
   const label = o.kind === "amount" ? `৳${o.value} off` : `${o.value}% off`;
-  await notify(item.organizationId, `Offer started: ${label}`, `${o.all ? "All products" : `${r.modifiedCount ?? o.productIds.length} product(s)`} now show the offer price. The AI tells customers about it.`, "inventory");
+  await notify(item.organizationId, `Offer started: ${label}`, `${o.all ? "All products" : `${r.modifiedCount ?? o.productIds.length} product(s)`} now show the offer price. The AI tells customers about it.`, "inventory", { push: false }); // the shop started it: no phone alert
 }
 
 // Picks scheduled posts one by one. The lock stops two servers publishing the same post.

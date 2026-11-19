@@ -5,6 +5,8 @@ import { esc, icon, openModal, closeModal, onAction, taka, ORDER_STATUS } from "
 // A soft colour from a name, so every customer/product letter looks a little different
 const hue = (text) => [...String(text || "?")].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
 export const letter = (name) => `<span class="m-lead" style="--h:${hue(name)}">${esc(String(name || "?").trim()[0] || "?").toUpperCase()}</span>`;
+// The product's photo (or its first letter when it has none)
+export const thumb = (url, name) => (url ? `<span class="m-lead pic"><img src="${esc(url)}" alt="" loading="lazy"></span>` : letter(name));
 export const leadIcon = (name, tone = "accent") => `<span class="m-lead icon tone-${tone}">${icon(name)}</span>`;
 
 // One tappable row: [lead] title / sub ........ side  ›

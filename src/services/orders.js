@@ -2,8 +2,8 @@
 const { Order, Product, Organization, Counter, Conversation } = require("../models");
 const { fail } = require("../lib/errors");
 const { normalizePhone, isValidPhone, taka, DAY } = require("../lib/utils");
-const { findZone, canonicalDistrict } = require("../lib/places");
 const { notify } = require("../lib/notify");
+const { findZone, canonicalDistrict } = require("../lib/places");
 const stock = require("./stock");
 const messenger = require("./messenger");
 
@@ -110,6 +110,10 @@ async function createOrder(org, input, by) {
       notes: String(input.notes || "").slice(0, 1000),
       history: [{ status, by, note: double ? `Order created · ⚠️ maybe the same as #${double.orderNo}` : "Order created" }],
     });
+    // An order the shop didn't type in itself (AI chat, comment): tell the shop at once, so it can call the customer
+    if (order.source !== "manual") {
+      await notify(org, `🛒 New order #${orderNo} · ${taka(order.total)}`, `${customerName}: ${order.items.map((i) => `${i.name}${i.variantName ? ` (${i.variantName})` : ""} ×${i.qty}`).join(", ")}${status === "pending" ? ". Call to confirm." : ""}`, status === "pending" ? "orders?status=pending" : "orders");
+    }
     return order;
   } catch (e) {
     for (const r of reserved) await stock.release(org, r, orderNo);

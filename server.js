@@ -23,6 +23,7 @@ app.use(express.json({ limit: "2mb", verify: (req, _res, buf) => { req.rawBody =
 // Public: dashboard files, uploaded media (Meta downloads it), legal pages, webhooks
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads"), { maxAge: "7d" }));
+app.get("/photos/:id", (req, res) => require("./src/services/photos").servePhoto(req, res)); // product + chat photos (Meta downloads them)
 app.use(require("./src/routes/legal"));
 app.use("/webhooks/meta", require("./src/routes/webhooks"));
 app.use("/api/auth", require("./src/routes/auth"));
@@ -46,6 +47,7 @@ app.use("/api/accounts", meta.router);
 app.use("/api/learn", require("./src/routes/learn"));
 app.use("/api/admin", requireAdmin, require("./src/routes/admin")); // Super Admin only
 app.use("/api/settings", require("./src/routes/settings"));
+app.use("/api/push", require("./src/routes/push")); // phone / computer alerts
 app.use("/api", (req, res) => res.status(404).json({ error: `Unknown API: ${req.method} ${req.originalUrl}` }));
 
 connectDB()
