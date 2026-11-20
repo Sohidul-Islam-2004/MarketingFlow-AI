@@ -16,9 +16,12 @@ function parseJSON(text) {
 
 // images: data: URLs or https links, sent with the user message (needs a model that can see: AI.VISION_MODEL)
 // baseUrl / apiKey: another AI service (the photo model can be on Gemini while chats run on Groq)
-async function askAI({ system, user, temperature = 0.5, maxTokens = 1500, images = [], model = AI.MODEL, baseUrl = AI.BASE_URL, apiKey = AI.API_KEY }) {
+// audio: { data: base64, format: "mp4" | "mp3" | "ogg" | "wav"… } for models that can listen (Gemini)
+async function askAI({ system, user, temperature = 0.5, maxTokens = 1500, images = [], audio = null, model = AI.MODEL, baseUrl = AI.BASE_URL, apiKey = AI.API_KEY }) {
   if (!apiKey && !/localhost|127\.0\.0\.1/.test(baseUrl)) throw fail(503, "AI is not set up. Add AI_API_KEY to .env");
-  const content = images.length ? [{ type: "text", text: user }, ...images.map((url) => ({ type: "image_url", image_url: { url } }))] : user;
+  const content = images.length || audio
+    ? [{ type: "text", text: user }, ...images.map((url) => ({ type: "image_url", image_url: { url } })), ...(audio ? [{ type: "input_audio", input_audio: audio }] : [])]
+    : user;
   const body = {
     model, temperature, max_tokens: maxTokens,
     response_format: { type: "json_object" },

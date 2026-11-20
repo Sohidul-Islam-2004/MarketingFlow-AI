@@ -85,7 +85,9 @@ async function onMessage(page, event, { channel = "Messenger", ownId = page.acco
       const conv = await Conversation.findOne({ organizationId: org, psid });
       if (!conv) return;
       if (msg.mid && conv.messages.some((m) => m.mid === msg.mid)) return; // we sent it (we keep the id of every message we send)
-      messenger.addMessage(conv, "agent", msg.text || "[attachment]", { mid: msg.mid });
+      const photo = (msg.attachments || []).find((a) => a.type === "image" && a.payload?.url)?.payload.url;
+      const other = (msg.attachments || []).find((a) => a.type !== "image")?.type;
+      messenger.addMessage(conv, "agent", msg.text || (photo ? "📷 Photo" : `📎 ${other || "attachment"}`), { mid: msg.mid, ...(photo ? { image: photo } : {}) });
       conv.aiPaused = true;
       await conv.save();
     });

@@ -38,7 +38,7 @@ async function draw(root) {
   root.innerHTML = `
     <div class="page-head"><div><h1>Comments</h1><p>The AI answers buying questions with your real prices. Complaints wait for you here.</p></div>
       <button class="btn light" data-action="simulate">✨ Test a comment</button></div>
-    <div class="mb">${chips(TABS.map(([k, l]) => [k, l, k === "needs_you" ? data.needsYou : null]), tab, "tab")}</div>
+    <div class="mb">${chips(TABS.map(([k, l]) => [k, l, k === "needs_you" && data.needsYou ? data.needsYou : null]), tab, "tab")}</div>
     <div class="stack">${rows.map(card).join("") || `<div class="card"><div class="empty"><b>Nothing here</b>New comments on your Page posts show up within seconds.</div></div>`}</div>`;
 }
 

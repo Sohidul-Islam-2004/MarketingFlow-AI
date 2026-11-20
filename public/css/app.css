@@ -240,7 +240,8 @@ dialog::backdrop { background: rgba(16,24,40,.45); backdrop-filter: blur(3px); }
 .bubble.system { align-self: center; background: none; color: var(--muted); font-size: 12px; padding: 2px; box-shadow: none; }
 .bubble .error { color: var(--red); font-size: 11px; }
 .composer { border-top: 1px solid var(--line); padding: 12px; display: flex; gap: 8px; align-items: flex-end; background: var(--card); }
-.composer textarea { resize: none; height: 44px; }
+.composer textarea { resize: none; height: 44px; max-height: 130px; line-height: 1.4; }
+.composer textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side-panel { border-left: 1px solid var(--line); padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background: var(--card); }
 .typing { display: flex; gap: 4px; padding: 12px 14px; }
 .typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: blink 1.2s infinite; }
@@ -574,3 +575,9 @@ input.switch:focus-visible { box-shadow: 0 0 0 4px var(--accent-soft); }
 .stuck-item { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
 .stuck-q { font-weight: 600; color: var(--ink); margin-bottom: 2px; }
 .stuck-a { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--card); font-size: 13.5px; white-space: pre-wrap; }
+
+/* Chats: a small composer (icon buttons, Send) */
+.composer .icon-btn { width: 42px; padding: 0; justify-content: center; flex: none; }
+.composer .send-btn { flex: none; }
+.composer .send-btn .i { display: none; }
+.thread-head .more-menu summary { width: 32px; height: 32px; font-size: 17px; border-radius: 8px; }

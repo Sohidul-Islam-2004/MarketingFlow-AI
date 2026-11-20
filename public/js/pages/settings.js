@@ -3,9 +3,10 @@ import { get, put, post } from "../api.js";
 import { esc, onAction, toast, options, readForm, confirmBox } from "../ui.js";
 
 let tab = "ai";
-const TABS = [["ai", "AI"], ["comments", "Comments"], ["zones", "Delivery fees"], ["profile", "Business"], ["password", "Password"]];
+const TABS = [["ai", "AI"], ["comments", "Comments"], ["zones", "Delivery"], ["profile", "Shop"], ["password", "Password"]];
 
-export async function render(root) {
+export async function render(root, params = {}) {
+  if (TABS.some(([k]) => k === params.tab)) tab = params.tab; // #settings?tab=zones
   onAction(root, {
     tab: (el) => { tab = el.dataset.tab; draw(root); },
     save: async (el) => {

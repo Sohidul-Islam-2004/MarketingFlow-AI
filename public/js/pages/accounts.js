@@ -4,6 +4,7 @@
 //   /api/meta/connect?with=instagram  -> same login, also asks for Instagram and saves the linked account
 import { get, post, put, del } from "../api.js";
 import { esc, dateTime, onAction, toast, pill, table, confirmBox, $ } from "../ui.js";
+import { isPhone } from "../app.js";
 
 let showForm = false;
 
@@ -56,11 +57,13 @@ async function draw(root, justConnected) {
         ${canConnect ? `<a class="btn ${pages.length ? "light" : ""}" href="/api/meta/connect">${pages.length ? "Add another Page" : "Connect Facebook"}</a>` : ""}</div></div>
     ${justConnected ? `<div class="card good-card"><b>Connected. Next: train the AI on your shop.</b><p class="small muted">It reads this Page and your website and learns your delivery, payment and return rules.</p><a class="btn mt" href="#train">Train the AI →</a></div>` : ""}
 
-    <div class="card">
+    ${isPhone()
+      ? (canConnect ? "" : `<div class="note">Connecting needs a Meta app first. Set it up once from a computer (Facebook & Instagram page), then connect here.</div>`) // the long app set-up is for a computer
+      : `<div class="card">
       <h3>Meta app</h3>
       ${appStatus(app)}
       ${formOpen ? appForm(app) : ""}
-    </div>
+    </div>`}
 
     <div class="card">
       <h3>Connected Page</h3>
@@ -70,10 +73,10 @@ async function draw(root, justConnected) {
         ["Messages & comments", (a) => (a.webhooksOn ? pill("On", "green") : pill("Off", "red"))],
         ["Last message from Facebook", (a) => (a.lastWebhookAt ? dateTime(a.lastWebhookAt) : `<span class="small muted">none yet</span>`)],
         ["", (a) => `<button class="btn sm danger" data-action="remove" data-platform="Facebook" data-id="${a._id}">Disconnect</button>`],
-      ], pages, { emptyText: canConnect ? "No Page connected yet. Press Connect Facebook, log in, and tick the Page you sell from." : "First add your Meta app above." })}
+      ], pages, { emptyText: canConnect ? "No Page connected yet. Press Connect Facebook, log in, and tick the Page you sell from." : isPhone() ? "No Page connected yet." : "First add your Meta app above." })}
     </div>
     ${pages.length ? instagramCard(instagram) : ""}
-    <div class="card"><h3>If messages don't arrive</h3><ol class="small" style="padding-left:18px;line-height:1.9">
+    <div class="card help-card"><h3>If messages don't arrive</h3><ol class="small" style="padding-left:18px;line-height:1.9">
       <li>Press <b>Check connection</b>. "Messages & comments" must say <b>On</b>, and Status must say <b>Working</b>.</li>
       <li>Send your Page a message from another Facebook account. "Last message from Facebook" should show the time within a few seconds.</li>
       ${app.own ? `<li>Using your own app: in developers.facebook.com check that the <b>Messenger</b> product is added and the app is not restricted.</li>` : ""}

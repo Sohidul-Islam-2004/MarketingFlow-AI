@@ -287,3 +287,38 @@ body:has(.inbox.show-chat) .tabbar { display: none; }
 .todo { grid-template-columns: 1fr 1fr; }
 .side-menu-card { display: none; } /* Look: a phone has no side menu */
 .m-screen:has(.m-fab) { padding-bottom: 76px; } /* the last row is not hidden behind the "+" button */
+
+/* ---------- 7. phone clean-up: only what matters, nothing wider than the screen ---------- */
+/* Chats / Comments: the test buttons live on the AI Training page */
+#page .page-head:has([data-action="simulate"]) { display: none; }
+/* the chat list without a box inside a box */
+.inbox { background: transparent; border: 0; box-shadow: none; border-radius: 0; }
+.inbox:not(.show-chat) .chats { background: transparent; }
+.chats .filters { padding: 0 0 12px; display: grid; gap: 10px; }
+.chats .filters .tabs { margin: 0; }
+.chats .filters input { background: var(--card) !important; border: 1px solid var(--line); }
+.chat-list { background: var(--card); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+.chat-list:has(> .empty) { background: transparent; border: 0; }
+.inbox.show-chat .thread { background: var(--bg); }
+/* an open chat: name + 3 small buttons, a compact composer */
+.thread-head > .row:last-child { overflow: visible; }
+.composer { gap: 8px; align-items: flex-end; }
+.composer textarea { flex: 1; min-width: 0; }
+.composer .icon-btn { width: 46px; min-height: 46px; border-radius: 50%; font-size: 18px; }
+.composer .send-btn { width: 46px; min-height: 46px; padding: 0; border-radius: 50%; justify-content: center; }
+.composer .send-btn span { display: none; }
+.composer .send-btn .i { display: block; width: 20px; height: 20px; }
+/* Posts: buttons side by side, filters under the title */
+.writer-foot { display: grid; gap: 10px; }
+.writer-foot .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.writer-foot .btn { width: 100%; justify-content: center; padding: 0 10px; }
+.posts-card > .row.between { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.posts-card > .row.between > * { min-width: 0; }
+.posts-card .chips { justify-content: flex-start; margin-right: 0; padding-right: 0; }
+.versions { grid-template-columns: 1fr; }
+/* Facebook & Instagram: the help list is for a computer */
+.help-card { display: none; }
+/* product form: label + value + remove on one line */
+.info-row { grid-template-columns: 1fr 1.3fr 40px !important; gap: 6px !important; }
+/* Settings: all 5 tabs fit on a small phone */
+#page .tabs:has([data-tab="password"]) .tab { padding-left: 9px; padding-right: 9px; font-size: 13.5px; }

@@ -11,7 +11,8 @@ let data = null; // last answer of GET /api/learn
 
 export async function render(page) {
   // top: questions the AI got stuck on this week; below: reading the Page and website
-  page.innerHTML = `<div class="page-head"><div><h1>AI Training</h1><p>Teach the AI what it didn't know, and let it read your Facebook Page and website. You check everything before it is used.</p></div></div>
+  page.innerHTML = `<div class="page-head"><div><h1>AI Training</h1><p>Teach the AI what it didn't know, and let it read your Facebook Page and website. You check everything before it is used.</p></div>
+      <a class="btn light" href="#inbox?simulate=1">✨ Test the AI</a></div>
     <div id="stuckBox"></div><div id="trainMain"></div>`;
   const root = page.querySelector("#trainMain");
   drawStuck(page.querySelector("#stuckBox")).catch(() => {});

@@ -1,8 +1,8 @@
 // Phone · Products: search, All · Low stock · On offer, tap a product for Edit / Stock / Archive.
 // The forms are the same as on a computer (pages/inventory.js).
 import { get, post } from "../api.js";
-import { esc, taka, onAction, liveSearch, chips, toast, icon } from "../ui.js";
-import { productForm, adjustForm, offerForAll } from "../pages/inventory.js";
+import { esc, taka, onAction, liveSearch, chips, toast } from "../ui.js";
+import { productForm, adjustForm } from "../pages/inventory.js";
 import { row, thumb, fab, searchBox, actionSheet } from "./kit.js";
 
 const filters = { q: "", show: "" };
@@ -14,7 +14,6 @@ export async function render(root, params) {
   onAction(root, {
     filter: (el) => { filters.show = el.dataset.value; draw(root); },
     add: () => productForm(null, refresh),
-    offerAll: () => offerForAll(refresh),
     open: (el) => {
       const p = products.find((x) => x._id === el.dataset.id);
       actionSheet(p.name, [
@@ -44,7 +43,6 @@ async function draw(root) {
     ${searchBox(filters.q, "Search products")}
     <div class="m-toolbar">
       ${chips([["", "All", all.length || null], ["low", "Low stock", all.filter(show.low).length || null], ["offer", "On offer", all.filter(show.offer).length || null]], filters.show, "filter")}
-      <button type="button" class="m-icon-btn" data-action="offerAll" title="Offer for all products">${icon("tag")}</button>
     </div>
     <div class="m-list">${products.map((p) => row({
       action: "open", id: p._id, lead: thumb(p.imageUrl, p.name), title: esc(p.name), sub: stockText(p),

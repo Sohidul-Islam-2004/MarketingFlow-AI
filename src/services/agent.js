@@ -314,7 +314,8 @@ async function handleCustomerMessage(org, conv, text, { images = [], captions = 
   // A shared post / reel / story, a sticker or a voice message: see attachmentText() above.
   if (ATTACHMENT_ONLY.test(String(text || "").trim())) {
     // A voice message: turned into text, then answered like a typed message (the chat shows "🎤 what they said")
-    const heard = audios.length ? await voice.transcribe(audios[0]).catch((e) => { console.warn("voice:", e.message); return null; }) : null;
+    const names = audios.length ? (await Product.find({ organizationId: org, archived: { $ne: true } }).select("name").limit(40).lean()).map((p) => p.name).join(", ") : "";
+    const heard = audios.length ? await voice.transcribe(audios[0], names).catch((e) => { console.warn("voice:", e.message); return null; }) : null;
     const seen = !heard && images.length ? await lookAtPhoto(org, images[0]).catch((e) => { console.warn("photo:", e.message); return null; }) : null;
     if (heard) {
       const said = [...conv.messages].reverse().find((m) => m.from === "customer");

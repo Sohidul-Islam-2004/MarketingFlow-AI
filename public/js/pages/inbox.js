@@ -2,7 +2,7 @@
 // Refreshes every 5 seconds while the page is open (the server answers "nothing new" when nothing changed).
 // On a phone you see one part at a time: chat list -> chat -> order.
 import { get, post, put, del } from "../api.js";
-import { esc, taka, dateTime, shortTime, onAction, openModal, closeModal, toast, orderPill, $, confirmBox, debounce, icon, loading, options } from "../ui.js";
+import { esc, taka, dateTime, shortTime, onAction, openModal, closeModal, toast, orderPill, $, confirmBox, debounce, icon, loading, options, moreMenu } from "../ui.js";
 import { itemRow, readItems, districtList } from "../shared.js";
 import { pickPhoto, shrinkPhoto } from "../photo.js";
 import { updateCounts } from "../app.js";
@@ -55,6 +55,8 @@ export async function render(root, params) {
     sendTestPhoto(e.target.files[0]).catch((err) => toast(err.message, true));
     e.target.value = "";
   });
+  // the reply box grows with the text (up to ~5 lines)
+  root.addEventListener("input", (e) => { if (e.target.id !== "replyBox") return; const t = e.target; t.style.height = "44px"; t.style.height = Math.min(t.scrollHeight + 2, 130) + "px"; });
   root.addEventListener("keydown", (e) => { if (e.target.id === "replyBox" && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply().catch((err) => toast(err.message, true)); } });
 
   await refreshAll();
@@ -75,7 +77,7 @@ async function refreshAll(quiet = false) {
 async function drawList() {
   const data = await get(`/api/inbox?tab=${state.tab}&q=${encodeURIComponent(state.q)}`);
   if (!$("#chatList")) return; // you left the page
-  $("#tabs").innerHTML = [["open", "Open"], ["needs_human", `Needs you (${data.needsHuman})`], ["closed", "Closed"]]
+  $("#tabs").innerHTML = [["open", "Open"], ["needs_human", `Needs you${data.needsHuman ? ` (${data.needsHuman})` : ""}`], ["closed", "Closed"]]
     .map(([k, l]) => `<button class="tab ${state.tab === k ? "on" : ""}" data-action="tab" data-tab="${k}">${l}</button>`).join("");
   // like a messaging app: name and time, the last message, then who is answering
   $("#chatList").innerHTML = data.rows.map((c) => `
@@ -109,16 +111,15 @@ async function drawChat(quiet = false) {
       ${c.status === "needs_human" ? `<div class="small" style="color:var(--red)">Needs you: ${esc(c.handoffReason || "")}</div>` : ""}</div></div>
       <div class="row">
         <button class="btn sm light order-btn" data-action="toggleOrder">🧾 Order${c.draft?.items?.length && c.draft.status !== "placed" ? " •" : ""}</button>
-        <button class="btn sm ${c.aiPaused ? "" : "light"}" data-action="aiToggle">${c.aiPaused ? "🤖 Turn AI on" : "✋ Take over (AI off)"}</button>
-        <button class="btn sm light" data-action="closeChat">${c.status === "closed" ? "Reopen" : "Close chat"}</button>
-        ${c.simulator ? `<button class="btn sm danger" data-action="deleteChat">Delete</button>` : ""}</div></div>
+        <button class="btn sm ${c.aiPaused ? "" : "light"}" data-action="aiToggle">${c.aiPaused ? "🤖 Turn AI on" : "✋ Take over"}</button>
+        ${moreMenu(`<button type="button" class="menu-item" data-action="closeChat">${c.status === "closed" ? "Reopen chat" : "Close chat"}</button>${c.simulator ? `<button type="button" class="menu-item danger" data-action="deleteChat">Delete test chat</button>` : ""}`)}</div></div>
     <div class="messages" id="messages">${c.messages.map((m, i) => bubble(m, c.simulator, i)).join("")}</div>
     <div class="composer">
       ${c.simulator
-        ? `<textarea id="replyBox" placeholder="Type as the CUSTOMER to test the AI… (Enter to send)"></textarea>
-           <label class="btn light" title="Send a photo as the customer">📷<input type="file" id="simPhoto" accept="image/*" hidden></label><button class="btn" data-action="send">Send</button>`
-        : `<textarea id="replyBox" placeholder="${c.canReply ? "Write a reply… (Enter to send). The AI pauses while you reply." : "The 24-hour reply window is closed. Wait for the customer to message again."}" ${c.canReply ? "" : "disabled"}></textarea>
-           <button class="btn light" data-action="photo" title="Send a photo" ${c.canReply ? "" : "disabled"}>📷</button><button class="btn light" data-action="suggest" title="AI writes a reply for you">✨</button><button class="btn" data-action="send" ${c.canReply ? "" : "disabled"}>Send</button>`}
+        ? `<textarea id="replyBox" rows="1" placeholder="Write as the customer…"></textarea>
+           <label class="btn light icon-btn" title="Send a photo as the customer">📷<input type="file" id="simPhoto" accept="image/*" hidden></label><button class="btn send-btn" data-action="send" title="Send">${icon("send")}<span>Send</span></button>`
+        : `<textarea id="replyBox" rows="1" placeholder="${c.canReply ? "Write a reply… (the AI pauses)" : "24 hours passed: wait for the customer to write"}" ${c.canReply ? "" : "disabled"}></textarea>
+           <button class="btn light icon-btn" data-action="photo" title="Send a photo" ${c.canReply ? "" : "disabled"}>📷</button><button class="btn light icon-btn" data-action="suggest" title="AI writes a reply for you">✨</button><button class="btn send-btn" data-action="send" title="Send" ${c.canReply ? "" : "disabled"}>${icon("send")}<span>Send</span></button>`}
     </div>`;
   $("#replyBox").value = typing;
   $("#messages").scrollTop = atBottom ? 1e9 : oldScroll; // stay where you were reading unless you were at the end
@@ -197,7 +198,7 @@ async function sendReply() {
   const box = $("#replyBox");
   const text = box.value.trim();
   if (!text) return;
-  box.value = "";
+  box.value = ""; box.style.height = "";
   try {
     if (state.chat.simulator) {
       box.placeholder = "AI is typing…";
