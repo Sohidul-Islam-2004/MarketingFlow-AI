@@ -322,3 +322,10 @@ body:has(.inbox.show-chat) .tabbar { display: none; }
 .info-row { grid-template-columns: 1fr 1.3fr 40px !important; gap: 6px !important; }
 /* Settings: all 5 tabs fit on a small phone */
 #page .tabs:has([data-tab="password"]) .tab { padding-left: 9px; padding-right: 9px; font-size: 13.5px; }
+/* product form on a phone: photo beside name + price, sections full width */
+.pf-top { grid-template-columns: 84px 1fr; gap: 12px; }
+.pf-top .photo-box { width: 84px; height: 84px; }
+.pf-two { gap: 8px; }
+.pf-sec .offer-row { grid-template-columns: 1fr 1fr; }
+.pf-sec .offer-row > div:last-child { grid-column: 1 / -1; }
+.variant-row { grid-template-columns: 1.3fr 1fr .9fr 36px !important; gap: 6px !important; }

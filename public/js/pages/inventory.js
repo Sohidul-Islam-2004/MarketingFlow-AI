@@ -78,9 +78,9 @@ const infoRow = (i = {}, n = 0) => `<div class="pf-row info-row">
 
 const variantRow = (v = {}) => `<div class="pf-row variant-row">
   <input type="hidden" name="vid[]" value="${esc(v._id || "")}">
-  <input name="vname[]" placeholder="M, Red, 8/128GB…" value="${esc(v.name && v.name !== "Default" ? v.name : "")}">
-  <input type="number" name="vprice[]" placeholder="Own price" title="Leave empty to use the product price" value="${v.price ?? ""}">
-  ${v._id ? `<input class="stock-box" disabled value="${v.onHand} in stock" title="Use Stock +/− to change">` : `<input class="stock-box" type="number" name="vstock[]" placeholder="Stock" min="0">`}
+  <input name="vname[]" placeholder="52, Black, 8/128GB…" value="${esc(v.name && v.name !== "Default" ? v.name : "")}">
+  <input type="number" name="vprice[]" placeholder="Own ৳" title="Leave empty to use the product price" value="${v.price ?? ""}">
+  ${v._id ? `<input class="stock-box" disabled value="${v.onHand} pcs" title="Use Stock +/− to change">` : `<input class="stock-box" type="number" name="vstock[]" placeholder="Stock" min="0">`}
   <button type="button" class="btn sm light" data-action="removeRow" title="Remove">×</button></div>`;
 
 /* ---------- offers ---------- */
@@ -120,39 +120,54 @@ const LABEL_IDEAS = ["Brand", "Model", "Warranty", "Fabric", "Size chart", "Colo
 // The photo box at the top of the product form
 const photoBox = (url) => (url ? `<img src="${esc(url)}" alt="">` : `<span>${icon("camera")}</span>`);
 
+// A section that opens on tap; closed it shows a one-line summary
+const section = (key, title, summary, inner, open) => `<details class="pf-sec" data-sec="${key}" ${open ? "open" : ""}>
+  <summary><b>${title}</b><span class="pf-sum">${summary}</span></summary><div class="pf-sec-body">${inner}</div></details>`;
+
 export function productForm(p, refresh) {
   let newPhoto = null; // "data:image/jpeg;base64,…" chosen in this form
   let dropPhoto = false;
+  const first = p?.variants?.[0];
+  const named = (p?.variants || []).filter((v) => v.name && v.name !== "Default");
+  const info = (p?.info || []).filter((i) => i.label || i.value);
+  const offer = p?.offerOn ? p.offer : null;
   const body = openModal({
     title: p ? `Edit ${p.name}` : "Add product", wide: true,
-    body: `<div class="pf-photo"><div class="photo-box" id="photoBox">${photoBox(p?.imageUrl)}</div>
-        <div><b>Photo</b><p class="small muted">The AI sends it when a customer asks "ছবি দেন". One clear photo is enough.</p>
-          <div class="row mt"><button type="button" class="btn sm light" data-action="choosePhoto">${p?.imageUrl ? "Change photo" : "+ Add photo"}</button>
-          <button type="button" class="btn sm light" data-action="dropPhoto" ${p?.imageUrl ? "" : "hidden"}>Remove</button></div></div></div>
-      <div class="pf-main mt"><div><label>Product name</label><input name="name" required placeholder="e.g. Cotton Panjabi, Redmi 13, Honey" value="${esc(p?.name || "")}"></div>
-        <div><label>Price (৳)</label><input type="number" name="price" min="0" required value="${p?.price ?? ""}"></div></div>
+    body: `<div class="pf-top">
+        <button type="button" class="photo-box" id="photoBox" data-action="choosePhoto" title="Add or change the photo">${photoBox(p?.imageUrl)}</button>
+        <div class="pf-fields">
+          <div><label>Product name</label><input name="name" required placeholder="e.g. IQRA Abaya, Redmi 13, Honey" value="${esc(p?.name || "")}"></div>
+          <div class="pf-two">
+            <div><label>Price (৳)</label><input type="number" name="price" min="0" required value="${p?.price ?? ""}"></div>
+            <div class="simple-stock" ${named.length ? "hidden" : ""}><label>Stock</label>${p && first
+              ? `<input disabled value="${first.onHand} pcs" title="Change it with Stock +/−">`
+              : `<input type="number" name="simpleStock" min="0" placeholder="e.g. 10">`}</div>
+          </div>
+        </div></div>
+      <div class="row pf-photo-links"><button type="button" class="link" data-action="choosePhoto">${p?.imageUrl ? "Change photo" : "+ Add photo"}</button>
+        <button type="button" class="link danger" data-action="dropPhoto" ${p?.imageUrl ? "" : "hidden"}>Remove photo</button></div>
+      <label class="switch-row pf-always"><span><b>Always available</b><small>Pre-order or made to order: stock is not counted</small></span>
+        <input type="checkbox" class="switch" name="alwaysAvailable" ${p?.alwaysAvailable ? "checked" : ""}></label>
 
-      <h4 class="mt">Details <span class="small muted">(optional, write anything customers ask about)</span></h4>
-      <div id="infoRows">${(p?.info?.length ? p.info : [{}, {}]).map(infoRow).join("")}</div>
-      <datalist id="infoLabels">${LABEL_IDEAS.map((l) => `<option value="${l}">`).join("")}</datalist>
-      <button type="button" class="btn sm light mt" data-action="addInfo">+ Add detail</button>
-
-      <h4 class="mt">Options and stock</h4>
-      <p class="small muted">Sizes, colours, models, weights… "Own price" only if it costs more or less. Only one kind? Leave the name empty.</p>
-      <div id="variants">${(p?.variants || [{}]).map(variantRow).join("")}</div>
-      <button type="button" class="btn sm light mt" data-action="addVariant">+ Add option</button>
-      <label class="check small mt"><input type="checkbox" name="alwaysAvailable" ${p?.alwaysAvailable ? "checked" : ""}> Always available (pre-order or made to order, don't count stock)</label>
-
-      <h4 class="mt">🏷️ Offer <span class="small muted">(optional, leave "How much" empty for no offer)</span></h4>
-      ${p?.offerEnded ? `<p class="small muted">The last offer has ended.</p>` : ""}
-      <div class="mt">${offerFields(p?.offerOn ? p.offer : null)}</div>
-
-      <div class="mt"><label>Anything else the AI should know <span class="small muted">(optional)</span></label><textarea name="description" rows="2" placeholder="e.g. Original product, box with charger, ready in 3-5 days">${esc(p?.description || "")}</textarea></div>`,
+      ${section("options", "Sizes / colours", named.length ? esc(named.map((v) => v.name).join(", ")) : "None · tap to add",
+        `<p class="small muted">Each size or colour with its own stock. "Own ৳" only if it costs more or less than the main price.</p>
+         <div id="variants">${named.map(variantRow).join("")}</div>
+         <button type="button" class="btn sm light mt" data-action="addVariant">+ Add size / colour</button>`)}
+      ${section("offer", "🏷️ Offer", offer ? offerText(offer) + (offer.until ? ` · until ${untilText(offer.until)}` : "") : p?.offerEnded ? "Ended · tap to start a new one" : "No offer",
+        `${offerFields(offer)}<p class="small muted mt">Leave "How much" empty for no offer.</p>`)}
+      ${section("details", "📝 Details for the AI", info.length || p?.description ? esc([...info.map((i) => `${i.label}: ${i.value}`), p?.description || ""].filter(Boolean).join(" · ").slice(0, 70)) : "Fabric, size chart, warranty… · optional",
+        `<div id="infoRows">${(info.length ? info : [{}]).map(infoRow).join("")}</div>
+         <datalist id="infoLabels">${LABEL_IDEAS.map((l) => `<option value="${l}">`).join("")}</datalist>
+         <button type="button" class="btn sm light mt" data-action="addInfo">+ Add detail</button>
+         <div class="mt"><label>Anything else the AI should know</label><textarea name="description" rows="2" placeholder="e.g. Free size, fits 50-56. Ready in 3-5 days.">${esc(p?.description || "")}</textarea></div>`)}`,
     onSubmit: async (d) => {
       const list = (x) => [].concat(x ?? []);
       let stockIndex = 0; // only new rows have a stock box
       const ids = list(d.vid), names = list(d.vname), prices = list(d.vprice), stocks = list(d.vstock);
-      const variants = ids.map((id, i) => ({ id: id || undefined, name: names[i], price: prices[i], stock: id ? undefined : stocks[stockIndex++] }));
+      let variants = ids.map((id, i) => ({ id: id || undefined, name: names[i], price: prices[i], stock: id ? undefined : stocks[stockIndex++] }))
+        .filter((v) => String(v.name || "").trim());
+      // no sizes / colours: one kind, with the stock from the top
+      if (!variants.length) variants = [{ id: first?._id, name: "", price: "", stock: first ? undefined : d.simpleStock }];
       const labels = list(d.ilabel), values = list(d.ivalue);
       const info = labels.map((label, i) => ({ label, value: values[i] }));
       const product = { name: d.name, price: d.price, description: d.description, info, variants, alwaysAvailable: !!d.alwaysAvailable, offer: offerFrom(d) };
@@ -165,32 +180,38 @@ export function productForm(p, refresh) {
     },
   });
   const always = body.querySelector("[name=alwaysAvailable]");
-  const showStock = () => body.querySelectorAll(".stock-box").forEach((b) => (b.style.visibility = always.checked ? "hidden" : ""));
+  const showStock = () => {
+    const hasOptions = body.querySelectorAll(".variant-row").length > 0;
+    body.querySelector(".simple-stock").hidden = hasOptions || always.checked;
+    body.querySelectorAll(".stock-box").forEach((b) => (b.style.visibility = always.checked ? "hidden" : ""));
+  };
   always.onchange = showStock;
   showStock();
   onAction(body, {
-    choosePhoto: async (el) => {
+    choosePhoto: async () => {
       const file = await pickPhoto();
       if (!file) return;
       newPhoto = await shrinkPhoto(file);
       dropPhoto = false;
       body.querySelector("#photoBox").innerHTML = photoBox(newPhoto);
-      el.textContent = "Change photo";
+      body.querySelector(".pf-photo-links [data-action=choosePhoto]").textContent = "Change photo";
       body.querySelector("[data-action=dropPhoto]").hidden = false;
     },
     dropPhoto: (el) => {
       newPhoto = null; dropPhoto = true;
       body.querySelector("#photoBox").innerHTML = photoBox(null);
-      body.querySelector("[data-action=choosePhoto]").textContent = "+ Add photo";
+      body.querySelector(".pf-photo-links [data-action=choosePhoto]").textContent = "+ Add photo";
       el.hidden = true;
     },
     addInfo: () => body.querySelector("#infoRows").insertAdjacentHTML("beforeend", infoRow({}, body.querySelectorAll(".info-row").length)),
-    addVariant: () => { body.querySelector("#variants").insertAdjacentHTML("beforeend", variantRow()); showStock(); },
-    removeRow: (el) => {
-      const row = el.closest(".pf-row");
-      if (row.classList.contains("variant-row") && body.querySelectorAll(".variant-row").length === 1) return; // keep at least one option
-      row.remove();
+    addVariant: () => {
+      // the first size of a product that had none keeps its stock (it becomes that size)
+      const reuse = !body.querySelector(".variant-row") && first && !named.length ? { ...first, name: "" } : {};
+      body.querySelector("#variants").insertAdjacentHTML("beforeend", variantRow(reuse));
+      body.querySelector("#variants .variant-row:last-child input[name='vname[]']").focus();
+      showStock();
     },
+    removeRow: (el) => { el.closest(".pf-row").remove(); showStock(); },
   });
 }
 

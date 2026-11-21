@@ -585,3 +585,26 @@ input.switch:focus-visible { box-shadow: 0 0 0 4px var(--accent-soft); }
 /* customer faces: a soft colour per customer, the photo on top when Facebook gives one */
 .face { position: relative; background: hsl(var(--h, 245) 70% 93%); color: hsl(var(--h, 245) 45% 38%); }
 .face img { position: absolute; inset: 0; }
+
+/* ---------- product form: the basics on top, the rest in small sections ---------- */
+.pf-top { display: grid; grid-template-columns: 112px 1fr; gap: 16px; align-items: start; }
+.pf-top .photo-box { width: 112px; height: 112px; cursor: pointer; padding: 0; }
+.pf-top .photo-box:hover { border-color: var(--purple); color: var(--purple); }
+.pf-fields { display: grid; gap: 12px; min-width: 0; }
+.pf-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pf-two input, .pf-fields input { min-width: 0; width: 100%; }
+.pf-photo-links { gap: 14px; margin: 8px 0 4px; }
+button.link { background: none; border: 0; padding: 0; color: var(--purple); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+button.link.danger { color: var(--red); }
+.pf-always { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; }
+.pf-sec { margin-top: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.pf-sec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 13px 14px; }
+.pf-sec > summary::-webkit-details-marker { display: none; }
+.pf-sec > summary::after { content: "›"; margin-left: auto; color: var(--faint); font-size: 20px; line-height: 1; transition: transform .15s; }
+.pf-sec[open] > summary::after { transform: rotate(90deg); }
+.pf-sec > summary b { flex: none; }
+.pf-sum { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pf-sec[open] .pf-sum { display: none; }
+.pf-sec-body { padding: 0 14px 14px; }
+.pf-sec .offer-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.pf-sec .variant-row:first-child { margin-top: 4px; }
