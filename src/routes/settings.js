@@ -5,6 +5,7 @@ const { handle, fail } = require("../lib/errors");
 const { toList } = require("../lib/utils");
 const { DEFAULT_ZONES, DISTRICT_NAMES, canonicalDistrict, findZone } = require("../lib/places");
 const { aiReady } = require("../lib/ai");
+const { setShopAI } = require("../services/aiSwitch");
 
 router.get("/", handle(async (req, res) => {
   const o = await Organization.findById(req.org).lean();
@@ -26,6 +27,11 @@ router.put("/profile", handle(async (req, res) => {
     orderPrefix: String(b.orderPrefix || "ORD-").replace(/[^A-Za-z0-9-]/g, "").slice(0, 10) || "ORD-",
   });
   res.json({ ok: true });
+}));
+
+// The "AI answers your customers" switch: on/off for every chat at once, saved the moment you flip it
+router.post("/ai/switch", handle(async (req, res) => {
+  res.json({ ok: true, ...(await setShopAI(req.org, !!req.body.on)) });
 }));
 
 router.put("/ai", handle(async (req, res) => {

@@ -73,6 +73,10 @@ async function refreshAll(quiet = false) {
   try { await drawChat(quiet); await drawList(); } catch (e) { if (!quiet && $("#inbox")) toast(e.message, true); }
 }
 
+// the same customer always gets the same colour
+const hue = (id) => [...String(id)].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) % 360, 7);
+const face = (c) => `<div class="face" style="--h:${hue(c._id)}">${c.avatar ? `<img src="${esc(c.avatar)}" alt="" onerror="this.remove()">` : ""}<span>${esc(c.customerName[0] || "?")}</span></div>`;
+
 /* ---------- left: chat list ---------- */
 async function drawList() {
   const data = await get(`/api/inbox?tab=${state.tab}&q=${encodeURIComponent(state.q)}`);
@@ -82,11 +86,11 @@ async function drawList() {
   // like a messaging app: name and time, the last message, then who is answering
   $("#chatList").innerHTML = data.rows.map((c) => `
     <div class="chat-row ${c._id === state.openId ? "on" : ""} ${c.unread ? "unread" : ""}" data-action="openChat" data-id="${c._id}">
-      <div class="face">${c.avatar ? `<img src="${esc(c.avatar)}" alt="">` : esc(c.customerName[0] || "?")}</div>
+      ${face(c)}
       <div class="who">
         <div class="who-top"><b>${esc(c.customerName)}</b><time>${shortTime(c.updatedAt)}</time></div>
         <div class="who-msg"><small>${esc(c.lastMessage)}</small>${c.unread ? `<span class="dot-count">${c.unread}</span>` : ""}</div>
-        <div class="who-tags"><span class="ch ch-${esc(String(c.channel).toLowerCase())}">${esc(c.channel === "Simulator" ? "Test chat" : c.channel)}</span>${c.status === "needs_human" ? `<span class="tag-red">Needs you</span>` : c.aiPaused ? `<span>AI off</span>` : `<span class="tag-ai">AI answering</span>`}${c.draftStatus === "placed" ? `<span class="tag-green">Ordered</span>` : ""}</div></div>
+        <div class="who-tags"><span class="ch ch-${esc(String(c.channel).toLowerCase())}">${esc(c.channel === "Simulator" ? "Test chat" : c.channel)}</span>${c.status === "needs_human" ? `<span class="tag-red">Needs you</span>` : !data.aiOn || c.aiPaused ? `<span>AI off</span>` : `<span class="tag-ai">AI answering</span>`}${c.draftStatus === "placed" ? `<span class="tag-green">Ordered</span>` : ""}</div></div>
     </div>`).join("") || `<div class="empty"><b>No chats here</b>New Messenger and Instagram messages appear here.</div>`;
 }
 
@@ -111,7 +115,9 @@ async function drawChat(quiet = false) {
       ${c.status === "needs_human" ? `<div class="small" style="color:var(--red)">Needs you: ${esc(c.handoffReason || "")}</div>` : ""}</div></div>
       <div class="row">
         <button class="btn sm light order-btn" data-action="toggleOrder">🧾 Order${c.draft?.items?.length && c.draft.status !== "placed" ? " •" : ""}</button>
-        <button class="btn sm ${c.aiPaused ? "" : "light"}" data-action="aiToggle">${c.aiPaused ? "🤖 Turn AI on" : "✋ Take over"}</button>
+        ${c.aiOn === false
+          ? `<a class="btn sm light" href="#settings?tab=ai" title="The AI is off for all chats">🤖 AI off · Settings</a>`
+          : `<button class="btn sm ${c.aiPaused ? "" : "light"}" data-action="aiToggle">${c.aiPaused ? "🤖 Turn AI on" : "✋ Take over"}</button>`}
         ${moreMenu(`<button type="button" class="menu-item" data-action="closeChat">${c.status === "closed" ? "Reopen chat" : "Close chat"}</button>${c.simulator ? `<button type="button" class="menu-item danger" data-action="deleteChat">Delete test chat</button>` : ""}`)}</div></div>
     <div class="messages" id="messages">${c.messages.map((m, i) => bubble(m, c.simulator, i)).join("")}</div>
     <div class="composer">

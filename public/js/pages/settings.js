@@ -26,6 +26,15 @@ export async function render(root, params = {}) {
       el.closest("form").querySelector("#testResult").textContent = `→ ${r.zone} · ৳${r.fee} · district: ${r.district || "unknown"} (matched by ${r.matched})`;
     },
   });
+  // "AI answers your customers": works the moment you flip it, for every chat
+  root.addEventListener("change", async (e) => {
+    if (tab !== "ai" || e.target.name !== "enabled") return;
+    const on = e.target.checked;
+    try {
+      const r = await post("/api/settings/ai/switch", { on });
+      toast(on ? `AI is on for all chats${r.chats ? ` (${r.chats} turned back on)` : ""}` : "AI is off for all chats");
+    } catch (err) { e.target.checked = !on; toast(err.message, true); }
+  });
   await draw(root);
 }
 
@@ -49,7 +58,7 @@ async function draw(root) {
   const advanced = (inner) => `<details class="advanced"><summary>More settings</summary><div class="stack">${inner}</div></details>`;
   const forms = {
     ai: `${s.ai.ready ? "" : `<div class="note">AI is not set up: add AI_API_KEY to .env and restart the server.</div>`}
-      <div>${toggle("enabled", s.ai.enabled, "AI answers your customers", "Messenger and Instagram chats, day and night")}
+      <div>${toggle("enabled", s.ai.enabled, "AI answers your customers", "On or off for every chat at once. Works right away.")}
       ${toggle("followUp", s.ai.followUp !== false, "Remind unfinished orders", "One friendly message 3 hours after a customer stopped in the middle of an order")}</div>
       <div><label>Delivery time (the AI tells customers this)</label><input name="deliveryTime" value="${esc(s.ai.deliveryTime)}" placeholder="Dhaka 1-2 days, outside Dhaka 3-5 days"></div>
       <div><label>Shop knowledge</label><p class="small muted" style="margin:-2px 0 8px">Return policy, size chart, opening hours, address, common questions. The AI only uses what is written here and your products. Answers you teach from a chat (🧠 Teach AI) are added here.</p><textarea name="knowledge" rows="10">${esc(s.ai.knowledge)}</textarea></div>

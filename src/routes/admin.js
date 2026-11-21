@@ -18,6 +18,7 @@ const { User, Organization, SocialAccount, Order, Conversation, Session, MediaAs
 const { handle, fail } = require("../lib/errors");
 const { DAY } = require("../lib/utils");
 const { blockedReason, passwordLink } = require("../services/account");
+const { setShopAI } = require("../services/aiSwitch");
 const { forgetSessions } = require("../middleware/auth");
 const { checkAllPages, disconnectPage } = require("./meta");
 
@@ -161,7 +162,7 @@ router.post("/pages/check", handle(async (req, res) => {
 router.post("/pages/:id/ai", handle(async (req, res) => {
   const page = await SocialAccount.findById(req.params.id).lean();
   if (!page) throw fail(404, "Page not found");
-  await Organization.updateOne({ _id: page.organizationId }, { $set: { "ai.enabled": !!req.body.on } });
+  await setShopAI(page.organizationId, !!req.body.on);
   res.json({ ok: true });
 }));
 

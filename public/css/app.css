@@ -581,3 +581,7 @@ input.switch:focus-visible { box-shadow: 0 0 0 4px var(--accent-soft); }
 .composer .send-btn { flex: none; }
 .composer .send-btn .i { display: none; }
 .thread-head .more-menu summary { width: 32px; height: 32px; font-size: 17px; border-radius: 8px; }
+
+/* customer faces: a soft colour per customer, the photo on top when Facebook gives one */
+.face { position: relative; background: hsl(var(--h, 245) 70% 93%); color: hsl(var(--h, 245) 45% 38%); }
+.face img { position: absolute; inset: 0; }

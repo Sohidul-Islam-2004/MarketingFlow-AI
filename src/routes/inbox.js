@@ -1,15 +1,19 @@
 // Customer inbox: chats, staff replies, AI on/off, order draft, and the test simulator.
 const router = require("express").Router();
 const crypto = require("crypto");
-const { Conversation, Order, Product } = require("../models");
+const { Conversation, Order, Product, Organization } = require("../models");
 const { handle, fail } = require("../lib/errors");
 const { escapeRegex } = require("../lib/utils");
 const messenger = require("../services/messenger");
 const agent = require("../services/agent");
 const photos = require("../services/photos");
 
+// Facebook gives names only after App Review, so a nameless customer gets the end of their id: "Customer 4821"
+const displayName = (c) => (c.customerName && c.customerName !== "Customer" ? c.customerName : `Customer ${String(c.psid || "").slice(-4)}`.trim());
+const shopAiOn = async (org) => (await Organization.findById(org).select("ai").lean())?.ai?.enabled !== false;
+
 const listRow = (c) => ({
-  _id: c._id, customerName: c.customerName, avatar: c.avatar, channel: c.channel, lastMessage: c.lastMessage, status: c.status,
+  _id: c._id, customerName: displayName(c), avatar: c.avatar, channel: c.channel, lastMessage: c.lastMessage, status: c.status,
   unread: c.unread, aiPaused: c.aiPaused, updatedAt: c.updatedAt, draftStatus: c.draft?.status || null, lastOrderNo: c.lastOrderNo,
 });
 
@@ -26,11 +30,12 @@ router.get("/", handle(async (req, res) => {
   if (tab === "needs_human") q.status = "needs_human";
   if (tab === "closed") q.status = "closed";
   if (req.query.q) { const re = new RegExp(escapeRegex(req.query.q), "i"); q.$or = [{ customerName: re }, { lastMessage: re }, { "draft.phone": re }]; }
-  const [rows, needsHuman] = await Promise.all([
+  const [rows, needsHuman, aiOn] = await Promise.all([
     Conversation.find(q).select("-messages").sort({ updatedAt: -1 }).limit(200).lean(),
     Conversation.countDocuments({ organizationId: req.org, status: "needs_human" }),
+    shopAiOn(req.org),
   ]);
-  res.json({ rows: rows.map(listRow), needsHuman });
+  res.json({ rows: rows.map(listRow), needsHuman, aiOn });
 }));
 
 router.get("/:id", handle(async (req, res) => {
@@ -42,7 +47,7 @@ router.get("/:id", handle(async (req, res) => {
   const draft = c.draft || { items: [] };
   const orders = await Order.find({ organizationId: req.org, $or: [{ conversationId: c._id }, ...(draft.phone ? [{ phone: draft.phone }] : [])] }).sort({ createdAt: -1 }).limit(5).lean();
   res.json({
-    ...c.toJSON(),
+    ...c.toJSON(), customerName: displayName(c), aiOn: await shopAiOn(req.org),
     canReply: messenger.canReply(c), simulator: messenger.isSimulator(c),
     totals: agent.draftTotal(draft), missing: draft.status === "placed" ? [] : agent.draftMissing(draft), orders,
   });
@@ -89,6 +94,7 @@ router.post("/:id/photo", handle(async (req, res) => {
 
 router.post("/:id/ai", handle(async (req, res) => {
   const c = await findConversation(req);
+  if (req.body.on && !(await shopAiOn(req.org))) throw fail(400, "The AI is off for all chats. Turn it on in Settings → AI.");
   c.aiPaused = !req.body.on;
   messenger.addMessage(c, "system", req.body.on ? `AI turned on by ${req.user.name}` : `${req.user.name} took over (AI off)`);
   if (req.body.on && c.status === "needs_human") { c.status = "open"; c.handoffReason = null; }

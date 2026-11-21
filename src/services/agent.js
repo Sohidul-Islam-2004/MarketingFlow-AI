@@ -191,7 +191,10 @@ function draftLine(products, item) {
 // Copies what the AI (or a staff member) filled in into conv.draft, then recalculates the delivery zone
 function updateDraft(conv, settings, products, input) {
   const d = { items: [], status: "collecting", version: 0, ...(conv.draft || {}) };
-  if (input.name && String(input.name).trim().length > 1) d.name = String(input.name).trim().slice(0, 100);
+  if (input.name && String(input.name).trim().length > 1) {
+    d.name = String(input.name).trim().slice(0, 100);
+    if (!conv.customerName || conv.customerName === "Customer") conv.customerName = d.name; // Facebook gave no name: use theirs
+  }
   if (input.address && String(input.address).trim().length > 3) d.address = String(input.address).trim().slice(0, 300);
   if (input.phone) { const p = normalizePhone(input.phone); if (p.length >= 11) d.phone = p; }
   if (input.district && canonicalDistrict(input.district)) d.district = canonicalDistrict(input.district);

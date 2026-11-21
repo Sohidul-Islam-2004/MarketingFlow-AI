@@ -58,17 +58,30 @@ async function handleEvents(body) {
   }
 }
 
+// Name + photo of the person. Facebook gives them only to apps with "Business Asset User Profile Access"
+// (App Review); before that it says no, and the chat shows "Customer 4821" until the customer tells their name.
 async function customerProfile(page, psid, channel) {
   try {
     if (channel === "Instagram") {
       const p = await graph(`/${psid}`, { token: decrypt(page.accessToken), params: { fields: "name,username,profile_pic" } });
-      return { name: p.name || (p.username ? `@${p.username}` : "Instagram customer"), avatar: p.profile_pic || null };
+      return { name: p.name || (p.username ? `@${p.username}` : null), avatar: p.profile_pic || null };
     }
     const p = await graph(`/${psid}`, { token: decrypt(page.accessToken), params: { fields: "first_name,last_name,profile_pic" } });
-    return { name: [p.first_name, p.last_name].filter(Boolean).join(" ") || "Customer", avatar: p.profile_pic || null };
-  } catch {
-    return { name: "Customer", avatar: null };
+    return { name: [p.first_name, p.last_name].filter(Boolean).join(" ") || null, avatar: p.profile_pic || null };
+  } catch (e) {
+    console.warn(`customer name (${channel}):`, e.message); // usually: App Review not done yet
+    return { name: null, avatar: null };
   }
+}
+
+// Ask again at most once a day while we only have "Customer"
+async function fillProfile(page, conv, channel) {
+  if (conv.customerName && conv.customerName !== "Customer" && conv.avatar) return;
+  if (conv.profileTriedAt && Date.now() - new Date(conv.profileTriedAt).getTime() < 24 * 3600 * 1000) return;
+  conv.profileTriedAt = new Date();
+  const p = await customerProfile(page, conv.psid, channel);
+  if (p.name && (!conv.customerName || conv.customerName === "Customer")) conv.customerName = p.name;
+  if (p.avatar) conv.avatar = p.avatar;
 }
 
 // channel = "Messenger" or "Instagram"; ownId = the Page id or the Instagram account id (to skip our own messages)
@@ -87,8 +100,13 @@ async function onMessage(page, event, { channel = "Messenger", ownId = page.acco
       if (msg.mid && conv.messages.some((m) => m.mid === msg.mid)) return; // we sent it (we keep the id of every message we send)
       const photo = (msg.attachments || []).find((a) => a.type === "image" && a.payload?.url)?.payload.url;
       const other = (msg.attachments || []).find((a) => a.type !== "image")?.type;
+      // A reply within seconds of the customer is automatic (Business Suite instant reply / away message,
+      // Meta's own AI): show it, but keep our AI on. A person typing takes longer: then the AI pauses.
+      const lastCustomer = [...conv.messages].reverse().find((m) => m.from === "customer");
+      const sentAt = Number(event.timestamp) || Date.now();
+      const automatic = lastCustomer?.at && sentAt - new Date(lastCustomer.at).getTime() < 15000;
       messenger.addMessage(conv, "agent", msg.text || (photo ? "📷 Photo" : `📎 ${other || "attachment"}`), { mid: msg.mid, ...(photo ? { image: photo } : {}) });
-      conv.aiPaused = true;
+      if (!automatic) conv.aiPaused = true;
       await conv.save();
     });
     return;
@@ -108,10 +126,8 @@ async function onMessage(page, event, { channel = "Messenger", ownId = page.acco
 
   await messenger.oneAtATime(`${org}:${psid}`, async () => {
     let conv = await Conversation.findOne({ organizationId: org, psid });
-    if (!conv) {
-      const profile = await customerProfile(page, psid, channel);
-      conv = new Conversation({ organizationId: org, psid, channel, pageId: page.accountId, customerName: profile.name, avatar: profile.avatar });
-    }
+    if (!conv) conv = new Conversation({ organizationId: org, psid, channel, pageId: page.accountId });
+    if (channel !== "Simulator") await fillProfile(page, conv, channel);
     messenger.addMessage(conv, "customer", text, { mid: msg?.mid || null, image: images[0] || null });
     await agent.handleCustomerMessage(org, conv, text, { images, captions, audios, shared });
     await conv.save();

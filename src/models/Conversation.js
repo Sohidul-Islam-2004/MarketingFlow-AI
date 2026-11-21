@@ -23,6 +23,7 @@ const conversationSchema = new Schema(
     channel: { type: String, default: "Messenger" }, // Messenger | Instagram | Simulator
     pageId: { type: String, default: null },
     customerName: { type: String, default: "Customer" },
+    profileTriedAt: { type: Date, default: null }, // last time we asked Facebook for the name (works after App Review)
     avatar: { type: String, default: null },
 
     status: { type: String, default: "open" }, // open | needs_human | closed
