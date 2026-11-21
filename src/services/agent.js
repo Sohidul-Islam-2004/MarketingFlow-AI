@@ -104,11 +104,11 @@ function relevantKnowledge(knowledge, recentText, budget = 3500) {
   return chosen.sort((a, b) => a.index - b.index).map((s) => s.body).join("\n\n");
 }
 
-async function knowledgeFor(org, settings, recentText, draft) {
+async function knowledgeFor(org, settings, recentText, draft, focusIds = []) {
   const all = await Product.find({ organizationId: org, archived: { $ne: true } }).lean();
   // Send the 40 products that best match the chat (and everything already in the draft)
   const words = normalizeText(recentText).split(" ").filter((w) => w.length > 1);
-  const inDraft = new Set((draft?.items || []).map((i) => i.productId));
+  const inDraft = new Set([...(draft?.items || []).map((i) => i.productId), ...(focusIds || []).map(String)]); // always sent
   const ranked = all
     .map((p) => ({ p, score: (inDraft.has(p._id) ? 100 : 0) + words.filter((w) => normalizeText(`${p.name} ${p.nameBn} ${p.category}`).includes(w)).length }))
     .sort((a, b) => b.score - a.score)
@@ -145,10 +145,12 @@ function ordersText(orders) {
 }
 
 async function askAgent(org, settings, conv, latestText, history = { orders: [], known: null }) {
-  const recent = conv.messages.filter((m) => m.from === "customer").slice(-6).map((m) => m.text).join(" ");
-  const k = await knowledgeFor(org, settings, `${recent} ${latestText}`, conv.draft);
-  const chat = conv.messages.slice(-16).filter((m) => m.from !== "system")
-    .map((m) => `${m.from === "customer" ? "CUSTOMER" : m.from === "agent" ? "SHOP STAFF" : "YOU"}: ${m.text}`).join("\n");
+  const photoNote = (m) => m.from === "system" && /^📷 AI saw:/.test(m.text || "");
+  const recent = conv.messages.filter((m) => m.from === "customer" || photoNote(m)).slice(-6).map((m) => m.text).join(" ");
+  const k = await knowledgeFor(org, settings, `${recent} ${latestText}`, conv.draft, conv.lastProductIds);
+  const chat = conv.messages.slice(-16).filter((m) => m.from !== "system" || photoNote(m))
+    .map((m) => (photoNote(m) ? `(THE CUSTOMER'S PHOTO SHOWED: ${m.text.replace(/^📷 AI saw:\s*/, "")})` : `${m.from === "customer" ? "CUSTOMER" : m.from === "agent" ? "SHOP STAFF" : "YOU"}: ${m.text}`)).join("\n");
+  const about = (conv.lastProductIds || []).map((id) => k.products.find((p) => p._id === String(id))).filter(Boolean);
   const d = conv.draft || {};
   const currentDraft = d.status === "placed" ? { items: [] } : { items: (d.items || []).map((i) => ({ productId: i.productId, variantId: i.variantId, qty: i.qty })), name: d.name || "", phone: d.phone || "", address: d.address || "", district: d.district || "" };
 
@@ -166,12 +168,13 @@ RULES
 - confidence: 0-100, how sure you are that your reply is correct.
 - When asking which size/colour/option, just ask: the system shows the options as buttons.
 - A message like "[Customer sent a photo: …]" is a photo described by the system: answer about that product as if they had asked about it.
+- If the customer wants to buy or asks about "this / it / eta" without naming a product, it is the product in "CHAT IS ABOUT" (or the one their photo showed). Ask which product only when that is empty.
 - If the customer asks about an order they already placed (status, when it arrives), answer from CUSTOMER'S ORDERS ("To call" means the shop will call to confirm it). Never invent dates or tracking. To cancel or change a placed order set needsHuman=true.
 - If RETURNING CUSTOMER details are given and the draft already has them, don't ask for name, phone or address again: say you'll send it to the same address and they can change it in the summary.
 - PHOTOS: products marked "photo: yes" have a photo the system can send. When the customer asks to see a product (ছবি, pic, photo, দেখান) or asks about one specific product for the first time, put its productId in "photos" (max 3) and say the photo is below (e.g. "ছবি নিচে দিলাম 👇"). Never send the same photo twice in a row. Never write that a photo is below unless you put its productId in "photos". If they want a photo of a product with "photo: no", say a team member will send it and set needsHuman=true with handoffReason "wants a photo of <product>".
 Return JSON only: ${ANSWER_SHAPE}`;
   const known = history.known ? `RETURNING CUSTOMER (from their last order): ${history.known.name}, ${history.known.phone}, ${history.known.address}, ${history.known.district || ""}` : "";
-  const user = [k.text, ordersText(history.orders), known, `CURRENT DRAFT: ${JSON.stringify(currentDraft)}`, `CHAT SO FAR:\n${chat || "(new chat)"}`, `CUSTOMER (latest): ${latestText}`].filter(Boolean).join("\n\n");
+  const user = [k.text, ordersText(history.orders), known, `CURRENT DRAFT: ${JSON.stringify(currentDraft)}`, about.length ? `CHAT IS ABOUT: ${about.map((p) => `${p.name} (productId ${p._id})`).join(", ")}` : "", `CHAT SO FAR:\n${chat || "(new chat)"}`, `CUSTOMER (latest): ${latestText}`].filter(Boolean).join("\n\n");
   const answer = await askAI({ system, user, temperature: 0.3, maxTokens: 900 });
   return { answer, products: k.products };
 }
@@ -313,13 +316,16 @@ async function handleCustomerMessage(org, conv, text, { images = [], captions = 
     conv.draft = { ...d, status: "collecting" }; conv.markModified("draft");
     return messenger.reply(org, conv, "ai", "অবশ্যই! কী পরিবর্তন করতে চান? পণ্য, সাইজ, পরিমাণ, নাম, ফোন নাকি ঠিকানা?");
   }
+  // A like (👍) or sticker: nothing to answer, except while an order waits for Confirm (the AI decides if it means yes)
+  if (/^\[sticker\]$/i.test(String(text || "").trim()) && d.status !== "awaiting_confirm") return;
   // A photo: a vision model says what it shows, then the AI answers as if the customer had typed it.
   // A shared post / reel / story, a sticker or a voice message: see attachmentText() above.
   if (ATTACHMENT_ONLY.test(String(text || "").trim())) {
     // A voice message: turned into text, then answered like a typed message (the chat shows "🎤 what they said")
     const names = audios.length ? (await Product.find({ organizationId: org, archived: { $ne: true } }).select("name").limit(40).lean()).map((p) => p.name).join(", ") : "";
     const heard = audios.length ? await voice.transcribe(audios[0], names).catch((e) => { console.warn("voice:", e.message); return null; }) : null;
-    const seen = !heard && images.length ? await lookAtPhoto(org, images[0]).catch((e) => { console.warn("photo:", e.message); return null; }) : null;
+    let photoError = "";
+    const seen = !heard && images.length ? await lookAtPhoto(org, images[0]).catch((e) => { console.warn("photo:", e.message); photoError = e.message; return null; }) : null;
     if (heard) {
       const said = [...conv.messages].reverse().find((m) => m.from === "customer");
       if (said) said.text = `🎤 ${heard}`;
@@ -327,8 +333,13 @@ async function handleCustomerMessage(org, conv, text, { images = [], captions = 
       text = ownWords = heard;
     } else if (seen) {
       if (seen.productId) conv.lastProductIds = [seen.productId];
-      messenger.addMessage(conv, "system", `📷 AI saw: ${seen.text}${seen.productName ? ` (looks like ${seen.productName})` : ""}`);
-      text = `[Customer sent a photo: ${seen.text}${seen.productName ? `. It looks like our product "${seen.productName}"` : ""}]`;
+      messenger.addMessage(conv, "system", `📷 AI saw: ${seen.text}${seen.writing ? ` · written: "${seen.writing}"` : ""}${seen.productName ? ` (looks like ${seen.productName})` : ""}`);
+      text = `[Customer sent a photo: ${seen.text}${seen.writing ? `. Written in it: "${seen.writing}". If this is their name, phone or address, use it for the order exactly like typed text` : ""}${seen.productName ? `. It is our product "${seen.productName}"` : ". If it is not clearly one of our products, say what you see and suggest our closest products (same type / colour). Do not ask for another photo"}]`;
+    } else if (images.length) {
+      // the photo could not be looked at: never ask for "a photo" right after they sent one
+      messenger.addMessage(conv, "system", `📷 AI could not look at this photo: ${photoError || "unknown reason"}`);
+      notify(org, `${conv.customerName} sent a photo the AI could not see`, "Open the chat and answer it.", `inbox?open=${conv._id}`, { push: false }).catch(() => {});
+      text = "[Customer sent a photo, but you cannot see it right now. Do NOT ask them to send a photo again. Say you got the photo and ask them to write the product name, or what they want to know]";
     } else {
       const post = await sharedPost(org, conv, shared, captions).catch((e) => { console.warn("shared post:", e.message); return null; });
       if (post?.products?.length) conv.lastProductIds = post.products.map((p) => p._id);
@@ -429,10 +440,9 @@ async function sharedPost(org, conv, shared, captions) {
 }
 
 async function lookAtPhoto(org, image) {
-  if (!vision.visionReady()) return null;
   const products = await Product.find({ organizationId: org, archived: { $ne: true } }).select("name info imageUrl").sort({ updatedAt: -1 }).limit(150).lean();
   const seen = await vision.describePhoto(image, products);
-  if (!seen?.text) return null;
+  if (!seen?.text && !seen?.writing) throw new Error("the photo AI gave no answer");
   return { ...seen, productName: seen.productId ? products.find((p) => p._id === seen.productId)?.name : null };
 }
 

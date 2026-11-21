@@ -114,10 +114,12 @@ async function onMessage(page, event, { channel = "Messenger", ownId = page.acco
 
   const psid = String(event.sender?.id || "");
   if (!psid || psid === String(ownId)) return;
-  const text = msg?.quick_reply?.payload || msg?.text || event.postback?.title || (msg?.attachments?.length ? `[${msg.attachments.map((a) => a.type).join(", ")}]` : "");
+  // the 👍 like and stickers come as "image" with a sticker_id: they are stickers, not photos
+  const kind = (a) => (a.payload?.sticker_id || msg?.sticker_id ? "sticker" : a.type);
+  const text = msg?.quick_reply?.payload || msg?.text || event.postback?.title || (msg?.attachments?.length ? `[${[...new Set(msg.attachments.map(kind))].join(", ")}]` : "");
   if (!text) return;
   if (!(await firstTime(`msg:${msg?.mid || `${event.timestamp}:${psid}`}`))) return;
-  const images = (msg?.attachments || []).filter((a) => a.type === "image" && a.payload?.url).map((a) => a.payload.url); // the AI can look at photos
+  const images = (msg?.attachments || []).filter((a) => kind(a) === "image" && a.payload?.url).map((a) => a.payload.url); // the AI can look at photos
   const captions = (msg?.attachments || []).map((a) => a.payload?.title || a.title).filter(Boolean); // caption of a shared post / reel
   const audios = (msg?.attachments || []).filter((a) => a.type === "audio" && a.payload?.url).map((a) => a.payload.url); // voice messages: turned into text
   // a shared post / reel (often the shop's own): its id and caption, so the AI can tell which product it shows

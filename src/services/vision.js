@@ -26,11 +26,12 @@ async function asDataUrl(url) {
   return `data:${type};base64,${buf.toString("base64")}`;
 }
 
-// -> { text: "beige panjabi with embroidered collar", productId: "…" | null } or null when it can't look
+// -> { text: "black abaya with grey trim", writing: "name, address… written in the photo", productId: "…" | null }
+// Throws with the reason when the photo can't be looked at (shown in the chat for the shop).
 async function describePhoto(url, products = []) {
-  if (!visionReady()) return null;
+  if (!visionReady()) throw new Error("photo AI is not set up (AI_VISION_* in Render)");
   const image = await asDataUrl(url);
-  if (!image) return null;
+  if (!image) throw new Error("could not download the photo");
   // the shop's own product photos to compare with
   const withPhoto = [];
   for (const p of products.filter((x) => x.imageUrl)) {
@@ -40,15 +41,20 @@ async function describePhoto(url, products = []) {
   }
   const list = products.slice(0, 150).map((p) => `${p._id} | ${p.name}${p.info?.length ? " | " + p.info.map((i) => i.value).join(", ").slice(0, 80) : ""}`).join("\n");
   const compare = withPhoto.length ? `\n\nIMAGE 1 is the customer's photo. The next images are the shop's own product photos, in this order:\n${withPhoto.map((x, i) => `IMAGE ${i + 2} = ${x.p._id} | ${x.p.name}`).join("\n")}` : "";
-  const answer = await askAI({
+  const ask = (extra) => askAI({
     model: AI.VISION_MODEL, baseUrl: AI.VISION_BASE_URL, apiKey: AI.VISION_API_KEY,
-    temperature: 0.1, maxTokens: 300, images: [image, ...withPhoto.map((x) => x.data)],
-    system: `A customer of an online shop sent a photo in a chat. Say in one short English line what it shows: the product type, colour, pattern, and any readable text (name, price, size). If it is clearly one of the shop's products (same item in a shop photo, or the name/details match), give its id, otherwise null. Never guess an id.
-Return JSON only: {"text":"","productId":null}`,
-    user: `SHOP PRODUCTS (id | name | details):\n${list || "(none)"}${compare}`,
+    temperature: 0.1, maxTokens: 500, images: [image, ...extra.map((x) => x.data)],
+    system: `A customer of a Bangladeshi online shop sent a photo in a chat.
+"text": one short English line on what it shows: product type, colour, pattern, or what kind of picture it is (a screenshot of a post, a payment receipt, a note…).
+"writing": copy any written words in the photo exactly, in their own language and script (names, phone numbers, addresses, prices, sizes, transaction ids). Empty if there are none.
+"productId": if it is clearly one of the shop's products (the same item as a shop photo, or the name/details match), its id, otherwise null. Never guess an id.
+Return JSON only: {"text":"","writing":"","productId":null}`,
+    user: `SHOP PRODUCTS (id | name | details):\n${list || "(none)"}${extra.length ? compare : ""}`,
   });
+  // many photos in one request can hit the free plan's limits: then look at the customer's photo alone
+  const answer = await ask(withPhoto).catch((e) => (withPhoto.length ? ask([]) : Promise.reject(e)));
   const productId = products.some((p) => p._id === answer.productId) ? answer.productId : null;
-  return { text: String(answer.text || "").slice(0, 300), productId };
+  return { text: String(answer.text || "").slice(0, 300), writing: String(answer.writing || "").trim().slice(0, 600), productId };
 }
 
 module.exports = { describePhoto, visionReady };
