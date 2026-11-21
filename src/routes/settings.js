@@ -6,12 +6,13 @@ const { toList } = require("../lib/utils");
 const { DEFAULT_ZONES, DISTRICT_NAMES, canonicalDistrict, findZone } = require("../lib/places");
 const { aiReady } = require("../lib/ai");
 const { setShopAI } = require("../services/aiSwitch");
+const { DEFAULT_INTRO } = require("../lib/intro");
 
 router.get("/", handle(async (req, res) => {
   const o = await Organization.findById(req.org).lean();
   res.json({
     profile: { name: o.name, phone: o.phone, logoUrl: o.logoUrl, returnPolicy: o.returnPolicy, orderPrefix: o.orderPrefix },
-    ai: { enabled: true, autoConfirm: true, tone: "friendly", handoffBelow: 60, knowledge: "", deliveryTime: "", handoffMessage: "", followUp: true, ...(o.ai || {}), ready: aiReady() },
+    ai: { enabled: true, autoConfirm: true, tone: "friendly", handoffBelow: 60, knowledge: "", deliveryTime: "", handoffMessage: "", followUp: true, introOn: true, introText: "", ...(o.ai || {}), defaultIntro: DEFAULT_INTRO, ready: aiReady() },
     comments: { autoReply: true, sendDm: true, delaySec: 30, needApproval: false, hideSpam: false, blockedWords: [], ...(o.comments || {}) },
     zones: o.zones?.length ? o.zones : DEFAULT_ZONES,
     usingDefaultZones: !o.zones?.length,
@@ -42,6 +43,8 @@ router.put("/ai", handle(async (req, res) => {
       handoffBelow: Math.max(0, Math.min(100, Number(b.handoffBelow) || 0)),
       knowledge: String(b.knowledge || "").slice(0, 20000), deliveryTime: String(b.deliveryTime || ""), handoffMessage: String(b.handoffMessage || ""),
       followUp: b.followUp === undefined ? true : !!b.followUp,
+      introOn: b.introOn === undefined ? true : !!b.introOn,
+      introText: String(b.introText || "").trim() === DEFAULT_INTRO ? "" : String(b.introText || "").trim().slice(0, 500),
     },
   });
   res.json({ ok: true });

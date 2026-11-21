@@ -37,6 +37,8 @@ const organizationSchema = new Schema(
       deliveryTime: { type: String, default: "24-48 hours inside Dhaka, 3-5 days outside" },
       handoffMessage: { type: String, default: "ধন্যবাদ! আমাদের টিমের একজন শীঘ্রই আপনাকে উত্তর দেবেন 🙏" },
       followUp: { type: Boolean, default: true }, // remind a customer once who stopped in the middle of an order
+      introOn: { type: Boolean, default: true }, // the AI says once, at the start of a new chat, that it is an AI
+      introText: { type: String, default: "" }, // empty = the built-in text ({shop} = shop name)
     },
 
     // Facebook comment engine

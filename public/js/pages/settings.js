@@ -59,7 +59,10 @@ async function draw(root) {
   const forms = {
     ai: `${s.ai.ready ? "" : `<div class="note">AI is not set up: add AI_API_KEY to .env and restart the server.</div>`}
       <div>${toggle("enabled", s.ai.enabled, "AI answers your customers", "On or off for every chat at once. Works right away.")}
-      ${toggle("followUp", s.ai.followUp !== false, "Remind unfinished orders", "One friendly message 3 hours after a customer stopped in the middle of an order")}</div>
+      ${toggle("followUp", s.ai.followUp !== false, "Remind unfinished orders", "One friendly message 3 hours after a customer stopped in the middle of an order")}
+      ${toggle("introOn", s.ai.introOn !== false, "AI says it is an AI", "Once, at the start of every new chat. Customers trust it more, and know how to reach you")}</div>
+      <div><label>That first message <span class="small muted">({shop} = your shop's name, {product} = one of your products)</span></label>
+        <textarea name="introText" rows="9">${esc(s.ai.introText || s.ai.defaultIntro)}</textarea></div>
       <div><label>Delivery time (the AI tells customers this)</label><input name="deliveryTime" value="${esc(s.ai.deliveryTime)}" placeholder="Dhaka 1-2 days, outside Dhaka 3-5 days"></div>
       <div><label>Shop knowledge</label><p class="small muted" style="margin:-2px 0 8px">Return policy, size chart, opening hours, address, common questions. The AI only uses what is written here and your products. Answers you teach from a chat (🧠 Teach AI) are added here.</p><textarea name="knowledge" rows="10">${esc(s.ai.knowledge)}</textarea></div>
       ${advanced(`<div class="f2"><div><label>How the AI talks</label><select name="tone">${options([["friendly", "Friendly"], ["professional", "Professional"], ["formal", "Formal"]], s.ai.tone)}</select></div>

@@ -20,6 +20,7 @@ const { askAI, aiReady } = require("../lib/ai");
 const { findZone, canonicalDistrict, normalizeText, DEFAULT_ZONES } = require("../lib/places");
 const { normalizePhone, isValidPhone, taka } = require("../lib/utils");
 const { notify } = require("../lib/notify");
+const { introText, fillIntro } = require("../lib/intro");
 const { priceOf, fullPriceOf } = require("./stock");
 const { activeOffer, offerLabel } = require("../lib/offer");
 const { createOrder } = require("./orders");
@@ -148,7 +149,7 @@ function ordersText(orders) {
   }).join("\n");
 }
 
-async function askAgent(org, settings, conv, latestText, history = { orders: [], known: null }) {
+async function askAgent(org, settings, conv, latestText, history = { orders: [], known: null }, introSent = false) {
   const photoNote = (m) => m.from === "system" && /^📷 AI saw:/.test(m.text || "");
   const recent = conv.messages.filter((m) => m.from === "customer" || photoNote(m)).slice(-6).map((m) => m.text).join(" ");
   const k = await knowledgeFor(org, settings, `${recent} ${latestText}`, conv.draft, conv.lastProductIds);
@@ -159,7 +160,7 @@ async function askAgent(org, settings, conv, latestText, history = { orders: [],
   const currentDraft = d.status === "placed" ? { items: [] } : { items: (d.items || []).map((i) => ({ productId: i.productId, variantId: i.variantId, qty: i.qty })), name: d.name || "", phone: d.phone || "", address: d.address || "", district: d.district || "" };
 
   const system = `You are the sales assistant of a Bangladeshi online shop, chatting on ${conv.channel === "Instagram" ? "Instagram" : "Facebook Messenger"}.
-Reply in the customer's language and script (Bangla, Banglish or English). Short and warm, max 3-4 lines. Tone: ${settings.ai.tone}.
+Reply in the customer's language and script (Bangla, Banglish or English). Short and warm, max 3-4 lines. Tone: ${settings.ai.tone}.${introSent ? "\nA greeting that says you are the shop's AI assistant was just sent. Do not greet or introduce yourself again: answer the message directly." : ""}
 RULES
 - Use ONLY the business info and PRODUCTS below. Never invent prices, stock, discounts, delivery times or policies. If you don't know, say you'll check with the team and set needsHuman=true.
 - To take an order you need: product (exact productId), the variantId when the product has several sizes/colours, quantity, name, phone (01XXXXXXXXX), full address with area, and district (one of Bangladesh's 64 districts).
@@ -354,10 +355,17 @@ async function handleCustomerMessage(org, conv, text, { images = [], captions = 
   if (HUMAN_WORDS.test(text)) return handToHuman(org, conv, `Customer said: "${text.slice(0, 80)}"`, settings.ai.handoffMessage);
   if (!aiReady()) return handToHuman(org, conv, "AI is not set up (AI_API_KEY missing)", settings.ai.handoffMessage);
 
+  // New chat: once, the AI says it is the shop's AI assistant (and how to reach a person), then answers
+  const firstAnswer = !conv.messages.some((m) => m.from === "ai" || m.from === "agent");
+  if (firstAnswer && settings.ai.introOn !== false) {
+    // a real product of this shop for the examples (one in stock, newest first)
+    const example = await Product.findOne({ organizationId: org, archived: { $ne: true } }).select("name").sort({ updatedAt: -1 }).lean();
+    await messenger.reply(org, conv, "ai", fillIntro(introText(settings.ai), settings.name, example?.name));
+  }
   messenger.showTyping(org, conv);
   let result;
   const history = await customerHistory(org, conv);
-  try { result = await askAgent(org, settings, conv, text, history); }
+  try { result = await askAgent(org, settings, conv, text, history, firstAnswer && settings.ai.introOn !== false); }
   catch (e) { return handToHuman(org, conv, `AI error: ${e.message}`, settings.ai.handoffMessage); }
   const { answer, products } = result;
 
