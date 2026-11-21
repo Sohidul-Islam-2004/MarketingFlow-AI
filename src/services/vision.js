@@ -8,7 +8,7 @@ const { Photo } = require("../models");
 
 const visionReady = () => !!(AI.VISION_MODEL && (AI.VISION_API_KEY || /localhost|127\.0\.0\.1/.test(AI.VISION_BASE_URL)));
 const MAX_BYTES = 4 * 1024 * 1024; // what the AI providers accept
-const COMPARE = 6; // product photos sent with the customer's photo
+const COMPARE = 4; // product photos sent with the customer's photo (more = slower)
 
 // Meta's photo links (and the shop's product photos) are sent as data, so the AI service doesn't have to download them
 async function asDataUrl(url) {
@@ -43,7 +43,7 @@ async function describePhoto(url, products = []) {
   const compare = withPhoto.length ? `\n\nIMAGE 1 is the customer's photo. The next images are the shop's own product photos, in this order:\n${withPhoto.map((x, i) => `IMAGE ${i + 2} = ${x.p._id} | ${x.p.name}`).join("\n")}` : "";
   const ask = (extra) => askAI({
     model: AI.VISION_MODEL, baseUrl: AI.VISION_BASE_URL, apiKey: AI.VISION_API_KEY,
-    temperature: 0.1, maxTokens: 500, images: [image, ...extra.map((x) => x.data)],
+    temperature: 0.1, maxTokens: 500, images: [image, ...extra.map((x) => x.data)], quick: true, timeoutMs: extra.length ? 25000 : 20000,
     system: `A customer of a Bangladeshi online shop sent a photo in a chat.
 "text": one short English line on what it shows: product type, colour, pattern, or what kind of picture it is (a screenshot of a post, a payment receipt, a note…).
 "writing": copy any written words in the photo exactly, in their own language and script (names, phone numbers, addresses, prices, sizes, transaction ids). Empty if there are none.

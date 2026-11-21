@@ -22,7 +22,7 @@ async function download(url) {
 async function withGemini({ bytes, type }, productNames) {
   const format = ({ "audio/mpeg": "mp3", "audio/x-wav": "wav", "audio/wave": "wav" })[type] || type.split("/")[1] || "mp4";
   const out = await askAI({
-    model: AI.VISION_MODEL, baseUrl: AI.VISION_BASE_URL, apiKey: AI.VISION_API_KEY, temperature: 0, maxTokens: 600,
+    model: AI.VISION_MODEL, baseUrl: AI.VISION_BASE_URL, apiKey: AI.VISION_API_KEY, temperature: 0, maxTokens: 600, quick: true, timeoutMs: 25000,
     audio: { data: bytes.toString("base64"), format },
     system: `You write down voice messages that customers send to a Bangladeshi online shop. Write exactly what is said, in the language spoken: Bangla in Bangla script, English words in English. Do not answer, explain or translate. If no words can be heard, return an empty text.
 Product names of this shop (spell them like this): ${productNames || "-"}

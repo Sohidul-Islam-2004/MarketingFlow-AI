@@ -176,7 +176,7 @@ RULES
 - If the customer asks about an order they already placed (status, when it arrives), answer from CUSTOMER'S ORDERS ("To call" means the shop will call to confirm it). Never invent dates or tracking. To cancel or change a placed order set needsHuman=true.
 - If RETURNING CUSTOMER details are given and the draft already has them, don't ask for name, phone or address again: say you'll send it to the same address and they can change it in the summary.
 - Product "details" are written by the shop, often copied from a Facebook post. Read them fully and answer the customer's exact question from them in your own short, friendly words (don't paste the whole text back). Package/option prices there count. For delivery charges always use DELIVERY FEES above, even if the details say something else.
-- PHOTOS: products marked "photo: yes" have a photo the system can send. When the customer asks to see a product (ছবি, pic, photo, দেখান) or asks about one specific product for the first time, put its productId in "photos" (max 3) and say the photo is below (e.g. "ছবি নিচে দিলাম 👇"). Never send the same photo twice in a row. Never write that a photo is below unless you put its productId in "photos". If they want a photo of a product with "photo: no", say a team member will send it and set needsHuman=true with handoffReason "wants a photo of <product>".
+- PHOTOS: products marked "photo: yes" have a photo the system can send. When the customer asks to see a product (ছবি, pic, photo, দেখান) or asks about one specific product for the first time, put its productId in "photos" (max 3) and say the photo is below (e.g. "ছবি নিচে দিলাম 👇"). Never send the same photo twice in a row. Never write that a photo is below unless you put its productId in "photos". If they ask for photos in general (a kind of product like "বোরকার পিক", "সব ছবি", "কালেকশন"), put up to 3 matching products with "photo: yes" in "photos" (read their details to know what each product is) and name them with their prices. Never say there are no photos while products with "photo: yes" exist. If they want a photo of a product with "photo: no", say a team member will send it and set needsHuman=true with handoffReason "wants a photo of <product>".
 Return JSON only: ${ANSWER_SHAPE}`;
   const known = history.known ? `RETURNING CUSTOMER (from their last order): ${history.known.name}, ${history.known.phone}, ${history.known.address}, ${history.known.district || ""}` : "";
   const user = [k.text, ordersText(history.orders), known, `CURRENT DRAFT: ${JSON.stringify(currentDraft)}`, about.length ? `CHAT IS ABOUT: ${about.map((p) => `${p.name} (productId ${p._id})`).join(", ")}` : "", `CHAT SO FAR:\n${chat || "(new chat)"}`, `CUSTOMER (latest): ${latestText}`].filter(Boolean).join("\n\n");
@@ -402,6 +402,12 @@ async function sendProductPhotos(org, conv, products, answer, ownWords, draft) {
   const find = (x) => products.find((p) => p._id === String(x)) || products.find((p) => p.name.toLowerCase() === String(x).toLowerCase().trim());
   let wanted = (Array.isArray(answer.photos) ? answer.photos : []).map(find).filter(Boolean);
   if (!wanted.length && (asked || promised)) wanted = [...(draft.items || []).map((i) => i.productId), ...(conv.lastProductIds || [])].map(find).filter(Boolean);
+  // "বোরকার পিক দেন" without a product name: up to 3 products with a photo that best match their words
+  if (!wanted.length && (asked || promised)) {
+    const words = normalizeText(ownWords || "").split(" ").filter((w) => w.length > 2);
+    const about = (p) => normalizeText(`${p.name} ${p.nameBn || ""} ${p.category || ""} ${(p.info || []).map((i) => `${i.label} ${i.value}`).join(" ")} ${p.description || ""}`);
+    wanted = products.filter((p) => p.imageUrl).map((p) => ({ p, s: words.filter((w) => about(p).includes(w)).length })).sort((a, b) => b.s - a.s).slice(0, 3).map((x) => x.p);
+  }
   wanted = [...new Map(wanted.map((p) => [p._id, p])).values()].slice(0, 3);
   if (wanted.length) conv.lastProductIds = wanted.map((p) => p._id);
 
