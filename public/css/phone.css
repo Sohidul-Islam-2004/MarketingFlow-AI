@@ -319,7 +319,7 @@ body:has(.inbox.show-chat) .tabbar { display: none; }
 /* Facebook & Instagram: the help list is for a computer */
 .help-card { display: none; }
 /* product form: label + value + remove on one line */
-.info-row { grid-template-columns: 1fr 1.3fr 40px !important; gap: 6px !important; }
+.spec-card .info-row { grid-template-columns: minmax(76px, .8fr) 1.6fr 34px !important; gap: 0 !important; }
 /* Settings: all 5 tabs fit on a small phone */
 #page .tabs:has([data-tab="password"]) .tab { padding-left: 9px; padding-right: 9px; font-size: 13.5px; }
 /* product form on a phone: photo beside name + price, sections full width */
@@ -329,3 +329,7 @@ body:has(.inbox.show-chat) .tabbar { display: none; }
 .pf-sec .offer-row { grid-template-columns: 1fr 1fr; }
 .pf-sec .offer-row > div:last-child { grid-column: 1 / -1; }
 .variant-row { grid-template-columns: 1.3fr 1fr .9fr 36px !important; gap: 6px !important; }
+/* an option: its name on its own line, then own price · stock · remove */
+.pf-sec .variant-row { grid-template-columns: 1fr 1fr 36px !important; }
+.pf-sec .variant-row input[name="vname[]"] { grid-column: 1 / -1; }
+.pf-sec .variant-row + .variant-row { padding-top: 10px; border-top: 1px dashed var(--line); }

@@ -58,7 +58,9 @@ async function aiSettings(org) {
 }
 
 /* ---------- what the AI is allowed to know ---------- */
-function productLines(products) {
+// `full` = ids of the products this chat is about: their details go in whole (a shop may write a long post),
+// the other products get a short version so the AI stays fast.
+function productLines(products, full = new Set()) {
   return products.map((p) => {
     const stockText = (v) => (p.alwaysAvailable ? "available to order" : v.available > 0 ? `${v.available} in stock` : "OUT OF STOCK");
     const offer = activeOffer(p);
@@ -66,7 +68,7 @@ function productLines(products) {
     const variants = p.variants.map((v) => `${v._id}=${v.name} ${priceText(v)} ${stockText(v)}`).join("; ");
     const offerText = offer ? ` | OFFER: ${offerLabel(offer)}${offer.until ? ` until ${new Date(offer.until).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Dhaka" })}` : ""}` : "";
     // the shop's own details, in its own words (warranty, fabric, RAM…)
-    const details = [...(p.info || []).filter((i) => i.value).map((i) => (i.label ? `${i.label}: ${i.value}` : i.value)), p.description].filter(Boolean).join("; ").replace(/\s+/g, " ").slice(0, 600);
+    const details = [...(p.info || []).filter((i) => i.value).map((i) => (i.label ? `${i.label}: ${i.value}` : i.value)), p.description].filter(Boolean).join("; ").replace(/\s+/g, " ").slice(0, full.has(p._id) ? 3000 : 300);
     return `${p._id} | ${p.name}${p.nameBn ? " / " + p.nameBn : ""} | ${variants}${offerText}${details ? ` | details: ${details}` : ""} | photo: ${p.imageUrl ? "yes" : "no"}`;
   }).join("\n");
 }
@@ -109,17 +111,19 @@ async function knowledgeFor(org, settings, recentText, draft, focusIds = []) {
   // Send the 40 products that best match the chat (and everything already in the draft)
   const words = normalizeText(recentText).split(" ").filter((w) => w.length > 1);
   const inDraft = new Set([...(draft?.items || []).map((i) => i.productId), ...(focusIds || []).map(String)]); // always sent
-  const ranked = all
+  const scored = all
     .map((p) => ({ p, score: (inDraft.has(p._id) ? 100 : 0) + words.filter((w) => normalizeText(`${p.name} ${p.nameBn} ${p.category}`).includes(w)).length }))
     .sort((a, b) => b.score - a.score)
-    .slice(0, 40)
-    .map((x) => x.p);
+    .slice(0, 40);
+  const ranked = scored.map((x) => x.p);
+  // full details for the products the chat is about (max 4), or for all when the shop has only a few
+  const full = new Set((all.length <= 4 ? scored : scored.filter((x) => x.score > 0).slice(0, 4)).map((x) => x.p._id));
   const zones = settings.zones?.length ? settings.zones : DEFAULT_ZONES;
   const text = [
     `BUSINESS: ${settings.name || "our shop"}`,
     `DELIVERY FEES: ${zones.map((z) => `${z.name} ${taka(z.fee)}`).join(", ")}. Delivery time: ${settings.ai.deliveryTime || "ask the team"}. Payment: cash on delivery.`,
     settings.ai.knowledge ? `BUSINESS INFO / POLICIES / FAQ:\n${relevantKnowledge(settings.ai.knowledge, recentText)}` : "",
-    `PRODUCTS (productId | name | options as variantId=name price stock | details written by the shop):\n${productLines(ranked) || "(no products yet)"}`,
+    `PRODUCTS (productId | name | options as variantId=name price stock | details written by the shop):\n${productLines(ranked, full) || "(no products yet)"}`,
   ].filter(Boolean).join("\n\n");
   return { text, products: all };
 }
@@ -171,6 +175,7 @@ RULES
 - If the customer wants to buy or asks about "this / it / eta" without naming a product, it is the product in "CHAT IS ABOUT" (or the one their photo showed). Ask which product only when that is empty.
 - If the customer asks about an order they already placed (status, when it arrives), answer from CUSTOMER'S ORDERS ("To call" means the shop will call to confirm it). Never invent dates or tracking. To cancel or change a placed order set needsHuman=true.
 - If RETURNING CUSTOMER details are given and the draft already has them, don't ask for name, phone or address again: say you'll send it to the same address and they can change it in the summary.
+- Product "details" are written by the shop, often copied from a Facebook post. Read them fully and answer the customer's exact question from them in your own short, friendly words (don't paste the whole text back). Package/option prices there count. For delivery charges always use DELIVERY FEES above, even if the details say something else.
 - PHOTOS: products marked "photo: yes" have a photo the system can send. When the customer asks to see a product (ছবি, pic, photo, দেখান) or asks about one specific product for the first time, put its productId in "photos" (max 3) and say the photo is below (e.g. "ছবি নিচে দিলাম 👇"). Never send the same photo twice in a row. Never write that a photo is below unless you put its productId in "photos". If they want a photo of a product with "photo: no", say a team member will send it and set needsHuman=true with handoffReason "wants a photo of <product>".
 Return JSON only: ${ANSWER_SHAPE}`;
   const known = history.known ? `RETURNING CUSTOMER (from their last order): ${history.known.name}, ${history.known.phone}, ${history.known.address}, ${history.known.district || ""}` : "";

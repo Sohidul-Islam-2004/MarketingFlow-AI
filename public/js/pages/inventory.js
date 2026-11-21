@@ -70,10 +70,10 @@ const optionText = (p, v) => {
 };
 
 /* ---------- add / edit ---------- */
-const EXAMPLES = [["Warranty", "1 year"], ["Fabric", "Cotton"], ["Brand", "Xiaomi"], ["Weight", "500g"]];
-const infoRow = (i = {}, n = 0) => `<div class="pf-row info-row">
-  <input name="ilabel[]" placeholder="${EXAMPLES[n % 4][0]}" list="infoLabels" value="${esc(i.label || "")}">
-  <input name="ivalue[]" placeholder="${EXAMPLES[n % 4][1]}" value="${esc(i.value || "")}">
+// One line of the product's "spec card": name on the left, value on the right
+const infoRow = (i = {}) => `<div class="pf-row info-row">
+  <input name="ilabel[]" class="info-label" placeholder="যেমন: ঘের" list="infoLabels" value="${esc(i.label || "")}">
+  <textarea name="ivalue[]" class="info-value" rows="1" placeholder="যেমন: ১২০ ইঞ্চি">${esc(i.value || "")}</textarea>
   <button type="button" class="btn sm light" data-action="removeRow" title="Remove">×</button></div>`;
 
 const variantRow = (v = {}) => `<div class="pf-row variant-row">
@@ -115,7 +115,49 @@ export function offerForAll(refresh) {
 }
 
 // Label ideas for every kind of shop. They are only suggestions: the shop can type anything.
-const LABEL_IDEAS = ["Brand", "Model", "Warranty", "Fabric", "Size chart", "Colour", "Material", "RAM / Storage", "Battery", "Weight", "Ingredients", "Expiry", "Origin", "Delivery time", "In the box"];
+// Tap to add: the things customers ask most (clothes first, then other shops)
+const QUICK_LABELS = ["কাপড়", "ঘের", "লম্বা", "বডি", "হাতা", "সাইজ চার্ট", "কালার", "ব্র্যান্ড", "ওয়ারেন্টি", "ওজন"];
+const LABEL_IDEAS = [...QUICK_LABELS, "মডেল", "মেটেরিয়াল", "উপাদান", "মেয়াদ", "দেশ", "বক্সে যা থাকে", "RAM / Storage", "Battery"];
+// A pasted Facebook post, sorted:
+//   "✅ শুধু বোরকা: ৳৯৫০/-"        -> an option with its own price
+//   "📏 লং: ৫০–৫৬ বডি: ৩৬–৫০"      -> two details (লং, বডি)
+//   "🚚 ডেলিভারি চার্জ: …"          -> left out (it belongs in Settings → Delivery)
+//   anything else                   -> stays as text
+const BN_DIGITS = "০১২৩৪৫৬৭৮৯";
+const toLatin = (s) => String(s).replace(/[০-৯]/g, (d) => BN_DIGITS.indexOf(d));
+const clean = (s) => String(s).replace(/^[^\p{L}\p{N}]+/u, "").replace(/[\s।.,|]+$/u, "").trim(); // emoji / bullets / end marks
+const priceOf = (v) => { const m = toLatin(v).replace(/,/g, "").match(/^\s*(?:৳|tk\.?|টাকা)?\s*(\d{2,7})\s*(?:\/-|৳|টাকা|tk|taka)?\s*$/i); return m ? Number(m[1]) : null; };
+function splitLine(line) {
+  const text = clean(line);
+  const first = text.match(/^([^:=]{1,40}?)\s*[:=]\s*(.+)$/u) || text.match(/^([^\-–]{1,40}?)\s+[-–]\s+(.+)$/u);
+  if (!first) return [];
+  // more "name: value" on the same line: the word before each next ":" is the next name
+  const parts = [clean(first[1])];
+  let rest = first[2];
+  for (;;) {
+    const m = rest.match(/^(.*\S)\s+([^\s:]{1,20}):\s*(.+)$/u);
+    if (!m || /\d$/.test(m[2])) break; // "10:30" is a time, not a new name
+    parts.push(m[1], m[2]); rest = m[3];
+  }
+  parts.push(rest);
+  const out = [];
+  for (let i = 0; i < parts.length; i += 2) out.push([clean(parts[i]), clean(parts[i + 1]) || parts[i + 1].trim()]);
+  return out.filter(([l, v]) => l && v);
+}
+function readPost(text) {
+  const result = { specs: [], options: [], skipped: [], rest: [] };
+  for (const line of String(text).split(/\r?\n/).filter((l) => l.trim())) {
+    if (/ডেলিভারি|delivery|ঢাকার (ভিতরে|বাইরে)|ঢাকা সিটি|কুরিয়ার চার্জ/i.test(line)) { result.skipped.push(clean(line)); continue; } // Settings → Delivery
+    const pairs = splitLine(line);
+    if (!pairs.length) { result.rest.push(clean(line) ? line.trim() : ""); continue; }
+    for (const [label, value] of pairs) {
+      if (priceOf(value) !== null) result.options.push([label, priceOf(value)]);
+      else result.specs.push([label, value]);
+    }
+  }
+  result.rest = result.rest.filter(Boolean);
+  return result;
+}
 
 // The photo box at the top of the product form
 const photoBox = (url) => (url ? `<img src="${esc(url)}" alt="">` : `<span>${icon("camera")}</span>`);
@@ -149,17 +191,20 @@ export function productForm(p, refresh) {
       <label class="switch-row pf-always"><span><b>Always available</b><small>Pre-order or made to order: stock is not counted</small></span>
         <input type="checkbox" class="switch" name="alwaysAvailable" ${p?.alwaysAvailable ? "checked" : ""}></label>
 
-      ${section("options", "Sizes / colours", named.length ? esc(named.map((v) => v.name).join(", ")) : "None · tap to add",
-        `<p class="small muted">Each size or colour with its own stock. "Own ৳" only if it costs more or less than the main price.</p>
+      ${section("options", "Sizes / colours / packages", named.length ? esc(named.map((v) => v.name).join(", ")) : "None · tap to add",
+        `<p class="small muted">Each size, colour or package (e.g. "বোরকা + হিজাব") with its own stock. "Own ৳" only if it costs more or less than the main price.</p>
          <div id="variants">${named.map(variantRow).join("")}</div>
          <button type="button" class="btn sm light mt" data-action="addVariant">+ Add size / colour</button>`)}
       ${section("offer", "🏷️ Offer", offer ? offerText(offer) + (offer.until ? ` · until ${untilText(offer.until)}` : "") : p?.offerEnded ? "Ended · tap to start a new one" : "No offer",
         `${offerFields(offer)}<p class="small muted mt">Leave "How much" empty for no offer.</p>`)}
       ${section("details", "📝 Details for the AI", info.length || p?.description ? esc([...info.map((i) => `${i.label}: ${i.value}`), p?.description || ""].filter(Boolean).join(" · ").slice(0, 70)) : "Fabric, size chart, warranty… · optional",
-        `<div id="infoRows">${(info.length ? info : [{}]).map(infoRow).join("")}</div>
+        `<p class="small muted">What customers ask about. Tap a name to add it, or paste a list ("ঘের: ১২০ ইঞ্চি" on each line).</p>
+         <div class="quick-labels" id="quickLabels">${QUICK_LABELS.map((l) => `<button type="button" class="qchip" data-action="addInfo" data-label="${l}">+ ${l}</button>`).join("")}<button type="button" class="qchip" data-action="addInfo">+ অন্য কিছু</button></div>
+         <div class="spec-card" id="infoRows">${info.map(infoRow).join("")}</div>
          <datalist id="infoLabels">${LABEL_IDEAS.map((l) => `<option value="${l}">`).join("")}</datalist>
-         <button type="button" class="btn sm light mt" data-action="addInfo">+ Add detail</button>
-         <div class="mt"><label>Anything else the AI should know</label><textarea name="description" rows="2" placeholder="e.g. Free size, fits 50-56. Ready in 3-5 days.">${esc(p?.description || "")}</textarea></div>`)}`,
+         <div class="mt"><div class="row between"><label>আরও কিছু <span class="small muted">(optional, write it like your Facebook post)</span></label>
+           <button type="button" class="btn sm light" data-action="sortText" title="The AI sorts the text in this box into options, details and notes">✨ AI দিয়ে সাজাও</button></div>
+           <textarea name="description" rows="3" placeholder="যেমন: সাথে হিজাব আছে, নেকাব নেই। ধোয়ার পর রং যাবে না। অর্ডারের ৩-৫ দিনে ডেলিভারি।">${esc(p?.description || "")}</textarea></div>`)}`,
     onSubmit: async (d) => {
       const list = (x) => [].concat(x ?? []);
       let stockIndex = 0; // only new rows have a stock box
@@ -203,16 +248,82 @@ export function productForm(p, refresh) {
       body.querySelector(".pf-photo-links [data-action=choosePhoto]").textContent = "+ Add photo";
       el.hidden = true;
     },
-    addInfo: () => body.querySelector("#infoRows").insertAdjacentHTML("beforeend", infoRow({}, body.querySelectorAll(".info-row").length)),
-    addVariant: () => {
-      // the first size of a product that had none keeps its stock (it becomes that size)
-      const reuse = !body.querySelector(".variant-row") && first && !named.length ? { ...first, name: "" } : {};
-      body.querySelector("#variants").insertAdjacentHTML("beforeend", variantRow(reuse));
-      body.querySelector("#variants .variant-row:last-child input[name='vname[]']").focus();
-      showStock();
+    addInfo: (el) => addInfoRow(el.dataset.label || ""),
+    // any post, any style: the AI sorts the text box into options / details / notes. You check, then Save.
+    sortText: async (el) => {
+      const box = body.querySelector("[name=description]");
+      if (!box.value.trim()) throw new Error("Paste your product post in the box first");
+      el.textContent = "সাজাচ্ছি…";
+      try {
+        const r = await post("/api/products/sort-text", { text: box.value });
+        const usedLabels = new Set([...rows.querySelectorAll(".info-label")].map((i) => i.value.trim()));
+        r.details.filter((d) => !usedLabels.has(d.label)).forEach((d) => addInfoRow(d.label, d.value, false));
+        if (r.options.length >= 2) {
+          const have = new Set([...body.querySelectorAll("input[name='vname[]']")].map((i) => i.value.trim()));
+          r.options.filter((o) => !have.has(o.name)).forEach((o) => addOption(o.name, o.price || ""));
+          body.querySelector("[data-sec=options]").open = true;
+        }
+        const price = body.querySelector("[name=price]");
+        if (!price.value && (r.price || r.options.some((o) => o.price))) price.value = r.price || Math.min(...r.options.filter((o) => o.price).map((o) => o.price));
+        box.value = r.notes;
+        toast(`Sorted: ${r.options.length >= 2 ? `${r.options.length} options (add the stock), ` : ""}${r.details.length} details. Check and press Save.${r.leftOut.length ? " Delivery charge left out: set it in Settings → Delivery." : ""}`);
+      } finally { el.textContent = "✨ AI দিয়ে সাজাও"; }
     },
-    removeRow: (el) => { el.closest(".pf-row").remove(); showStock(); },
+    addVariant: () => { addOption(); body.querySelector("#variants .variant-row:last-child input[name='vname[]']").focus(); },
+    removeRow: (el) => { el.closest(".pf-row").remove(); showStock(); markUsed(); },
   });
+
+  // a size / colour / option row. The first one of a product that had none keeps its stock (it becomes that option)
+  function addOption(name = "", price = "") {
+    const reuse = !body.querySelector(".variant-row") && first && !named.length ? { ...first } : {};
+    body.querySelector("#variants").insertAdjacentHTML("beforeend", variantRow({ ...reuse, name, price: price || undefined }));
+    showStock();
+  }
+
+  // the spec card: a quick name already used is greyed out; empty card shows a hint
+  const rows = body.querySelector("#infoRows");
+  const markUsed = () => {
+    const used = new Set([...rows.querySelectorAll(".info-label")].map((i) => i.value.trim()));
+    body.querySelectorAll("#quickLabels [data-label]").forEach((b) => (b.hidden = used.has(b.dataset.label)));
+  };
+  function addInfoRow(label = "", value = "", focus = true) {
+    const empty = [...rows.querySelectorAll(".info-row")].find((r) => !r.querySelector(".info-label").value && !r.querySelector(".info-value").value);
+    if (empty && label) empty.remove(); // reuse instead of leaving a blank line
+    rows.insertAdjacentHTML("beforeend", infoRow({ label, value }));
+    const row = rows.lastElementChild;
+    fit(row.querySelector(".info-value"));
+    if (focus) (label ? row.querySelector(".info-value") : row.querySelector(".info-label")).focus();
+    markUsed();
+  }
+  // long values wrap onto more lines, so everything can be read
+  const fit = (t) => { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; };
+  const fitAll = () => rows.querySelectorAll(".info-value").forEach(fit);
+  rows.addEventListener("input", (e) => { markUsed(); if (e.target.classList.contains("info-value")) fit(e.target); });
+  body.querySelector("[data-sec=details]").addEventListener("toggle", fitAll);
+  // paste a whole Facebook post (into the details or the text box): sorted into options, details and text
+  const onPaste = (e) => {
+    const post = readPost(e.clipboardData?.getData("text") || "");
+    const found = post.specs.length + post.options.length;
+    if (found < 2 && !(found && post.skipped.length)) return; // a normal paste
+    e.preventDefault();
+    const row = e.target.closest(".info-row");
+    if (row && !row.querySelector(".info-label").value && !row.querySelector(".info-value").value) row.remove();
+    post.specs.forEach(([l, v]) => addInfoRow(l, v, false));
+    if (post.options.length >= 2) {
+      post.options.forEach(([name, price]) => addOption(name, price));
+      const price = body.querySelector("[name=price]");
+      if (!price.value) price.value = Math.min(...post.options.map((o) => o[1]));
+      body.querySelector("[data-sec=options]").open = true;
+    } else post.options.forEach(([l, v]) => addInfoRow(l, `৳${v}`, false)); // one price: just a detail
+    const box = body.querySelector("[name=description]");
+    if (post.rest.length) box.value = [box.value.trim(), ...post.rest].filter(Boolean).join("\n");
+    body.querySelector("[data-sec=details]").open = true;
+    const said = [post.options.length >= 2 && `${post.options.length} options with their price (add the stock)`, post.specs.length && `${post.specs.length} details`].filter(Boolean).join(" and ");
+    toast(`Added ${said}.${post.skipped.length ? " Delivery charge left out: set it in Settings → Delivery." : ""}`);
+  };
+  rows.addEventListener("paste", onPaste);
+  body.querySelector("[name=description]").addEventListener("paste", onPaste);
+  markUsed();
 }
 
 /* ---------- stock change ---------- */

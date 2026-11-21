@@ -608,3 +608,19 @@ button.link.danger { color: var(--red); }
 .pf-sec-body { padding: 0 14px 14px; }
 .pf-sec .offer-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 .pf-sec .variant-row:first-child { margin-top: 4px; }
+
+/* product details: tap-to-add names and a clean "spec card" */
+.quick-labels { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 12px; }
+.qchip { border: 1px dashed var(--line-2); background: var(--card); color: var(--ink-2, var(--ink)); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.qchip:hover { border-color: var(--purple); color: var(--purple); background: var(--soft); }
+.spec-card { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--card); }
+.spec-card:empty { display: none; }
+.spec-card .info-row { grid-template-columns: minmax(90px, 0.8fr) 2fr 36px; gap: 0; margin: 0; border-top: 1px solid var(--line); }
+.spec-card .info-row:first-child { border-top: 0; }
+.spec-card .info-row { align-items: stretch; }
+.spec-card .info-row input, .spec-card .info-row textarea { border: 0; border-radius: 0; background: transparent; box-shadow: none; min-height: 44px; padding: 0 12px; }
+.spec-card .info-row textarea { resize: none; overflow: hidden; padding: 12px; line-height: 1.45; height: 44px; }
+.spec-card .info-row input:focus, .spec-card .info-row textarea:focus { background: var(--soft); outline: none; }
+.spec-card .info-label { font-weight: 600; color: var(--muted); background: var(--soft) !important; border-right: 1px solid var(--line) !important; }
+.spec-card .info-row .btn { border: 0; background: transparent; color: var(--faint); box-shadow: none; }
+.spec-card .info-row .btn:hover { color: var(--red); }

@@ -7,6 +7,7 @@ const { newId } = require("../models/_base");
 const stock = require("../services/stock");
 const { activeOffer, cleanOffer } = require("../lib/offer");
 const photos = require("../services/photos");
+const { askAI, aiReady } = require("../lib/ai");
 
 const REASONS = ["restock", "damage", "correction", "return"];
 
@@ -87,6 +88,34 @@ router.put("/:id", handle(async (req, res) => {
 
 // Archived products disappear from the shop and the AI but stay on old orders
 // One offer for many products at once: { kind, value, until, ids? } (no ids = every product). value 0 = stop the offers.
+// "✨ Sort with AI": a product post written any way (every page writes differently) ->
+// options with their own price, details (name: value) and the rest as notes. Nothing is saved here.
+router.post("/sort-text", handle(async (req, res) => {
+  const text = String(req.body.text || "").trim().slice(0, 4000);
+  if (text.length < 5) throw fail(400, "Paste or write the product text first");
+  if (!aiReady()) throw fail(400, "The AI is not set up");
+  const out = await askAI({
+    temperature: 0, maxTokens: 1200,
+    system: `You sort the text of ONE product from a Bangladeshi online shop (often copied from a Facebook post) into a form.
+- "options": things the customer chooses between, each with its own price (e.g. "শুধু বোরকা" 950, "বোরকা + হিজাব" 1250) or sizes/colours listed as choices. price = number in taka or null when it has no own price. Max 20.
+- "details": facts customers ask about, as short label + value (কাপড়, ঘের, লম্বা, বডি, হাতা, সাইজ, ওয়ারেন্টি…). Split lines that hold several facts. Keep the shop's own words and language; drop emoji.
+- "notes": anything else useful for answering customers, short, in the shop's words.
+- "price": the main/lowest price as a number, or null.
+- Leave OUT delivery charges and shop-wide policies (they belong to the shop settings): put them in "left_out".
+- Never invent anything that is not in the text.
+Return JSON only: {"price":null,"options":[{"name":"","price":null}],"details":[{"label":"","value":""}],"notes":"","left_out":[""]}`,
+    user: text,
+  });
+  const num = (x) => (Number.isFinite(Number(x)) && Number(x) > 0 ? Math.round(Number(x)) : null);
+  res.json({
+    price: num(out.price),
+    options: (Array.isArray(out.options) ? out.options : []).filter((o) => o?.name).slice(0, 20).map((o) => ({ name: String(o.name).slice(0, 60), price: num(o.price) })),
+    details: (Array.isArray(out.details) ? out.details : []).filter((d) => d?.label && d?.value).slice(0, 30).map((d) => ({ label: String(d.label).slice(0, 40), value: String(d.value).slice(0, 200) })),
+    notes: String(out.notes || "").slice(0, 1500),
+    leftOut: (Array.isArray(out.left_out) ? out.left_out : []).filter(Boolean).map(String).slice(0, 5),
+  });
+}));
+
 router.post("/offer", handle(async (req, res) => {
   const offer = cleanOffer(req.body);
   const q = { organizationId: req.org, archived: { $ne: true } };
