@@ -17,7 +17,7 @@ const { encrypt, decrypt } = require("../lib/crypto");
 const { fail } = require("../lib/errors");
 const { META, PUBLIC_BASE_URL } = require("../config");
 
-const WEBHOOK_FIELDS = "messages,messaging_postbacks,message_echoes,feed";
+const WEBHOOK_FIELDS = "messages,messaging_postbacks,message_echoes,messaging_referrals,feed";
 
 async function appFor(org) {
   const o = await Organization.findById(org).select("metaApp").lean();

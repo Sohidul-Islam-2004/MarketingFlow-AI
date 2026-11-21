@@ -84,6 +84,13 @@ async function fillProfile(page, conv, channel) {
   if (p.avatar) conv.avatar = p.avatar;
 }
 
+// The ad shows in the chat for the shop, and the AI uses it to know which product the customer means
+function rememberAd(conv, ad) {
+  conv.adContext = { ...ad, at: new Date(), used: false };
+  conv.markModified?.("adContext");
+  messenger.addMessage(conv, "system", `📣 Came from your ad${ad.title ? `: "${ad.title}"` : ""}`, ad.photoUrl ? { image: ad.photoUrl } : {});
+}
+
 // channel = "Messenger" or "Instagram"; ownId = the Page id or the Instagram account id (to skip our own messages)
 async function onMessage(page, event, { channel = "Messenger", ownId = page.accountId } = {}) {
   const org = page.organizationId;
@@ -114,6 +121,21 @@ async function onMessage(page, event, { channel = "Messenger", ownId = page.acco
 
   const psid = String(event.sender?.id || "");
   if (!psid || psid === String(ownId)) return;
+  // Came from a "Send message" ad: Facebook tells which ad (title, photo, post). With the first message,
+  // or alone when the customer already had a chat with the shop.
+  const ref = msg?.referral || event.referral || event.postback?.referral;
+  const ad = ref && (ref.source === "ADS" || ref.ads_context_data) ? {
+    adId: ref.ad_id ? String(ref.ad_id) : null, title: String(ref.ads_context_data?.ad_title || "").slice(0, 200),
+    photoUrl: ref.ads_context_data?.photo_url || ref.ads_context_data?.video_url || null, postId: ref.ads_context_data?.post_id ? String(ref.ads_context_data.post_id) : null,
+  } : null;
+  if (ad && !msg && !event.postback) { // only the ad click, nothing written yet: remember it for their next message
+    await messenger.oneAtATime(`${org}:${psid}`, async () => {
+      const conv = (await Conversation.findOne({ organizationId: org, psid })) || new Conversation({ organizationId: org, psid, channel, pageId: page.accountId });
+      rememberAd(conv, ad);
+      await conv.save();
+    });
+    return;
+  }
   // the 👍 like and stickers come as "image" with a sticker_id: they are stickers, not photos
   const kind = (a) => (a.payload?.sticker_id || msg?.sticker_id ? "sticker" : a.type);
   const text = msg?.quick_reply?.payload || msg?.text || event.postback?.title || (msg?.attachments?.length ? `[${[...new Set(msg.attachments.map(kind))].join(", ")}]` : "");
@@ -130,6 +152,7 @@ async function onMessage(page, event, { channel = "Messenger", ownId = page.acco
     let conv = await Conversation.findOne({ organizationId: org, psid });
     if (!conv) conv = new Conversation({ organizationId: org, psid, channel, pageId: page.accountId });
     if (channel !== "Simulator") await fillProfile(page, conv, channel);
+    if (ad) rememberAd(conv, ad);
     messenger.addMessage(conv, "customer", text, { mid: msg?.mid || null, image: images[0] || null });
     await agent.handleCustomerMessage(org, conv, text, { images, captions, audios, shared });
     await conv.save();

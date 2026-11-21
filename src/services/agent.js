@@ -343,7 +343,7 @@ async function handleCustomerMessage(org, conv, text, { images = [], captions = 
       text = `[Customer sent a photo: ${seen.text}${seen.writing ? `. Written in it: "${seen.writing}". If this is their name, phone or address, use it for the order exactly like typed text` : ""}${seen.productName ? `. It is our product "${seen.productName}"` : ". If it is not clearly one of our products, say what you see and suggest our closest products (same type / colour). Do not ask for another photo"}]`;
     } else if (images.length) {
       // the photo could not be looked at: never ask for "a photo" right after they sent one
-      messenger.addMessage(conv, "system", `📷 AI could not look at this photo: ${photoError || "unknown reason"}`);
+      messenger.addMessage(conv, "system", `📷 AI could not look at this photo: ${photoError || "unknown reason"}${/limit reached/.test(photoError) ? ". Photo AI: use a model with a higher free daily limit (AI_VISION_MODEL) or add billing" : ""}`);
       notify(org, `${conv.customerName} sent a photo the AI could not see`, "Open the chat and answer it.", `inbox?open=${conv._id}`, { push: false }).catch(() => {});
       text = "[Customer sent a photo, but you cannot see it right now. Do NOT ask them to send a photo again. Say you got the photo and ask them to write the product name, or what they want to know]";
     } else {
@@ -353,6 +353,14 @@ async function handleCustomerMessage(org, conv, text, { images = [], captions = 
     }
   }
   if (HUMAN_WORDS.test(text)) return handToHuman(org, conv, `Customer said: "${text.slice(0, 80)}"`, settings.ai.handoffMessage);
+  // The customer came from an ad (in the last day): find the product it shows, so "Price?" gets a real answer
+  const ad = conv.adContext;
+  if (ad && !ad.used && Date.now() - new Date(ad.at).getTime() < 24 * 3600e3) {
+    const fromAd = await productFromAd(org, conv, ad).catch((e) => { console.warn("ad:", e.message); return { products: [] }; });
+    conv.adContext = { ...ad, used: true }; conv.markModified?.("adContext");
+    if (fromAd.products.length) conv.lastProductIds = fromAd.products.map((p) => p._id);
+    text = `${text}\n[The customer came from your ad${ad.title ? ` "${ad.title}"` : ""}${fromAd.caption ? ` (ad text: "${fromAd.caption.slice(0, 300)}")` : ""}. ${fromAd.products.length ? `It shows our product${fromAd.products.length > 1 ? "s" : ""}: ${fromAd.products.map((p) => `${p.name} (productId ${p._id})`).join(", ")}. Answer about ${fromAd.products.length > 1 ? "them" : "it"} directly (price, stock), don't ask which product` : "If you can't tell which product the ad shows, ask politely which one they liked"}]`;
+  }
   if (!aiReady()) return handToHuman(org, conv, "AI is not set up (AI_API_KEY missing)", settings.ai.handoffMessage);
 
   // New chat: once, the AI says it is the shop's AI assistant (and how to reach a person), then answers
@@ -456,6 +464,26 @@ async function sharedPost(org, conv, shared, captions) {
   if (!caption) return null;
   const products = await Product.find({ organizationId: org, archived: { $ne: true } }).select("name nameBn").lean();
   return { caption, products: productsIn(caption, products, 3) };
+}
+
+// The product an ad shows: from its title, then the post text, then its photo compared with the shop's photos
+async function productFromAd(org, conv, ad) {
+  const products = await Product.find({ organizationId: org, archived: { $ne: true } }).select("name nameBn info imageUrl").sort({ updatedAt: -1 }).limit(150).lean();
+  let found = ad.title ? productsIn(ad.title, products, 3) : [];
+  let caption = "";
+  if (!found.length && ad.postId && !messenger.isSimulator(conv)) {
+    const page = await messenger.pageOf(org, conv.pageId);
+    const r = await graph(`/${ad.postId}`, { token: decrypt(page.accessToken), params: { fields: "message" } }).catch(() => ({}));
+    caption = r.message || "";
+    if (caption) found = productsIn(caption, products, 3);
+  }
+  if (!found.length && ad.photoUrl && vision.visionReady()) {
+    const seen = await vision.describePhoto(ad.photoUrl, products).catch(() => null);
+    const p = seen?.productId && products.find((x) => x._id === seen.productId);
+    if (p) found = [p];
+    if (!caption && seen?.text) caption = seen.text;
+  }
+  return { products: found, caption };
 }
 
 async function lookAtPhoto(org, image) {

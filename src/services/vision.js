@@ -52,7 +52,8 @@ Return JSON only: {"text":"","writing":"","productId":null}`,
     user: `SHOP PRODUCTS (id | name | details):\n${list || "(none)"}${extra.length ? compare : ""}`,
   });
   // many photos in one request can hit the free plan's limits: then look at the customer's photo alone
-  const answer = await ask(withPhoto).catch((e) => (withPhoto.length ? ask([]) : Promise.reject(e)));
+  // (not after "limit reached": that would only use up more of the day's quota)
+  const answer = await ask(withPhoto).catch((e) => (withPhoto.length && !e.limit ? ask([]) : Promise.reject(e)));
   const productId = products.some((p) => p._id === answer.productId) ? answer.productId : null;
   return { text: String(answer.text || "").slice(0, 300), writing: String(answer.writing || "").trim().slice(0, 600), productId };
 }

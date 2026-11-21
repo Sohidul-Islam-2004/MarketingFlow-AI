@@ -39,13 +39,15 @@ async function askAI({ system, user, temperature = 0.5, maxTokens = 1500, images
     delete body.response_format; delete body.reasoning_effort;
     res = await call();
   }
-  // Busy (rate limit) or a provider hiccup: wait a little and try again, twice at most
-  for (let attempt = 1; attempt <= 2 && (res.status === 429 || res.status >= 500); attempt++) {
+  // Busy (rate limit) or a provider hiccup: wait a little and try again, twice at most.
+  // quick (photos / voice on a free plan with a small daily limit): a 429 is not retried, each try uses up the day's quota
+  for (let attempt = 1; attempt <= 2 && ((res.status === 429 && !quick) || res.status >= 500); attempt++) {
     const wait = Math.min(8, Number(res.headers.get("retry-after")) || attempt * 2);
     await sleep(wait * 1000);
     res = await call();
   }
   const json = await res.json().catch(() => ({}));
+  if (res.status === 429) throw Object.assign(fail(502, "limit reached on the AI plan (too many requests, try a model with a higher free limit or add billing)"), { limit: true });
   if (!res.ok) throw fail(502, `AI provider error: ${json.error?.message || res.status}`);
   return parseJSON(json.choices?.[0]?.message?.content);
 }

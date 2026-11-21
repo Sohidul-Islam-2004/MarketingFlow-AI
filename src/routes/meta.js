@@ -18,7 +18,7 @@ const SCOPES = [
   "business_management",
 ].join(",");
 const INSTAGRAM_SCOPES = ["instagram_basic", "instagram_manage_messages", "instagram_manage_comments", "instagram_content_publish"].join(",");
-const WEBHOOK_FIELDS = ["messages", "messaging_postbacks", "message_echoes", "feed"];
+const WEBHOOK_FIELDS = ["messages", "messaging_postbacks", "message_echoes", "messaging_referrals", "feed"];
 
 
 // The "state" Facebook sends back tells us which workspace started the login. It is signed with

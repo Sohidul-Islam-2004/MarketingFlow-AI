@@ -8,7 +8,7 @@ const { graph } = require("../lib/graph");
 const { sleep } = require("../lib/utils");
 
 const SUBSCRIPTIONS = [
-  { object: "page", fields: "messages,messaging_postbacks,message_echoes,feed" },
+  { object: "page", fields: "messages,messaging_postbacks,message_echoes,messaging_referrals,feed" },
   { object: "instagram", fields: "messages,messaging_postbacks,comments" }, // only works if the app has the Instagram product
 ];
 
