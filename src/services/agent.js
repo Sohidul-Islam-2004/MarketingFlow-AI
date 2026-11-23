@@ -69,7 +69,7 @@ function productLines(products, full = new Set()) {
     const variants = p.variants.map((v) => `${v._id}=${v.name} ${priceText(v)} ${stockText(v)}`).join("; ");
     const offerText = offer ? ` | OFFER: ${offerLabel(offer)}${offer.until ? ` until ${new Date(offer.until).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Dhaka" })}` : ""}` : "";
     // the shop's own details, in its own words (warranty, fabric, RAM…)
-    const details = [...(p.info || []).filter((i) => i.value).map((i) => (i.label ? `${i.label}: ${i.value}` : i.value)), p.description].filter(Boolean).join("; ").replace(/\s+/g, " ").slice(0, full.has(p._id) ? 3000 : 300);
+    const details = [...(p.info || []).filter((i) => i.value).map((i) => (i.label ? `${i.label}: ${i.value}` : i.value)), p.description, p.storeText].filter(Boolean).join("; ").replace(/\s+/g, " ").slice(0, full.has(p._id) ? 3000 : 300);
     return `${p._id} | ${p.name}${p.nameBn ? " / " + p.nameBn : ""} | ${variants}${offerText}${details ? ` | details: ${details}` : ""} | photo: ${p.imageUrl ? "yes" : "no"}`;
   }).join("\n");
 }

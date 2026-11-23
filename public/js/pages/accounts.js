@@ -1,10 +1,13 @@
-// Facebook Page + Instagram: add your own Meta app, connect your Page (and its Instagram), check, disconnect.
+// Connections: everything the shop connects, on one page.
+//   Facebook Page + Instagram: add your own Meta app, connect your Page (and its Instagram), check, disconnect.
+//   Your website (WooCommerce / Shopify / a developer-made website): see js/website.js
 //   GET/PUT/DELETE /api/accounts/app  -> the shop's own Meta app (services/metaApp.js)
 //   /api/meta/connect                 -> Facebook login (uses the own app if saved, otherwise the shared app)
 //   /api/meta/connect?with=instagram  -> same login, also asks for Instagram and saves the linked account
 import { get, post, put, del } from "../api.js";
 import { esc, dateTime, onAction, toast, pill, table, confirmBox, $ } from "../ui.js";
 import { isPhone } from "../app.js";
+import { drawWebsite } from "../website.js";
 
 let showForm = false;
 
@@ -52,13 +55,15 @@ async function draw(root, justConnected) {
   const formOpen = showForm || !canConnect; // no app at all: the form is the first step
 
   root.innerHTML = `
-    <div class="page-head"><div><h1>Facebook & Instagram</h1><p>Connect the Page you sell from (and its Instagram). The AI answers chats and comments, and your posts are published there.</p></div>
+    <div class="page-head"><div><h1>Connections</h1><p>Your Facebook Page, Instagram and website, in one place.</p></div>
       <div class="row">${pages.length ? `<button class="btn light" data-action="check">Check connection</button>` : ""}
         ${canConnect ? `<a class="btn ${pages.length ? "light" : ""}" href="/api/meta/connect">${pages.length ? "Add another Page" : "Connect Facebook"}</a>` : ""}</div></div>
     ${justConnected ? `<div class="card good-card"><b>Connected. Next: train the AI on your shop.</b><p class="small muted">It reads this Page and your website and learns your delivery, payment and return rules.</p><a class="btn mt" href="#train">Train the AI →</a></div>` : ""}
 
+    <h2 class="conn-title">📘 Facebook & Instagram</h2>
+    <p class="small muted conn-sub">The AI answers Messenger and Instagram chats and comments, and your posts are published there.</p>
     ${isPhone()
-      ? (canConnect ? "" : `<div class="note">Connecting needs a Meta app first. Set it up once from a computer (Facebook & Instagram page), then connect here.</div>`) // the long app set-up is for a computer
+      ? (canConnect ? "" : `<div class="note">Connecting needs a Meta app first. Set it up once from a computer (this Connections page), then connect here.</div>`) // the long app set-up is for a computer
       : `<div class="card">
       <h3>Meta app</h3>
       ${appStatus(app)}
@@ -80,7 +85,14 @@ async function draw(root, justConnected) {
       <li>Press <b>Check connection</b>. "Messages & comments" must say <b>On</b>, and Status must say <b>Working</b>.</li>
       <li>Send your Page a message from another Facebook account. "Last message from Facebook" should show the time within a few seconds.</li>
       ${app.own ? `<li>Using your own app: in developers.facebook.com check that the <b>Messenger</b> product is added and the app is not restricted.</li>` : ""}
-      <li>Still "none yet"? Press <b>Connect Facebook</b> again and tick your Page in the Facebook window.</li></ol></div>`;
+      <li>Still "none yet"? Press <b>Connect Facebook</b> again and tick your Page in the Facebook window.</li></ol></div>
+
+    <h2 class="conn-title">🌐 Your website</h2>
+    <p class="small muted conn-sub">Products (with prices, photos, options and stock) come from your website by themselves. Confirmed orders can go to it too.</p>
+    <div class="card" id="websiteBox"><p class="small muted">Loading…</p></div>
+
+`;
+  drawWebsite(root.querySelector("#websiteBox")).catch((e) => { const b = root.querySelector("#websiteBox"); if (b) b.innerHTML = `<p class="small muted">${esc(e.message)}</p>`; });
 }
 
 // Instagram works through the Facebook Page, so this card shows only after a Page is connected

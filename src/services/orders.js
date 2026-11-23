@@ -154,6 +154,8 @@ async function changeStatus(org, orderId, to, options = {}) {
     order.markModified("history");
     await order.save();
   }
+  // Confirmed: create it on the shop's website too (WooCommerce / Shopify), when one is connected
+  if (to === "confirmed") await require("./storeSync").pushOrder(org, order).catch((e) => console.warn("website order:", e.message));
   return { ...order.toObject(), told };
 }
 

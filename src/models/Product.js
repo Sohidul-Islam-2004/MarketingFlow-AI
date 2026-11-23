@@ -18,6 +18,7 @@ const variantSchema = new Schema(
     onHand: { type: Number, default: 0 },
     reserved: { type: Number, default: 0 },
     available: { type: Number, default: 0 },
+    storeId: { type: String, default: null }, // the variant's id on the shop's website (WooCommerce / Shopify)
   }
 );
 
@@ -38,6 +39,9 @@ const productSchema = new Schema(
     alwaysAvailable: { type: Boolean, default: false },
     offer: { type: new Schema({ kind: { type: String, default: "percent" }, value: { type: Number, default: 0 }, until: { type: Date, default: null } }, { _id: false }), default: null },
     archived: { type: Boolean, default: false },
+    storeId: { type: String, default: null }, // product id on the shop's website: kept in sync by services/storeSync.js
+    storeText: { type: String, default: "" },
+    offerFromStore: { type: Boolean, default: false }, // the offer is the website's sale (ends when the sale ends there) // the website's description (the AI reads it; the shop's own "description" is never overwritten)
     variants: { type: [variantSchema], default: [] },
   },
   options

@@ -18,4 +18,5 @@ module.exports = {
   Notification: require("./Notification"),
   ProcessedEvent: require("./ProcessedEvent"),
   ShopScan: require("./ShopScan"),
+  StoreLink: require("./StoreLink"),
 };

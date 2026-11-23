@@ -5,6 +5,7 @@ const { sendWaitingReplies } = require("./services/comments");
 const { checkAllPages } = require("./routes/meta");
 const { sendReminders } = require("./services/followUp");
 const { sweepChatPhotos } = require("./services/photos");
+const { syncAll: syncWebsites } = require("./services/storeSync");
 
 const running = new Set();
 // Runs a job unless the previous run of the same job is still busy
@@ -24,6 +25,7 @@ function startJobs() {
   setInterval(() => run("order reminders", sendReminders), 10 * 60 * 1000); // customers who stopped mid-order
   setInterval(() => run("check Page tokens", checkAllPages), 6 * 60 * 60 * 1000); // finds expired tokens for the Admin page
   setInterval(() => run("old chat photos", sweepChatPhotos), 6 * 60 * 60 * 1000); // photos sent from the Inbox, after 7 days
+  setInterval(() => run("website sync", syncWebsites), 2 * 60 * 60 * 1000); // WooCommerce / Shopify products + orders that didn't go
   console.log("⏱️  Jobs on: publish posts every 30s, comment replies every 10s");
 }
 

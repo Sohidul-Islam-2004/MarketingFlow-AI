@@ -19,7 +19,7 @@ const MENU = [
   ["orders", "Orders", [["orders", "Orders"], ["customers", "Customers"]]],
   ["inventory", "Products", [["inventory", "Products"]]],
   ["content", "Posts", [["content", "Posts"], ["calendar", "Calendar"]]],
-  ["setup", "Setup", [["accounts", "Facebook & Instagram"], ["train", "AI Training"], ["settings", "Settings"], ["look", "Look"]]],
+  ["setup", "Setup", [["accounts", "Connections"], ["train", "AI Training"], ["settings", "Settings"], ["look", "Look"]]],
 ];
 const ADMIN_MENU = [["admin-customers", "Shops", [["admin-customers", "Shops"]]], ["admin-pages", "All Pages", [["admin-pages", "All Pages"]]]]; // SUPER_ADMIN_EMAILS only
 let SHOW_ADMIN = false;

@@ -48,6 +48,7 @@ app.use("/api/learn", require("./src/routes/learn"));
 app.use("/api/admin", requireAdmin, require("./src/routes/admin")); // Super Admin only
 app.use("/api/settings", require("./src/routes/settings"));
 app.use("/api/push", require("./src/routes/push")); // phone / computer alerts
+app.use("/api/store", require("./src/routes/store")); // the shop's WooCommerce / Shopify website
 app.use("/api", (req, res) => res.status(404).json({ error: `Unknown API: ${req.method} ${req.originalUrl}` }));
 
 connectDB()
