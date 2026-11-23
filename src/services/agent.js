@@ -26,6 +26,7 @@ const { activeOffer, offerLabel } = require("../lib/offer");
 const { createOrder } = require("./orders");
 const messenger = require("./messenger");
 const { productsIn } = require("../lib/productMatch");
+const { optionLine } = require("../lib/optionGrid");
 const { graph } = require("../lib/graph");
 const { decrypt } = require("../lib/crypto");
 
@@ -59,17 +60,26 @@ async function aiSettings(org) {
 }
 
 /* ---------- what the AI is allowed to know ---------- */
-// `full` = ids of the products this chat is about: their details go in whole (a shop may write a long post),
-// the other products get a short version so the AI stays fast.
-function productLines(products, full = new Set()) {
+// `full` = ids of the products this chat is about: every option with its id (so the AI can order it) and the
+// whole details (a shop may write a long post). The other products are one short line each, so the request
+// stays small (a website's product can have 20+ options: colours × sizes × add-ons).
+function productLines(products, full = new Set(), tight = false) {
   return products.map((p) => {
     const stockText = (v) => (p.alwaysAvailable ? "available to order" : v.available > 0 ? `${v.available} in stock` : "OUT OF STOCK");
     const offer = activeOffer(p);
     const priceText = (v) => (offer ? `${taka(priceOf(p, v))} (OFFER, normal price ${taka(fullPriceOf(p, v))})` : taka(priceOf(p, v)));
+    if (!full.has(p._id)) {
+      const opts = p.variants.filter((v) => v.name && v.name !== "Default");
+      const inStock = p.alwaysAvailable || p.variants.some((v) => v.available > 0);
+      const prices = [...new Set(p.variants.map((v) => priceOf(p, v)))].sort((a, b) => a - b);
+      const short = opts.length ? optionLine(opts.map((v) => ({ name: v.name, price: priceOf(p, v) }))) || opts.slice(0, 8).map((v) => v.name).join(", ") + (opts.length > 8 ? "…" : "") : "";
+      const about = [...(p.info || []).filter((i) => i.value).map((i) => (i.label ? `${i.label}: ${i.value}` : i.value)), p.description, p.storeText].filter(Boolean).join("; ").replace(/\s+/g, " ").slice(0, tight ? 0 : 70);
+      return `${p._id} | ${p.name}${p.nameBn ? " / " + p.nameBn : ""} | ${prices.length > 1 ? `${taka(prices[0])}–${taka(prices.at(-1))}` : taka(prices[0])}${offer ? " (OFFER)" : ""}${short ? ` | options (summary): ${short}` : ""} | ${inStock ? "in stock" : "OUT OF STOCK"}${about ? ` | about: ${about}` : ""} | photo: ${p.imageUrl ? "yes" : "no"}`;
+    }
     const variants = p.variants.map((v) => `${v._id}=${v.name} ${priceText(v)} ${stockText(v)}`).join("; ");
     const offerText = offer ? ` | OFFER: ${offerLabel(offer)}${offer.until ? ` until ${new Date(offer.until).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Dhaka" })}` : ""}` : "";
     // the shop's own details, in its own words (warranty, fabric, RAM…)
-    const details = [...(p.info || []).filter((i) => i.value).map((i) => (i.label ? `${i.label}: ${i.value}` : i.value)), p.description, p.storeText].filter(Boolean).join("; ").replace(/\s+/g, " ").slice(0, full.has(p._id) ? 3000 : 300);
+    const details = [...(p.info || []).filter((i) => i.value).map((i) => (i.label ? `${i.label}: ${i.value}` : i.value)), p.description, p.storeText].filter(Boolean).join("; ").replace(/\s+/g, " ").slice(0, tight ? 600 : 1200);
     return `${p._id} | ${p.name}${p.nameBn ? " / " + p.nameBn : ""} | ${variants}${offerText}${details ? ` | details: ${details}` : ""} | photo: ${p.imageUrl ? "yes" : "no"}`;
   }).join("\n");
 }
@@ -107,7 +117,7 @@ function relevantKnowledge(knowledge, recentText, budget = 3500) {
   return chosen.sort((a, b) => a.index - b.index).map((s) => s.body).join("\n\n");
 }
 
-async function knowledgeFor(org, settings, recentText, draft, focusIds = []) {
+async function knowledgeFor(org, settings, recentText, draft, focusIds = [], tight = false) {
   const all = await Product.find({ organizationId: org, archived: { $ne: true } }).lean();
   // Send the 40 products that best match the chat (and everything already in the draft)
   const words = normalizeText(recentText).split(" ").filter((w) => w.length > 1);
@@ -115,16 +125,19 @@ async function knowledgeFor(org, settings, recentText, draft, focusIds = []) {
   const scored = all
     .map((p) => ({ p, score: (inDraft.has(p._id) ? 100 : 0) + words.filter((w) => normalizeText(`${p.name} ${p.nameBn} ${p.category}`).includes(w)).length }))
     .sort((a, b) => b.score - a.score)
-    .slice(0, 40);
+    .slice(0, tight ? 15 : 40);
   const ranked = scored.map((x) => x.p);
-  // full details for the products the chat is about (max 4), or for all when the shop has only a few
-  const full = new Set((all.length <= 4 ? scored : scored.filter((x) => x.score > 0).slice(0, 4)).map((x) => x.p._id));
+  // Full details for the products the chat is about: in the order / shown in a photo or ad, or named by the
+  // customer ("নূর আবায়া নিব"). A shared word ("বোরকা") is not enough. A shop with only a few products: all.
+  const said = normalizeText(recentText);
+  const named = (p) => [p.name, p.nameBn].filter(Boolean).some((n) => { const w = normalizeText(n); return w.length > 1 && said.includes(w); });
+  const full = new Set((all.length <= 3 ? scored : scored.filter((x) => x.score >= 100 || named(x.p)).slice(0, tight ? 1 : 3)).map((x) => x.p._id));
   const zones = settings.zones?.length ? settings.zones : DEFAULT_ZONES;
   const text = [
     `BUSINESS: ${settings.name || "our shop"}`,
     `DELIVERY FEES: ${zones.map((z) => `${z.name} ${taka(z.fee)}`).join(", ")}. Delivery time: ${settings.ai.deliveryTime || "ask the team"}. Payment: cash on delivery.`,
-    settings.ai.knowledge ? `BUSINESS INFO / POLICIES / FAQ:\n${relevantKnowledge(settings.ai.knowledge, recentText)}` : "",
-    `PRODUCTS (productId | name | options as variantId=name price stock | details written by the shop):\n${productLines(ranked, full) || "(no products yet)"}`,
+    settings.ai.knowledge ? `BUSINESS INFO / POLICIES / FAQ:\n${relevantKnowledge(settings.ai.knowledge, recentText, tight ? 1000 : 2500)}` : "",
+    `PRODUCTS (productId | name | options as variantId=name price stock | details written by the shop). Products with "options (summary)" are shown short: once the customer picks one, its full option list comes with the next message; to order it now, ask which option they want:\n${productLines(ranked, full, tight) || "(no products yet)"}`,
   ].filter(Boolean).join("\n\n");
   return { text, products: all };
 }
@@ -149,11 +162,15 @@ function ordersText(orders) {
   }).join("\n");
 }
 
-async function askAgent(org, settings, conv, latestText, history = { orders: [], known: null }, introSent = false) {
+// About how many tokens a text is (Bangla takes more tokens per letter than English)
+const tokensOf = (s) => Math.ceil(String(s).replace(/[^\x00-\x7F]/g, "").length / 4 + String(s).replace(/[\x00-\x7F]/g, "").length / 1.6);
+const PROMPT_TOKENS = Number(process.env.AI_PROMPT_TOKENS) || 5500; // the AI plan's per-minute limit, minus the answer
+
+async function askAgent(org, settings, conv, latestText, history = { orders: [], known: null }, introSent = false, tight = false) {
   const photoNote = (m) => m.from === "system" && /^📷 AI saw:/.test(m.text || "");
   const recent = conv.messages.filter((m) => m.from === "customer" || photoNote(m)).slice(-6).map((m) => m.text).join(" ");
-  const k = await knowledgeFor(org, settings, `${recent} ${latestText}`, conv.draft, conv.lastProductIds);
-  const chat = conv.messages.slice(-16).filter((m) => m.from !== "system" || photoNote(m))
+  const k = await knowledgeFor(org, settings, `${recent} ${latestText}`, conv.draft, conv.lastProductIds, tight);
+  const chat = conv.messages.slice(tight ? -8 : -16).filter((m) => m.from !== "system" || photoNote(m))
     .map((m) => (photoNote(m) ? `(THE CUSTOMER'S PHOTO SHOWED: ${m.text.replace(/^📷 AI saw:\s*/, "")})` : `${m.from === "customer" ? "CUSTOMER" : m.from === "agent" ? "SHOP STAFF" : "YOU"}: ${m.text}`)).join("\n");
   const about = (conv.lastProductIds || []).map((id) => k.products.find((p) => p._id === String(id))).filter(Boolean);
   const d = conv.draft || {};
@@ -181,7 +198,13 @@ RULES
 Return JSON only: ${ANSWER_SHAPE}`;
   const known = history.known ? `RETURNING CUSTOMER (from their last order): ${history.known.name}, ${history.known.phone}, ${history.known.address}, ${history.known.district || ""}` : "";
   const user = [k.text, ordersText(history.orders), known, `CURRENT DRAFT: ${JSON.stringify(currentDraft)}`, about.length ? `CHAT IS ABOUT: ${about.map((p) => `${p.name} (productId ${p._id})`).join(", ")}` : "", `CHAT SO FAR:\n${chat || "(new chat)"}`, `CUSTOMER (latest): ${latestText}`].filter(Boolean).join("\n\n");
-  const answer = await askAI({ system, user, temperature: 0.3, maxTokens: 900 });
+  // Too big for the AI plan's limit: the same question, shorter (fewer products, shorter chat)
+  if (!tight && tokensOf(system + user) > PROMPT_TOKENS) return askAgent(org, settings, conv, latestText, history, introSent, true);
+  const answer = await askAI({ system, user, temperature: 0.3, maxTokens: 800 }).catch((e) => {
+    if (!tight && /too large|reduce your message|context length|maximum context/i.test(e.message)) return null;
+    throw e;
+  });
+  if (!answer) return askAgent(org, settings, conv, latestText, history, introSent, true);
   return { answer, products: k.products };
 }
 
