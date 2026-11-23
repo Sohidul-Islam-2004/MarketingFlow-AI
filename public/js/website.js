@@ -3,6 +3,7 @@
 //        → "Import N products". Then: Sync now, send confirmed orders to the website, disconnect.
 import { get, post, put, del } from "./api.js";
 import { esc, onAction, toast, confirmBox, dateTime, readForm } from "./ui.js";
+import { optionSummary } from "./options.js";
 
 let kind = "woocommerce"; // the choice before connecting
 let typed = {}; // what was typed, kept while looking at the preview
@@ -100,7 +101,9 @@ function previewView(p) {
       ${it.imageUrl ? `<img src="${esc(it.imageUrl)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'pv-noimg',textContent:'no photo'}))">` : `<div class="pv-noimg">no photo</div>`}
       <div class="pv-body"><b>${esc(it.name)}</b>
         <div class="pv-price">${it.offer ? `<s>${taka(it.price)}</s> ${taka(it.price - it.offer.value)}` : it.price ? taka(it.price) : `<span class="bad">no price</span>`}${it.category ? ` <span class="muted">· ${esc(it.category)}</span>` : ""}</div>
-        ${it.options.length ? `<div class="pv-opts">${it.options.map((o) => `<span>${esc(o.name)}${o.price && o.price !== it.price ? ` ${taka(o.price)}` : ""} · ${o.stock === null ? "available" : `${o.stock} pcs`}</span>`).join("")}</div>`
+        ${it.options.length && optionSummary(it.options.map((o) => ({ ...o, price: o.price ?? (it.offer ? it.price - it.offer.value : it.price) })))
+          ? optionSummary(it.options.map((o) => ({ ...o, price: o.price ?? (it.offer ? it.price - it.offer.value : it.price) })))
+          : it.options.length ? `<div class="pv-opts">${it.options.map((o) => `<span>${esc(o.name)}${o.price && o.price !== it.price ? ` ${taka(o.price)}` : ""} · ${o.stock === null ? "available" : `${o.stock} pcs`}</span>`).join("")}</div>`
           : `<div class="small muted">${it.stock === null || it.stock === undefined ? "Always available" : `${it.stock} in stock`}</div>`}
         ${it.text ? `<div class="small muted pv-text">${esc(it.text)}</div>` : ""}</div></div>`;
   return `<div class="stack">

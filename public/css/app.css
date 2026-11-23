@@ -654,3 +654,8 @@ button.link.danger { color: var(--red); }
 .pv-opts span { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--soft); }
 .pv-text { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .store-pick button { padding: 0 6px; font-size: 14px; line-height: 1.2; }
+/* many options, summed up (js/options.js) */
+.og { display: grid; gap: 3px; font-size: 13px; }
+.og-line { line-height: 1.45; }
+.og-add b { font-weight: 650; }
+.og-out { color: var(--red); }

@@ -7,6 +7,7 @@ import { get, post, put, del } from "../api.js";
 import { esc, taka, table, onAction, openModal, toast, options, dateTime, pill, confirmBox, liveSearch, empty, chips, moreMenu, icon } from "../ui.js";
 import { pickPhoto, shrinkPhoto } from "../photo.js";
 import { thumb } from "../mobile/kit.js";
+import { optionSummary, sameStock } from "../options.js";
 
 // show: "" all · "low" low stock · "offer" on offer · "archived"
 let filters = { q: "", show: "" };
@@ -50,8 +51,9 @@ async function draw(root) {
         ["Price", (p) => (p.offerOn
           ? `<b>${taka(p.salePrice)}</b> <s class="small muted">${taka(p.price)}</s><div>${pill(offerText(p.offer), "pink")}</div>${p.offer.until ? `<div class="small muted">until ${untilText(p.offer.until)}</div>` : ""}`
           : taka(p.price) + (p.offerEnded ? `<div class="small muted">offer ended</div>` : ""))],
-        ["Options", (p) => p.variants.map((v) => pill(optionText(p, v), p.alwaysAvailable ? "grey" : v.available <= 0 ? "red" : v.available <= p.lowStockAt ? "yellow" : "grey")).join(" ")],
-        ["Stock", (p) => p.alwaysAvailable ? pill("Always available", "green") : `<b>${p.available}</b>${p.reserved ? `<div class="small muted">${p.reserved} in orders</div>` : ""}`],
+        ["Options", (p) => optionSummary(p.variants.map((v) => ({ name: v.name, price: v.price ?? (p.offerOn ? p.salePrice : p.price), stock: p.alwaysAvailable ? null : v.available })))
+          || p.variants.map((v) => pill(optionText(p, v), p.alwaysAvailable ? "grey" : v.available <= 0 ? "red" : v.available <= p.lowStockAt ? "yellow" : "grey")).join(" ")],
+        ["Stock", (p) => p.alwaysAvailable ? pill("Always available", "green") : sameStock(p.variants.map((v) => ({ name: v.name, stock: v.available }))) != null ? `<b>${sameStock(p.variants.map((v) => ({ name: v.name, stock: v.available })))}</b><div class="small muted">each option</div>` : `<b>${p.available}</b>${p.reserved ? `<div class="small muted">${p.reserved} in orders</div>` : ""}`],
         ["", (p) => `<div class="row" style="flex-wrap:nowrap;justify-content:flex-end">
           ${archived ? `<button class="btn sm light" data-action="archive" data-id="${p._id}">Restore</button><button class="btn sm danger" data-action="remove" data-id="${p._id}">Delete</button>`
             : `${p.alwaysAvailable ? "" : `<button class="btn sm light" data-action="adjust" data-id="${p._id}">Stock +/−</button>`}

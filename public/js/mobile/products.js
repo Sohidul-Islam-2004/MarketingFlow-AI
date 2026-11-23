@@ -4,6 +4,7 @@ import { get, post } from "../api.js";
 import { esc, taka, onAction, liveSearch, chips, toast } from "../ui.js";
 import { productForm, adjustForm } from "../pages/inventory.js";
 import { row, thumb, fab, searchBox, actionSheet } from "./kit.js";
+import { optionShort } from "../options.js";
 
 const filters = { q: "", show: "" };
 let products = [];
@@ -32,6 +33,8 @@ export async function render(root, params) {
 function stockText(p) {
   if (p.alwaysAvailable) return "Always available";
   const named = p.variants.filter((v) => v.name !== "Default");
+  const short = optionShort(named.map((v) => ({ name: v.name, price: v.price, stock: v.available })));
+  if (short) return short;
   return named.length ? named.map((v) => `${esc(v.name)} ${v.available}`).join(" · ") : `${p.available} in stock`;
 }
 
