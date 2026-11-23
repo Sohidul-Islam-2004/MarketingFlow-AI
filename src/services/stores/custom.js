@@ -53,44 +53,86 @@ function imageOf(o, base) {
   try { return new URL(String(img), base).href; } catch { return ""; }
 }
 
-// price + sale price -> { price, offer }
+// price, sale price, "was" price -> { price (normal), offer, now (what the customer pays) }
+//   { price: 1100, sale_price: 950 }  { regularPrice: 1100, price: 950 }  { mrp: 1100, price: 950 }  -> 1100, offer 150, now 950
 function priceOf(o) {
-  const regular = toNum(pick(o, ["regular_price", "regularPrice", "mrp", "original_price", "originalPrice", "compare_at_price", "price"]));
+  const cur = toNum(pick(o, ["price", "amount", "current_price", "currentPrice", "selling_price", "sellingPrice"]));
+  const was = toNum(pick(o, ["regular_price", "regularPrice", "mrp", "original_price", "originalPrice", "compare_at_price", "compareAtPrice", "old_price", "oldPrice", "list_price"]));
   const sale = toNum(pick(o, ["sale_price", "salePrice", "discount_price", "discountPrice", "offer_price", "offerPrice", "special_price"]));
-  if (regular && sale && sale < regular) return { price: regular, offer: { kind: "amount", value: regular - sale, until: null }, now: sale };
-  const price = toNum(pick(o, ["price", "sale_price", "salePrice", "regular_price", "amount"]));
-  return { price, offer: null, now: price };
+  const now = sale > 0 ? sale : cur ?? was;
+  if (now == null) return { price: null, offer: null, now: null };
+  const base = Math.max(now, ...[was, sale > 0 ? cur : null].filter((x) => x > 0));
+  return { price: base, offer: base > now ? { kind: "amount", value: base - now, until: null } : null, now };
 }
 
+// Details the AI reads: a details/specs block, and common single fields (fabric, brand, warranty…)
+const FACT_FIELDS = [["fabric", "Fabric"], ["material", "Material"], ["brand", "Brand"], ["model", "Model"], ["origin", "Origin"], ["made_in", "Made in"], ["madeIn", "Made in"],
+  ["warranty", "Warranty"], ["weight", "Weight"], ["size_chart", "Size chart"], ["sizeChart", "Size chart"], ["care", "Care"], ["fit", "Fit"]];
 function factsOf(o) {
+  const out = [];
   const d = pick(o, ["details", "specs", "specifications", "attributes", "info", "features"]);
-  if (!d) return [];
-  if (Array.isArray(d)) return d.map((x) => (typeof x === "string" ? text(x) : `${text(pick(x, ["label", "name", "key", "title"]) || "")}: ${text(pick(x, ["value", "values", "options", "text"]) ?? "")}`)).filter((l) => l && !/^:\s*$/.test(l));
-  if (typeof d === "object") return Object.entries(d).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : text(v)}`);
-  return [text(d)];
+  if (Array.isArray(d)) out.push(...d.map((x) => (typeof x === "string" ? text(x) : `${text(pick(x, ["label", "name", "key", "title"]) || "")}: ${text([].concat(pick(x, ["value", "values", "options", "text"]) ?? "").join(", "))}`)).filter((l) => l && !/^:\s*|:\s*$/.test(l)));
+  else if (d && typeof d === "object") out.push(...Object.entries(d).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : text(v)}`));
+  else if (d) out.push(text(d));
+  for (const [k, label] of FACT_FIELDS) if (typeof o[k] === "string" || typeof o[k] === "number") { const v = text(o[k]); if (v && !out.some((l) => l.toLowerCase().startsWith(`${label.toLowerCase()}:`))) out.push(`${label}: ${v}`); }
+  return out;
 }
+
+// One group of choices: ["52","54"]  or  [{ name: "Black", price?, stock? }, …]
+const choicesOf = (list) => (Array.isArray(list) ? list : []).map((v, i) => (typeof v === "object" && v
+  ? { id: pick(v, ["id", "_id", "sku"]), name: text(pick(v, ["name", "title", "label", "option", "size", "color", "value"]) || `#${i + 1}`), price: priceOf(v).now, stock: pick(v, ["stock", "quantity", "qty", "countInStock", "inStock", "in_stock", "available"]) !== undefined ? stockOf(v) : undefined }
+  : { name: text(v), price: null, stock: undefined })).filter((c) => c.name);
+
+const MAX_OPTIONS = 60;
+// Options a customer picks: given options/variants, or colours × sizes (× add-ons like "+ হিজাব ৳250")
+function optionsOf(o, productId, now, stock) {
+  const given = pick(o, ["options", "variants", "variations"]);
+  if (Array.isArray(given) && given.length && given.some((v) => typeof v === "object" && !Array.isArray(v.values))) {
+    return choicesOf(given).map((c) => ({ id: String(c.id ?? `${productId}|${c.name}`), name: c.name, price: c.price ?? now, stock: c.stock === undefined ? stock : c.stock }));
+  }
+  // groups: colours, sizes (and Shopify-style [{ name: "Size", values: [...] }])
+  const groups = [];
+  if (Array.isArray(given)) for (const g of given) if (g && Array.isArray(g.values)) groups.push(choicesOf(g.values));
+  for (const k of ["colors", "colours", "color", "sizes", "size", "lengths"]) if (Array.isArray(o[k]) && o[k].length) groups.push(choicesOf(o[k]));
+  let combos = [{ parts: [], price: now, stock }];
+  for (const g of groups.filter((x) => x.length)) {
+    const next = [];
+    for (const c of combos) for (const ch of g) next.push({ parts: [...c.parts, ch.name], price: ch.price ?? c.price, stock: ch.stock === undefined ? c.stock : ch.stock });
+    if (next.length > MAX_OPTIONS) break;
+    combos = next;
+  }
+  const addons = choicesOf(pick(o, ["addons", "add_ons", "addOns", "extras", "upsells"]) || []).filter((a) => a.price != null);
+  if (addons.length && combos.length * (addons.length + 1) <= MAX_OPTIONS) {
+    combos = combos.flatMap((c) => [c, ...addons.map((a) => ({ parts: [...c.parts, `+ ${a.name}`], price: (c.price || 0) + a.price, stock: c.stock }))]);
+    if (!combos[0].parts.length) combos[0].parts = ["শুধু পণ্যটি"]; // "only the product" next to "+ হিজাব"
+  }
+  return combos.map((c) => ({ id: [productId, ...c.parts].join("|"), name: c.parts.join(" / ").replace(/ \/ \+ /g, " + "), price: c.price, stock: c.stock }));
+}
+
+const HIDDEN = (o) => o.active === false || o.published === false || o.visible === false || o.isActive === false || ["draft", "hidden", "inactive", "archived", "private"].includes(String(o.status || "").toLowerCase());
 
 function toProduct(o, base) {
   const name = text(pick(o, ["name", "title", "productName", "product_name", "name_en", "name_bn"]));
-  if (!name) return null;
+  if (!name || HIDDEN(o)) return null;
+  const id = String(pick(o, ["id", "_id", "sku", "slug"]) ?? name);
   const { price, offer, now } = priceOf(o);
-  const rawOptions = pick(o, ["options", "variants", "variations", "sizes", "colors"]);
-  let variants = [];
-  if (Array.isArray(rawOptions) && rawOptions.length) {
-    variants = rawOptions.map((v, i) => {
-      if (typeof v !== "object") return { id: `${name}#${text(v)}`, name: text(v), price: null, stock: null };
-      const label = text(pick(v, ["name", "title", "label", "option", "size", "color", "value"]) || `#${i + 1}`);
-      return { id: String(pick(v, ["id", "_id", "sku"]) ?? `${name}#${label}`), name: label, price: priceOf(v).now ?? null, stock: stockOf(v) };
-    });
-  } else variants = [{ id: String(pick(o, ["id", "_id", "sku", "slug"]) ?? name), name: "", price: now, stock: stockOf(o) }];
-  if (variants.length > 1 && offer) variants = variants.map((v) => ({ ...v, price: v.price ?? now })); // options pay the sale price
-  const prices = variants.map((v) => v.price).filter((x) => x != null);
+  const stock = stockOf(o);
+  let variants = optionsOf(o, id, now, stock);
+  const ownPrices = variants.length > 1 && variants.some((v) => v.price !== now);
+  if (variants.length === 1 && !variants[0].name) variants = [{ id, name: "", price: now, stock }];
+  const addons = choicesOf(pick(o, ["addons", "add_ons", "addOns", "extras", "upsells"]) || []);
+  const addonNote = addons.length && !variants.some((v) => v.name.includes("+ ")) ? [`সাথে নিতে পারেন: ${addons.map((a) => `${a.name}${a.price != null ? ` +৳${a.price}` : ""}`).join(", ")}`] : [];
   const category = pick(o, ["category.name", "category", "categories.0.name", "categories.0", "type", "productType"]);
+  let image = imageOf(o, base);
+  if (!image) for (const c of [].concat(o.colors || [])) if (c && typeof c === "object" && c.image) { image = imageOf(c, base); break; }
   return {
-    id: String(pick(o, ["id", "_id", "sku", "slug"]) ?? name), name,
-    price: price ?? (prices.length ? Math.min(...prices) : 0), offer: variants.length > 1 ? null : offer,
-    text: [...factsOf(o), text(pick(o, ["description", "details_text", "short_description", "summary", "desc", "body", "body_html"]))].filter(Boolean).join("\n").slice(0, 4000),
-    imageUrl: imageOf(o, base), category: typeof category === "string" ? text(category) : "", variants,
+    id, name,
+    // options with their own price (add-ons, sizes): each pays its own price, so no product-wide offer on top
+    // (then the product's price is the lowest price paid now, never the old "was" price)
+    price: ownPrices ? Math.min(...variants.map((v) => v.price).filter((x) => x != null)) : price ?? 0, offer: ownPrices ? null : offer,
+    variants: variants.map((v) => ({ ...v, price: ownPrices ? v.price : v.price === now ? null : v.price })),
+    text: [...factsOf(o), ...addonNote, text(pick(o, ["description", "details_text", "short_description", "summary", "desc", "body", "body_html"]))].filter(Boolean).join("\n").slice(0, 4000),
+    imageUrl: image, category: typeof category === "string" ? text(category) : "",
   };
 }
 
