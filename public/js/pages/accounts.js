@@ -8,6 +8,7 @@ import { get, post, put, del } from "../api.js";
 import { esc, dateTime, onAction, toast, pill, table, confirmBox, $ } from "../ui.js";
 import { isPhone } from "../app.js";
 import { drawWebsite } from "../website.js";
+import { drawWebChat } from "../webchat.js";
 
 let showForm = false;
 
@@ -55,7 +56,7 @@ async function draw(root, justConnected) {
   const formOpen = showForm || !canConnect; // no app at all: the form is the first step
 
   root.innerHTML = `
-    <div class="page-head"><div><h1>Connections</h1><p>Your Facebook Page, Instagram and website, in one place.</p></div>
+    <div class="page-head"><div><h1>Connections</h1><p>Your Facebook Page, Instagram, website and website chat, in one place.</p></div>
       <div class="row">${pages.length ? `<button class="btn light" data-action="check">Check connection</button>` : ""}
         ${canConnect ? `<a class="btn ${pages.length ? "light" : ""}" href="/api/meta/connect">${pages.length ? "Add another Page" : "Connect Facebook"}</a>` : ""}</div></div>
     ${justConnected ? `<div class="card good-card"><b>Connected. Next: train the AI on your shop.</b><p class="small muted">It reads this Page and your website and learns your delivery, payment and return rules.</p><a class="btn mt" href="#train">Train the AI →</a></div>` : ""}
@@ -91,7 +92,12 @@ async function draw(root, justConnected) {
     <p class="small muted conn-sub">Products (with prices, photos, options and stock) come from your website by themselves. Confirmed orders can go to it too.</p>
     <div class="card" id="websiteBox"><p class="small muted">Loading…</p></div>
 
+    <h2 class="conn-title">💬 Chat on your website</h2>
+    <p class="small muted conn-sub">A chat button on your website. The AI answers there too, day and night.</p>
+    <div class="card" id="webChatBox"><p class="small muted">Loading…</p></div>
+
 `;
+  drawWebChat(root.querySelector("#webChatBox")).catch((e) => { const b = root.querySelector("#webChatBox"); if (b) b.innerHTML = `<p class="small muted">${esc(e.message)}</p>`; });
   drawWebsite(root.querySelector("#websiteBox")).catch((e) => { const b = root.querySelector("#websiteBox"); if (b) b.innerHTML = `<p class="small muted">${esc(e.message)}</p>`; });
 }
 

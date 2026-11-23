@@ -659,3 +659,7 @@ button.link.danger { color: var(--red); }
 .og-line { line-height: 1.45; }
 .og-add b { font-weight: 650; }
 .og-out { color: var(--red); }
+/* website chat (Connections + Inbox tag) */
+.code-row { display: flex; gap: 8px; align-items: center; }
+.code-row code { flex: 1; min-width: 0; background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; word-break: break-all; }
+.who-tags .ch-website::before { background: var(--green, #16a34a); }

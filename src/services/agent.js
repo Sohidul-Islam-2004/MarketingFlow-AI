@@ -176,7 +176,7 @@ async function askAgent(org, settings, conv, latestText, history = { orders: [],
   const d = conv.draft || {};
   const currentDraft = d.status === "placed" ? { items: [] } : { items: (d.items || []).map((i) => ({ productId: i.productId, variantId: i.variantId, qty: i.qty })), name: d.name || "", phone: d.phone || "", address: d.address || "", district: d.district || "" };
 
-  const system = `You are the sales assistant of a Bangladeshi online shop, chatting on ${conv.channel === "Instagram" ? "Instagram" : "Facebook Messenger"}.
+  const system = `You are the sales assistant of a Bangladeshi online shop, chatting on ${conv.channel === "Instagram" ? "Instagram" : conv.channel === "Website" ? "the chat on the shop's own website" : "Facebook Messenger"}.
 Reply in the customer's language and script (Bangla, Banglish or English). Short and warm, max 3-4 lines. Tone: ${settings.ai.tone}.${introSent ? "\nA greeting that says you are the shop's AI assistant was just sent. Do not greet or introduce yourself again: answer the message directly." : ""}
 RULES
 - Use ONLY the business info and PRODUCTS below. Never invent prices, stock, discounts, delivery times or policies. If you don't know, say you'll check with the team and set needsHuman=true.
@@ -478,7 +478,7 @@ function optionButtons(draft, products) {
 async function sharedPost(org, conv, shared, captions) {
   const s = shared.find((x) => x.title || x.id);
   let caption = s?.title || captions.find(Boolean) || "";
-  if (!caption && s?.id && !messenger.isSimulator(conv)) {
+  if (!caption && s?.id && !messenger.offFacebook(conv)) {
     const page = await messenger.pageOf(org, conv.pageId);
     const field = /^ig_/.test(s.type) || conv.channel === "Instagram" ? "caption" : s.type === "reel" ? "description" : "message";
     const r = await graph(`/${s.id}`, { token: decrypt(page.accessToken), params: { fields: field } }).catch(() => ({})); // works for the shop's own posts
@@ -494,7 +494,7 @@ async function productFromAd(org, conv, ad) {
   const products = await Product.find({ organizationId: org, archived: { $ne: true } }).select("name nameBn info imageUrl").sort({ updatedAt: -1 }).limit(150).lean();
   let found = ad.title ? productsIn(ad.title, products, 3) : [];
   let caption = "";
-  if (!found.length && ad.postId && !messenger.isSimulator(conv)) {
+  if (!found.length && ad.postId && !messenger.offFacebook(conv)) {
     const page = await messenger.pageOf(org, conv.pageId);
     const r = await graph(`/${ad.postId}`, { token: decrypt(page.accessToken), params: { fields: "message" } }).catch(() => ({}));
     caption = r.message || "";

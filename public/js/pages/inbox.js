@@ -8,7 +8,7 @@ import { pickPhoto, shrinkPhoto } from "../photo.js";
 import { updateCounts } from "../app.js";
 
 const state = { tab: "open", q: "", openId: null, chat: null };
-const channelTag = (c) => `<span class="pill ${c === "Simulator" ? "p-grey" : c === "Instagram" ? "p-pink" : "p-blue"}">${esc(c)}</span>`;
+const channelTag = (c) => `<span class="pill ${c === "Simulator" ? "p-grey" : c === "Instagram" ? "p-pink" : c === "Website" ? "p-green" : "p-blue"}">${esc(c)}</span>`;
 
 export async function render(root, params) {
   if (params.tab) state.tab = params.tab;

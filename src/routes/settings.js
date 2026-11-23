@@ -7,6 +7,8 @@ const { DEFAULT_ZONES, DISTRICT_NAMES, canonicalDistrict, findZone } = require("
 const { aiReady } = require("../lib/ai");
 const { setShopAI } = require("../services/aiSwitch");
 const { DEFAULT_INTRO } = require("../lib/intro");
+const crypto = require("crypto");
+const { PUBLIC_BASE_URL } = require("../config");
 
 router.get("/", handle(async (req, res) => {
   const o = await Organization.findById(req.org).lean();
@@ -18,6 +20,26 @@ router.get("/", handle(async (req, res) => {
     usingDefaultZones: !o.zones?.length,
     districts: DISTRICT_NAMES,
   });
+}));
+
+// The chat on the shop's own website: its public key and the code to paste (made the first time it's opened)
+async function widgetInfo(req, org) {
+  if (!org.widgetKey) {
+    org.widgetKey = crypto.randomBytes(12).toString("hex");
+    await Organization.updateOne({ _id: org._id }, { $set: { widgetKey: org.widgetKey } });
+  }
+  const proto = req.protocol || String(req.headers["x-forwarded-proto"] || "http").split(",")[0];
+  const site = /^https?:\/\//.test(PUBLIC_BASE_URL) ? PUBLIC_BASE_URL.replace(/\/+$/, "") : `${proto}://${req.headers.host}`;
+  return { key: org.widgetKey, on: org.widgetOn !== false, color: org.widgetColor || "#5b47e0", testUrl: `${site}/chat-test/${org.widgetKey}`,
+    code: `<script src="${site}/widget.js" data-shop="${org.widgetKey}" async></script>` };
+}
+router.get("/widget", handle(async (req, res) => res.json(await widgetInfo(req, await Organization.findById(req.org).select("widgetKey widgetOn widgetColor").lean()))));
+router.put("/widget", handle(async (req, res) => {
+  const set = {};
+  if (req.body.on !== undefined) set.widgetOn = !!req.body.on;
+  if (/^#[0-9a-f]{6}$/i.test(req.body.color || "")) set.widgetColor = req.body.color;
+  await Organization.updateOne({ _id: req.org }, { $set: set });
+  res.json(await widgetInfo(req, await Organization.findById(req.org).select("widgetKey widgetOn widgetColor").lean()));
 }));
 
 router.put("/profile", handle(async (req, res) => {

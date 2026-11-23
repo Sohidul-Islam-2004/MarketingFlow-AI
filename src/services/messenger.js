@@ -1,5 +1,7 @@
 // Sending Messenger and Instagram messages to customers. Both go through the connected Facebook Page
 // (an Instagram chat keeps its Page id in conv.pageId).
+// Two kinds of chats never go through Facebook: test chats ("sim_…") and the chat on the shop's own website
+// ("web_…", js widget.js): their messages are only saved here, and the website asks for them.
 const { SocialAccount } = require("../models");
 const { graph } = require("../lib/graph");
 const { decrypt } = require("../lib/crypto");
@@ -8,7 +10,9 @@ const { fail } = require("../lib/errors");
 const REPLY_WINDOW = 24 * 3600e3; // Meta only allows replies within 24h of the customer's last message
 
 const isSimulator = (conv) => String(conv.psid).startsWith("sim_");
-const canReply = (conv) => isSimulator(conv) || (!!conv.lastCustomerAt && Date.now() - new Date(conv.lastCustomerAt) < REPLY_WINDOW);
+const isWebsite = (conv) => String(conv.psid).startsWith("web_");
+const offFacebook = (conv) => isSimulator(conv) || isWebsite(conv); // nothing to send to Meta
+const canReply = (conv) => offFacebook(conv) || (!!conv.lastCustomerAt && Date.now() - new Date(conv.lastCustomerAt) < REPLY_WINDOW);
 
 // Adds a message to the conversation (keeps the last 300)
 function addMessage(conv, from, text, extra = {}) {
@@ -26,7 +30,7 @@ async function pageOf(org, pageId) {
 
 // Sends text. quickReplies = ["✅ Confirm", "✏️ Change"] shows buttons under the message.
 async function sendText(org, conv, text, quickReplies = []) {
-  if (isSimulator(conv)) return {};
+  if (offFacebook(conv)) return {};
   if (!canReply(conv)) throw fail(400, "The 24-hour reply window is closed. Meta only lets you answer after the customer messages again.");
   const page = await pageOf(org, conv.pageId);
   const message = { text: String(text).slice(0, conv.channel === "Instagram" ? 1000 : 2000) };
@@ -36,7 +40,7 @@ async function sendText(org, conv, text, quickReplies = []) {
 
 // Sends a photo. url must be a public https address (Facebook / Instagram download it from there).
 async function sendImage(org, conv, url) {
-  if (isSimulator(conv)) return {};
+  if (offFacebook(conv)) return {};
   if (!canReply(conv)) throw fail(400, "The 24-hour reply window is closed. Meta only lets you answer after the customer messages again.");
   if (!/^https:\/\//.test(url || "")) throw fail(400, "Photos can only be sent when the site has a public https address (PUBLIC_BASE_URL in .env)");
   const page = await pageOf(org, conv.pageId);
@@ -46,7 +50,7 @@ async function sendImage(org, conv, url) {
 
 // Shows "seen" + the typing dots to the customer while the AI thinks. Never throws.
 function showTyping(org, conv) {
-  if (isSimulator(conv)) return;
+  if (offFacebook(conv)) return;
   pageOf(org, conv.pageId)
     .then(async (page) => {
       const send = (sender_action) => graph(`/${page.accountId}/messages`, { token: decrypt(page.accessToken), method: "POST", body: { recipient: { id: conv.psid }, sender_action } });
@@ -90,4 +94,4 @@ function oneAtATime(key, task) {
   return run;
 }
 
-module.exports = { isSimulator, canReply, addMessage, pageOf, sendText, sendImage, reply, replyPhoto, showTyping, oneAtATime };
+module.exports = { isSimulator, isWebsite, offFacebook, canReply, addMessage, pageOf, sendText, sendImage, reply, replyPhoto, showTyping, oneAtATime };

@@ -28,6 +28,9 @@ const organizationSchema = new Schema(
     zones: { type: [zoneSchema], default: [] }, // empty = built-in Dhaka zones
 
     // AI sales agent (inbox)
+    widgetKey: { type: String, default: null, index: true }, // the website chat's public id (in the code the shop pastes)
+    widgetOn: { type: Boolean, default: true },
+    widgetColor: { type: String, default: "#5b47e0" },
     ai: {
       enabled: { type: Boolean, default: true },
       autoConfirm: { type: Boolean, default: true }, // AI orders start as "confirmed" instead of "pending"

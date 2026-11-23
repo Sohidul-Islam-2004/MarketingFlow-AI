@@ -78,7 +78,7 @@ router.post("/:id/photo", handle(async (req, res) => {
     if (!p?.imageUrl) throw fail(400, "This product has no photo yet. Add one in Products.");
     image = p.imageUrl; caption = `📷 ${p.name}`;
   } else image = await photos.savePhoto(req.org, req.body.image, { kind: "chat" });
-  if (!messenger.isSimulator(c) && !photos.publicPhotoUrl(image)) throw fail(400, "Photos can only be sent when the site has a public https address (PUBLIC_BASE_URL in .env)");
+  if (!messenger.offFacebook(c) && !photos.publicPhotoUrl(image)) throw fail(400, "Photos can only be sent when the site has a public https address (PUBLIC_BASE_URL in .env)");
   let error = null;
   await messenger.oneAtATime(`${req.org}:${c.psid}`, async () => {
     const fresh = await Conversation.findById(c._id);

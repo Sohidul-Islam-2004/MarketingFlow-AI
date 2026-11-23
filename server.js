@@ -28,6 +28,13 @@ app.use(require("./src/routes/legal"));
 app.use("/webhooks/meta", require("./src/routes/webhooks"));
 app.use("/api/auth", require("./src/routes/auth"));
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
+// The chat bubble on shops' own websites (public/widget.js) + a page to try it
+app.use("/api/widget", require("./src/routes/widget"));
+app.get("/chat-test/:key", (req, res) => { res.setHeader("Content-Type", "text/html; charset=utf-8"); res.end(`<!doctype html><html lang="bn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Website chat test</title>
+<style>body{font-family:system-ui,sans-serif;max-width:640px;margin:60px auto;padding:0 20px;color:#334;line-height:1.6}code{background:#f1f2f6;padding:2px 6px;border-radius:6px}</style></head>
+<body><h2>Your website chat</h2><p>This page shows the chat bubble the way your website will. Press the button at the bottom right and write like a customer.</p>
+<p class="small">Messages appear in MarketingFlow → Inbox as <b>Website</b>.</p>
+<script src="/widget.js" data-shop="${String(req.params.key).replace(/[^a-z0-9]/gi, "")}" async></script></body></html>`); });
 
 // Facebook Login (browser redirects, the session cookie identifies the workspace)
 app.get("/api/meta/connect", meta.startConnect);
